@@ -5,7 +5,7 @@
 
 ## 現在地
 
-NEXUS（AI から届く情報を読み・探し・AI に質問する個人用 PWA）を、software-engineer ハーネスの `/se` で上流工程から進めている。依頼の文は `NEXUS_implementation_handoff/NEXUS_IMPLEMENTATION_HANDOFF.md`。要件定義（X-05 PG01）と基本設計（X-05 PG02）を、どちらも「条件付きで進める」で終えた（2026-11-24）。基本設計の書類 `docs/upstream/bd/` の BD-01、02、03、06、07、09、10、11、13 は版 1.0。要件定義の書類は変更要求 CR-001〜CR-004 で直し、RD-03、04、09、10、12、15、16 が 1.1、RD-05、06、07 が 1.2。横断の X-01〜X-04、X-07 は 1.1。機械の点検（dscheck の lint・trigger・glossary・confirm・chain・gate）は全て通っている（2026-11-24 に確かめた）。`setool status` の次にやることは「詳細設計。未決事項が2件あるので先に聞く。次は DD-01」。詳細設計の書類はまだ1冊も無い。アプリの本番のコードは無い。画面の試作は `prototype/`（本番に使わない。BD-13）にあり、試作の Tailscale Serve の入口（:8443）とサーバは止めた。PG02 の記録、BD の 1.0 化、CR-004 の反映はまだコミットしていない（最後のコミットは 56fd2f2）。
+NEXUS（AI から届く情報を読み・探し・AI に質問する個人用 PWA）を、software-engineer ハーネスの `/se` で上流工程から進めている。依頼の文は `NEXUS_implementation_handoff/NEXUS_IMPLEMENTATION_HANDOFF.md`。要件定義（X-05 PG01）と基本設計（X-05 PG02）を「条件付きで進める」で終え、2026-11-24 に条件を全て解いた（X-05 PG02 の後の「条件1の解決」「条件2の解決」）。Q-066 は本人が公式の文書を読んで判断して決定（CR-006 で NFR-029・AC36 の確かめ方を変えた）。Q-082 は CLI の設定でできると決定し、文書で保証の無い経路は CR-007 で受け入れるリスクにした。本人の希望で、質問の応答では AI に `~/projects/brain-harness` を読むだけで使わせる（CR-005、ADR-016）。これらの反映を Codex が RV12〜RV15 で判定し、止めるの指摘は0件。ADR-016、ADR-017 は本人が全文を読んで承認した。dscheck の lint・glossary・trigger・chain・gate（bd）は全て通っている（2026-11-24）。詳細設計の書類はまだ1冊も無い。アプリの本番のコードは無い。画面の試作は `prototype/`（本番に使わない）。
 
 ## 確定済みの判断
 
@@ -15,18 +15,20 @@ NEXUS（AI から届く情報を読み・探し・AI に質問する個人用 PW
 - UI の画像は Codex（image-gen スキル）に作らせる。見た目の参考は `NEXUS_implementation_handoff/references/` の参考の画像とモック HTML。要件に無い部品（宣伝文、検索と設定、学習連続、ワークスペース、下の帯）は入れない。ホーム右上の惑星の飾りは本人の希望で入れる（2026-11-24 本人）。
 - AI の項目の判定は、書いた AI（Claude）と別のモデル（Codex。`codex exec -s read-only`）が行う。判定の記録は X-05 に原文を写す。点検を通すために記録の言葉を AI だけで書き換えない（2026-11-24。書き換えるときは本人に確かめる）。
 - 命名とコーディングの決まりは X-07 2章・3章（snake_case の DB、camelCase と PascalCase の TypeScript、kebab-case のファイル、Prettier と ESLint）。
+- Q-066: 問い合わせずに、本人の判断で `claude -p` を本人のサブスクリプションで使う。規約が変わるか指摘があれば Messages API に替える（X-04 Q-066、CR-006、ADR-017。2026-11-24 本人）。
+- 質問の応答では、AI に `~/projects/brain-harness` を読むだけで使わせる。NEXUS の内容で分からないとき、ウェブとフォルダのどれを使うかは AI が決める。中身が外へ出る経路は受け入れる（CR-005、ADR-016。2026-11-24 本人）。
+- Q-082 で文書から保証が得られなかった経路（IP で直接指した宛先、内部の番地に変わる名前、転送、リンクと `..`、Claude Code が自分で読む設定のファイル）は受け入れる。macOS の側で止める仕組みは作らない（CR-007。2026-11-24 本人）。
+- `claude -p` はサブスクリプションのログインで使うので `--bare` は使えない（API キーが要る）。DD-09 で、利用者の設定と brain-harness の `.claude/` を読ませない指定を決める（X-04 Q-082 の答え）。
 
 ## 残タスク
 
-1. Q-082 を解く: Claude Code の CLI の設定で、使えるツールをウェブの検索とページの読み取りだけにし、ファイルの読み書きとコマンドの実行を許さず、ページの読み取りで Mac mini の中（localhost、127.0.0.1、Mac mini の名前）と Tailscale の中の宛先を読ませないことができるかを、公式の文書（Claude Code の headless、settings、permissions の頁など）で確かめる。結果と出どころを本人に示し、本人が確かめたら X-04 Q-082 を決定にし、X-05 に PG02 の条件2が解けたと記録する。完了条件: X-04 Q-082 の状態が「決定」で、答えに出どころの URL がある。
-2. Q-066 を解く: 本人のサブスクリプションで `claude -p` を NEXUS のサーバから動かす使い方を Anthropic が認めるかを、本人が確かめる（本人の作業。AI は確かめ方の案と、公式の文書で分かることだけを示す）。結果を X-04 Q-066 に書き、認められなければ Messages API に替える変更（ADR、NFR-009 と Q-008 の見直し）を起こす。完了条件: X-04 Q-066 が「決定」で、X-05 に PG01・PG02 の条件1が解けたと記録がある。
-3. 本人にコミットを聞く（PG02 の記録、BD の 1.0 化、CR-004 の反映、Q の決定）。完了条件: 本人の答えのとおりに main へコミットしたか、しないと決まった。
-4. 詳細設計の書類の採否を見直す: `dscheck tailor` で案を作り直し、本人に承認を求める（AP-BD 1.2、GT-BD G15）。完了条件: X-06 の DD の採否に本人の承認が書かれている。
-5. 詳細設計を書く（`dscheck order --phase dd` の順。最初は DD-01）。手順は `/Users/orion/workspace/harnesses/software-engineer/docs/dev-standard/procedures/` の AP-DD。完了条件: 詳細設計の完了判定（PG03）まで。その後、仕様書 `docs/specs/` を書き、本人が確定し、`/se develop`。
+1. 詳細設計の書類の採否を見直す: `dscheck tailor` で案を作り直し、本人に承認を求める（AP-BD 1.2、GT-BD G15）。完了条件: X-06 の DD の採否に本人の承認が書かれている。
+2. 詳細設計を書く（`dscheck order --phase dd` の順。最初は DD-01）。手順は `/Users/orion/workspace/harnesses/software-engineer/docs/dev-standard/procedures/` の AP-DD。DD-09 には Q-082 の答え（CLI の引数と設定、読ませないファイルの一覧、AC22 の証拠の残し方）を書く。完了条件: 詳細設計の完了判定（PG03）まで。その後、仕様書 `docs/specs/` を書き、本人が確定し、`/se develop`。
+3. RD・BD の各書類に残る「Q-066 に左右される」の注記は、Q-066 が決定になったので古い。次にその書類を直すときに、変更要求を起こしてまとめて直す（本人の承認が要る）。
 
 ## 次の一手
 
-まず `/se` を打って `setool status` を確かめる。次に残タスク1（Q-082）に取りかかる。読むもの: `docs/upstream/x/X-04-issue-change-register.md` の Q-082 の行、`docs/upstream/bd/BD-10-security-design.md` の 3章 T03・T16 と 4章 ネットワーク、`docs/upstream/bd/BD-01-architecture.md` の 7章 NFR-016。Claude Code の公式の文書を読み、「使えるツールを限る設定（許可・拒否の規則）」「ページの読み取り（WebFetch）の宛先を限れるか」「ファイルとコマンドのツールを止められるか」を、引用と URL 付きでまとめて本人に示す。同時に、本人に Q-066（Anthropic への確認）の進み具合を聞く。
+`/se` を打って `setool status` を確かめる。次に残タスク1（`dscheck tailor` で詳細設計の書類の採否の案を作り直し、本人に承認を求める）に取りかかる。
 
 ## 触ってはいけないもの
 
