@@ -1,0 +1,1116 @@
+openapi: 3.1.0
+info:
+  title: NEXUS API
+  version: 0.1.0
+  description: |
+    NEXUS の API の正本（DD-04 1章）。端末の画面が使う API（/api/app/、/register）と、
+    配信元が使う API（/api/inbox/、/api/learning/。今の cerebellum の形に合わせる。BD-06 4.1）を定義する。
+    認可、冪等性、副作用、エラーと MSG の対応は DD-04 に書く。
+servers:
+  - url: /
+tags:
+  - name: app
+    description: 端末の画面が使う API（端末の鍵の Cookie が要る）
+  - name: sender
+    description: 配信元が使う API（配信元の鍵が要る。BD-06）
+  - name: system
+    description: 登録と状態
+paths:
+  /api/app/home:
+    get:
+      operationId: getHome
+      tags: [app]
+      summary: ホームに出す値（FN-020）
+      security: [{ deviceKey: [] }]
+      responses:
+        '200':
+          description: ホームの値
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Home' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/news/galaxy:
+    get:
+      operationId: getGalaxy
+      tags: [app]
+      summary: その日の記事と関係（FN-003）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: 対象日。省くと日本時間の今日
+          schema: { $ref: '#/components/schemas/Date' }
+      responses:
+        '200':
+          description: 図のデータ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Galaxy' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/news/articles/{contentId}:
+    get:
+      operationId: getArticle
+      tags: [app]
+      summary: 記事の案内と関係のある記事（FN-004）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: 記事の案内
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleDetail' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/{contentId}/opened:
+    post:
+      operationId: markOpened
+      tags: [app]
+      summary: 初めて開いた日時を残す（FN-004、FN-009）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: 今の内容の状態
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentState' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/{contentId}/read:
+    put:
+      operationId: setRead
+      tags: [app]
+      summary: 既読にする、未読に戻す（FN-005）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [isRead]
+              properties:
+                isRead: { type: boolean }
+      responses:
+        '200':
+          description: 今の内容の状態
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentState' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/{contentId}/saved:
+    put:
+      operationId: setSaved
+      tags: [app]
+      summary: 保存する、保存を外す（FN-006）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [isSaved]
+              properties:
+                isSaved: { type: boolean }
+      responses:
+        '200':
+          description: 今の内容の状態
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentState' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/english/sets:
+    get:
+      operationId: listEnglishSets
+      tags: [app]
+      summary: 教材の一覧（FN-008）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 教材の一覧（対象日の新しい順）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnglishSetPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/english/sets/{contentId}:
+    get:
+      operationId: getEnglishSet
+      tags: [app]
+      summary: 教材（FN-009）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: 教材と、前に完了した答え
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnglishSetDetail' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/english/sets/{contentId}/answer:
+    put:
+      operationId: putEnglishAnswer
+      tags: [app]
+      summary: 答えと採点を残して完了する。前の答えは置き換える（FN-012）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [grades]
+              properties:
+                grades:
+                  type: array
+                  minItems: 1
+                  maxItems: 60
+                  items: { $ref: '#/components/schemas/Grade' }
+      responses:
+        '200':
+          description: 残した答え
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnglishAnswer' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/inbox:
+    get:
+      operationId: listInbox
+      tags: [app]
+      summary: 新着と未読の一覧（FN-017）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 届いた日時の新しい順
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/search:
+    get:
+      operationId: searchContents
+      tags: [app]
+      summary: 検索（FN-018）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: 検索の言葉。空白で区切った全ての言葉を含む内容を返す
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 届いた日時の新しい順
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/contents/saved:
+    get:
+      operationId: listSaved
+      tags: [app]
+      summary: 保存した内容の一覧（FN-019）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 保存した日時の新しい順
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/conversations:
+    get:
+      operationId: listConversations
+      tags: [app]
+      summary: 前の会話の一覧（FN-014）。targetContentId を省くと対象の無い会話
+      security: [{ deviceKey: [] }]
+      parameters:
+        - name: targetContentId
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/Id' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 最後に話した日時の新しい順
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+    post:
+      operationId: createConversation
+      tags: [app]
+      summary: 新しい会話を作る（FN-014）
+      security: [{ deviceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                target: { $ref: '#/components/schemas/QuestionTarget' }
+      responses:
+        '201':
+          description: 作った会話。対象の内容が無ければ対象の無い会話にし、notice に MSG-011 を入れる
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/conversations/{conversationId}:
+    get:
+      operationId: getConversation
+      tags: [app]
+      summary: 会話の発言（FN-014）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: 会話と、送った順の発言
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationDetail' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/conversations/{conversationId}/questions:
+    post:
+      operationId: postQuestion
+      tags: [app]
+      summary: 質問を送る。応答は streamReply で受ける（FN-015）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4000 }
+      responses:
+        '202':
+          description: 受け付けた。本人の発言と、作成中の AI の発言を返す
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [question, reply]
+                properties:
+                  question: { $ref: '#/components/schemas/Message' }
+                  reply: { $ref: '#/components/schemas/Message' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 同じ会話に作成中の応答がある。質問は残さず、作成中の AI の発言を返す
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReplyInProgress' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/messages/{messageId}/stream:
+    get:
+      operationId: streamReply
+      tags: [app]
+      summary: AI の応答の続きを SSE で受ける（FN-015、FN-016。ADR-013）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: 前に受け取った出来事の番号（<実行ID>.<本文の UTF-16 の単位の長さ>）。実行が今と同じならこの位置の後から、違えば reset を送ってから送る
+          schema: { type: string, pattern: '^[0-9]+\.[0-9]+$' }
+      responses:
+        '200':
+          description: |
+            text/event-stream。出来事は次の3つ。
+            event: delta、id: <実行ID>.<書き足した後の位置>、data: {"text": "続きの文"}
+            event: reset、data: {}（本文を作り直したとき。表示を空にする）
+            event: state、data: {"replyState": "writing|done|failed|cancelled", "messageId": n, "notice": "MSG-012|MSG-013|MSG-014|null"}
+            応答の状態が完了、失敗、中止になったら state を送って閉じる。15秒ごとに空のコメント行を送る。
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /api/app/messages/{messageId}/retry:
+    post:
+      operationId: retryReply
+      tags: [app]
+      summary: 失敗か中止の応答を送り直す（FN-016）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: 今の AI の発言（送り直したら作成中。事前条件に合わなければ今の状態のまま）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/messages/{messageId}/stop:
+    post:
+      operationId: stopReply
+      tags: [app]
+      summary: 作成中の応答を止める（FN-016）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: 今の AI の発言
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/messages/{messageId}/dismiss:
+    post:
+      operationId: dismissReply
+      tags: [app]
+      summary: 失敗した応答を送り直さないことにする（FN-016 の「やめる」）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: 今の AI の発言
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /register:
+    get:
+      operationId: openRegistration
+      tags: [system]
+      summary: 登録の URL を開く（FN-023）。端末の鍵は求めない
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        '303':
+          description: |
+            登録できたら、Set-Cookie で端末の鍵を渡し、Location を / にする。
+            登録できなければ、Cookie を渡さず、Location を /?notice=MSG-021 にする。
+          headers:
+            Location: { schema: { type: string } }
+            Set-Cookie: { schema: { type: string } }
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: 状態を返す（BD-01 6章 監視、BD-11 OP04）。鍵を求めない（DD-04 3.1、BD-10 2章）
+      responses:
+        '200':
+          description: Web サーバが動いている
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/inbox/batches:
+    post:
+      operationId: postNewsBatch
+      tags: [sender]
+      summary: ニュースの記事を受け取る（IF-001、FN-001）
+      security: [{ senderKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewsBatch' }
+      responses:
+        '200':
+          description: 受け取った（MSG-031）。形の正しくない記事は rejected に入れ、ほかは残した
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsBatchResult' }
+        '400': { $ref: '#/components/responses/SenderBadRequest' }
+        '401': { $ref: '#/components/responses/SenderUnauthorized' }
+        '413': { $ref: '#/components/responses/SenderTooLarge' }
+        '500': { $ref: '#/components/responses/SenderInternal' }
+  /api/learning/sets:
+    post:
+      operationId: postEnglishSet
+      tags: [sender]
+      summary: 英語のセットを受け取る（IF-002、FN-007）
+      security: [{ senderKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnglishSetPayload' }
+      responses:
+        '200':
+          description: 受け取った（MSG-031）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [date, receivedAt]
+                properties:
+                  date: { $ref: '#/components/schemas/Date' }
+                  receivedAt: { $ref: '#/components/schemas/DateTime' }
+        '400': { $ref: '#/components/responses/SenderBadRequest' }
+        '401': { $ref: '#/components/responses/SenderUnauthorized' }
+        '413': { $ref: '#/components/responses/SenderTooLarge' }
+        '500': { $ref: '#/components/responses/SenderInternal' }
+  /api/learning/sets/{date}:
+    get:
+      operationId: getEnglishSetForSender
+      tags: [sender]
+      summary: 英語のセットを読む（IF-003、FN-013）
+      security: [{ senderKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SenderDate'
+        - $ref: '#/components/parameters/Lane'
+      responses:
+        '200':
+          description: 届いたセットの原文に date と receivedAt を足したもの
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnglishSetPayload'
+                  - type: object
+                    required: [receivedAt]
+                    properties:
+                      receivedAt: { $ref: '#/components/schemas/DateTime' }
+        '400': { $ref: '#/components/responses/SenderBadRequest' }
+        '401': { $ref: '#/components/responses/SenderUnauthorized' }
+        '404':
+          description: その日付のセットが無い（MSG-036）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/SenderInternal' }
+
+  /api/learning/sets/{date}/result:
+    get:
+      operationId: getEnglishResult
+      tags: [sender]
+      summary: 英語の答えを読む（IF-003、FN-013）
+      security: [{ senderKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SenderDate'
+        - $ref: '#/components/parameters/Lane'
+      responses:
+        '200':
+          description: 最後に完了した答え
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnglishResultForSender' }
+        '400': { $ref: '#/components/responses/SenderBadRequest' }
+        '401': { $ref: '#/components/responses/SenderUnauthorized' }
+        '404':
+          description: 答えがまだ無い（MSG-035）か、セットが無い（MSG-036）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/SenderInternal' }
+
+components:
+  securitySchemes:
+    deviceKey:
+      type: apiKey
+      in: cookie
+      name: nexus_device
+      description: 端末の鍵。HttpOnly、Secure、SameSite=Strict、Path=/（BD-10 4章）
+    senderKey:
+      type: http
+      scheme: bearer
+      description: '配信元の鍵（Authorization: Bearer <鍵>。BD-06 4.2）'
+  parameters:
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: 前のページの nextCursor。省くと最初のページ
+      schema: { type: string, maxLength: 200 }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 50, default: 30 }
+    SenderDate:
+      name: date
+      in: path
+      required: true
+      description: YYYY-MM-DD か today（日本時間の今日）
+      schema:
+        oneOf:
+          - $ref: '#/components/schemas/Date'
+          - { type: string, const: today }
+    Lane:
+      name: lane
+      in: query
+      required: true
+      schema: { type: string, const: en }
+  responses:
+    BadRequest:
+      description: 入力の形が正しくない（MSG は DD-04 3.4）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    DeviceUnauthorized:
+      description: 端末の鍵が無いか通らない（MSG-020）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ForbiddenOrigin:
+      description: データを変える要求の送り元のオリジンが NEXUS でない（BD-10 T17）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: 指した内容、会話、発言が無い
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Internal:
+      description: 予期しない失敗（DD-06）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderBadRequest:
+      description: 形が正しくない（MSG-033）。何も残していない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderUnauthorized:
+      description: 鍵が無い、正しくない、取り消した、その連携を使えない（MSG-032）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderTooLarge:
+      description: 大きさが上限を超えた（MSG-034）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderInternal:
+      description: 残せなかった（IF-001 は MSG-045）。何も残していない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Id: { type: integer, minimum: 1 }
+    Date:
+      type: string
+      pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      description: 日本時間の日付
+    DateTime:
+      type: string
+      description: 日本時間で時差付きの日時（YYYY-MM-DDTHH:MM:SS.sss+09:00）
+    Url:
+      type: string
+      pattern: '^https?://'
+      maxLength: 2048
+    Kind:
+      type: string
+      description: 情報の種類（BD-07 4.2。今は news と english）。種類を足すときに値が増えるので enum にしない（NFR-004。DD-01 M14）
+    RelationType: { type: string, enum: [follow_up, background, same_actor, related_topic] }
+    ReplyState: { type: string, enum: [writing, done, failed, cancelled] }
+    MessageIdText:
+      type: string
+      pattern: '^MSG-[0-9]{3}$'
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, messageId]
+          properties:
+            code:
+              type: string
+              enum: [bad_request, unauthorized, forbidden_origin, not_found, reply_in_progress, payload_too_large, internal]
+            message: { type: string, description: MSG の文言（差し込む値を入れたもの） }
+            messageId: { $ref: '#/components/schemas/MessageIdText' }
+            rejected:
+              type: array
+              description: IF-001 で形が正しくない記事（MSG-033）
+              items: { $ref: '#/components/schemas/RejectedItem' }
+    RejectedItem:
+      type: object
+      required: [slug, reason]
+      properties:
+        slug: { type: string }
+        reason: { type: string, description: MSG-033 の文言 }
+    ContentState:
+      type: object
+      required: [contentId, isNew, isRead, isSaved]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        isNew: { type: boolean, description: 開いた日時が空 }
+        isRead: { type: boolean }
+        isSaved: { type: boolean }
+        savedAt: { oneOf: [{ $ref: '#/components/schemas/DateTime' }, { type: 'null' }] }
+    ContentSummary:
+      type: object
+      required: [contentId, kind, title, targetDate, receivedAt, isNew, isRead, isSaved]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        kind: { $ref: '#/components/schemas/Kind' }
+        title: { type: string }
+        targetDate: { $ref: '#/components/schemas/Date' }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        isNew: { type: boolean }
+        isRead: { type: boolean }
+        isSaved: { type: boolean }
+        savedAt: { oneOf: [{ $ref: '#/components/schemas/DateTime' }, { type: 'null' }] }
+    ContentPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ContentSummary' } }
+        nextCursor: { oneOf: [{ type: string }, { type: 'null' }] }
+    Home:
+      type: object
+      required: [newCount, unreadCount, learning, ai, picks, notices]
+      properties:
+        newCount: { type: integer, minimum: 0 }
+        unreadCount: { type: integer, minimum: 0 }
+        learning:
+          description: 対象日が一番新しい英語の教材。無ければ null
+          oneOf:
+            - type: object
+              required: [contentId, learningTheme, isCompleted]
+              properties:
+                contentId: { $ref: '#/components/schemas/Id' }
+                learningTheme: { type: string }
+                isCompleted: { type: boolean }
+            - { type: 'null' }
+        ai:
+          type: object
+          required: [writingCount, hasFailure]
+          properties:
+            writingCount: { type: integer, minimum: 0 }
+            hasFailure: { type: boolean }
+        picks:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            required: [contentId, title, theme, imageUrl]
+            properties:
+              contentId: { $ref: '#/components/schemas/Id' }
+              title: { type: string }
+              theme: { type: string }
+              imageUrl: { oneOf: [{ $ref: '#/components/schemas/Url' }, { type: 'null' }] }
+        notices:
+          type: array
+          description: ホームのカードに出す知らせ（MSG-015、MSG-016、MSG-017）
+          items: { type: string, enum: [MSG-015, MSG-016, MSG-017] }
+    GalaxyNode:
+      type: object
+      required: [contentId, title, theme, imageUrl, targetDate, isNew, isRead]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        title: { type: string }
+        theme: { type: string }
+        imageUrl: { oneOf: [{ $ref: '#/components/schemas/Url' }, { type: 'null' }] }
+        targetDate: { $ref: '#/components/schemas/Date' }
+        isNew: { type: boolean }
+        isRead: { type: boolean }
+    GalaxyLink:
+      type: object
+      required: [fromContentId, toContentId, relationType]
+      properties:
+        fromContentId: { $ref: '#/components/schemas/Id' }
+        toContentId: { $ref: '#/components/schemas/Id' }
+        relationType: { $ref: '#/components/schemas/RelationType' }
+    Galaxy:
+      type: object
+      required: [date, availableDates, themes, nodes, links]
+      properties:
+        date: { $ref: '#/components/schemas/Date' }
+        availableDates:
+          type: array
+          description: 記事のある対象日の新しい順。60件まで（日付の選択肢）
+          maxItems: 60
+          items: { $ref: '#/components/schemas/Date' }
+        themes: { type: array, items: { type: string } }
+        nodes:
+          type: array
+          description: その日の記事と、それらに有効な関係のある記事（7日前までの記事を含む。BD-02 FN-003）
+          items: { $ref: '#/components/schemas/GalaxyNode' }
+        links:
+          type: array
+          description: その日の記事のどれかを含む有効な関係
+          items: { $ref: '#/components/schemas/GalaxyLink' }
+    RelatedArticle:
+      type: object
+      required: [node, relationType, reason, direction]
+      properties:
+        node: { $ref: '#/components/schemas/GalaxyNode' }
+        relationType: { $ref: '#/components/schemas/RelationType' }
+        reason: { type: string, description: AI の判定の根拠（AI の判定として見せる） }
+        direction: { type: string, enum: [from, to], description: この記事が関係の元なら from }
+    ArticleDetail:
+      type: object
+      required: [contentId, title, theme, guideMd, sourceUrl, imageUrl, targetDate, receivedAt, state, related]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        title: { type: string }
+        theme: { type: string }
+        guideMd: { type: string }
+        sourceUrl: { $ref: '#/components/schemas/Url' }
+        imageUrl: { oneOf: [{ $ref: '#/components/schemas/Url' }, { type: 'null' }] }
+        targetDate: { $ref: '#/components/schemas/Date' }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        related:
+          type: array
+          description: 有効な関係のある記事（関係の先の過去の記事を含む）
+          items: { $ref: '#/components/schemas/RelatedArticle' }
+    EnglishSetSummary:
+      type: object
+      required: [contentId, learningTheme, targetDate, receivedAt, isNew, isRead, isSaved, isCompleted]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        learningTheme: { type: string }
+        targetDate: { $ref: '#/components/schemas/Date' }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        isNew: { type: boolean }
+        isRead: { type: boolean }
+        isSaved: { type: boolean }
+        isCompleted: { type: boolean }
+    EnglishSetPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/EnglishSetSummary' } }
+        nextCursor: { oneOf: [{ type: string }, { type: 'null' }] }
+    Problem:
+      type: object
+      description: 画面に返す問題。kind は受け取りで quiz を補った値（DD-02 FN-007）
+      required: [no, kind, questionMd, answerMd]
+      properties:
+        no: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [quiz, code] }
+        questionMd: { type: string, minLength: 1 }
+        answerMd: { type: string, minLength: 1 }
+        answerType: { oneOf: [{ type: string, enum: [choice, number, text] }, { type: 'null' }] }
+        expected: { oneOf: [{ type: string, minLength: 1 }, { type: 'null' }] }
+        choices:
+          oneOf:
+            - { type: array, minItems: 2, maxItems: 6, uniqueItems: true, items: { type: string } }
+            - { type: 'null' }
+        workdir: { oneOf: [{ type: string }, { type: 'null' }] }
+    ProblemPayload:
+      description: sharpen が送る問題（BD-06 IF-002 3.2）。kind は任意で、無ければ quiz とみなす。原文は補わずに残す
+      type: object
+      required: [no, questionMd, answerMd]
+      properties:
+        no: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [quiz, code] }
+        questionMd: { type: string, minLength: 1 }
+        answerMd: { type: string, minLength: 1 }
+        answerType: { oneOf: [{ type: string, enum: [choice, number, text] }, { type: 'null' }] }
+        expected: { oneOf: [{ type: string, minLength: 1 }, { type: 'null' }] }
+        choices:
+          oneOf:
+            - { type: array, minItems: 2, maxItems: 6, uniqueItems: true, items: { type: string } }
+            - { type: 'null' }
+        workdir: { oneOf: [{ type: string }, { type: 'null' }] }
+    Reading:
+      type: object
+      description: sharpen の read.json の形（BD-07 4.1 読む教材）。項目の名前は sharpen の drills/en/2026-11-10/read.json に合わせた（DD-04 4章）
+      required: [date, format, title, scene, summary, paragraphs]
+      properties:
+        date: { type: string }
+        format: { type: string }
+        title: { type: string }
+        scene: { type: string }
+        summary: { type: string }
+        paragraphs:
+          type: array
+          items:
+            type: object
+            required: [sentences]
+            properties:
+              sentences:
+                type: array
+                items:
+                  type: object
+                  required: [en, ja, notes]
+                  properties:
+                    en: { type: string, description: 英文 }
+                    ja: { type: string, description: 和訳 }
+                    notes:
+                      type: array
+                      items:
+                        type: object
+                        required: [text, kind, ja]
+                        properties:
+                          text: { type: string, description: 語句 }
+                          kind: { type: string, description: 注の種類（sharpen の値をそのまま持つ） }
+                          ja: { type: string, description: 説明 }
+    EnglishSetDetail:
+      type: object
+      required: [contentId, learningTheme, targetDate, lessonMd, problems, closingMd, reading, state, lastAnswer]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        learningTheme: { type: string }
+        targetDate: { $ref: '#/components/schemas/Date' }
+        lessonMd: { type: string }
+        problems: { type: array, items: { $ref: '#/components/schemas/Problem' } }
+        closingMd: { oneOf: [{ type: string }, { type: 'null' }] }
+        reading: { oneOf: [{ $ref: '#/components/schemas/Reading' }, { type: 'null' }] }
+        state: { $ref: '#/components/schemas/ContentState' }
+        lastAnswer:
+          description: 前に完了した答え。やり直すときの初めの値と、置き換えの確認（MSG-006）に使う
+          oneOf: [{ $ref: '#/components/schemas/EnglishAnswer' }, { type: 'null' }]
+    Grade:
+      type: object
+      additionalProperties: false
+      required: [no, grade]
+      properties:
+        no: { type: integer, minimum: 1 }
+        grade: { type: string, enum: [o, d, x] }
+        answer: { type: string, maxLength: 500 }
+    EnglishAnswer:
+      type: object
+      required: [contentId, grades, completedAt]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        grades: { type: array, items: { $ref: '#/components/schemas/Grade' } }
+        completedAt: { $ref: '#/components/schemas/DateTime' }
+    QuestionTarget:
+      type: object
+      additionalProperties: false
+      required: [kind, contentId]
+      description: 質問の対象（BD-07 4.1）。対象の内容は contentId から NEXUS の中で引き、端末の送った文は信じない（依頼 6章）
+      properties:
+        kind: { type: string, enum: [page, article, phrase, node] }
+        contentId: { $ref: '#/components/schemas/Id' }
+        phrase: { type: string, maxLength: 200, description: kind が phrase のとき必須 }
+        sentence: { type: string, maxLength: 2000, description: kind が phrase のとき必須 }
+        position:
+          type: object
+          additionalProperties: false
+          description: kind が phrase のとき必須。読む教材なら段落と文の番号、教材の本文なら part を lesson にする
+          properties:
+            part: { type: string, enum: [reading, lesson, problem] }
+            paragraphIndex: { type: integer, minimum: 0 }
+            sentenceIndex: { type: integer, minimum: 0 }
+            problemNo: { type: integer, minimum: 1 }
+    Conversation:
+      type: object
+      required: [conversationId, target, startedAt, lastSpokenAt]
+      properties:
+        conversationId: { $ref: '#/components/schemas/Id' }
+        target: { oneOf: [{ $ref: '#/components/schemas/QuestionTarget' }, { type: 'null' }] }
+        targetTitle: { oneOf: [{ type: string }, { type: 'null' }], description: 対象の内容の見出し（質問の対象の印） }
+        startedAt: { $ref: '#/components/schemas/DateTime' }
+        lastSpokenAt: { $ref: '#/components/schemas/DateTime' }
+    ConversationPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Conversation' } }
+        nextCursor: { oneOf: [{ type: string }, { type: 'null' }] }
+    ConversationCreated:
+      type: object
+      required: [conversation, notice]
+      properties:
+        conversation: { $ref: '#/components/schemas/Conversation' }
+        notice: { oneOf: [{ type: string, const: MSG-011 }, { type: 'null' }] }
+    Message:
+      type: object
+      required: [messageId, conversationId, speaker, bodyMd, sentAt, replyState, replyToMessageId]
+      properties:
+        messageId: { $ref: '#/components/schemas/Id' }
+        conversationId: { $ref: '#/components/schemas/Id' }
+        speaker: { type: string, enum: [owner, ai] }
+        bodyMd: { type: string }
+        sentAt: { $ref: '#/components/schemas/DateTime' }
+        replyState: { oneOf: [{ $ref: '#/components/schemas/ReplyState' }, { type: 'null' }] }
+        replyToMessageId: { oneOf: [{ $ref: '#/components/schemas/Id' }, { type: 'null' }] }
+        notice:
+          description: 応答の状態に合わせて会話の中に出す知らせ
+          oneOf: [{ type: string, enum: [MSG-012, MSG-013, MSG-014] }, { type: 'null' }]
+    ConversationDetail:
+      type: object
+      required: [conversation, messages]
+      properties:
+        conversation: { $ref: '#/components/schemas/Conversation' }
+        messages: { type: array, items: { $ref: '#/components/schemas/Message' } }
+    ReplyInProgress:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          required: [reply]
+          properties:
+            reply: { $ref: '#/components/schemas/Message' }
+    Health:
+      type: object
+      required: [status, queuedCount, runningCount, oldestQueuedAt]
+      properties:
+        status: { type: string, const: ok }
+        queuedCount: { type: integer, minimum: 0 }
+        runningCount: { type: integer, minimum: 0 }
+        oldestQueuedAt: { oneOf: [{ $ref: '#/components/schemas/DateTime' }, { type: 'null' }] }
+    NewsItem:
+      type: object
+      required: [slug, kind, title, bodyMd, url, theme]
+      properties:
+        slug: { type: string, pattern: '^[0-9a-f]{12}$' }
+        kind: { type: string, const: read }
+        title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+        bodyMd: { type: string, minLength: 1, description: 128 KiB まで（UTF-8 のバイト数。zod で確かめる） }
+        url: { $ref: '#/components/schemas/Url' }
+        imageUrl: { oneOf: [{ $ref: '#/components/schemas/Url' }, { type: 'null' }] }
+        theme: { type: string, minLength: 1, maxLength: 50, pattern: '^[^\n]*$' }
+    NewsBatch:
+      type: object
+      required: [source, date, items]
+      description: 全体で 1 MiB まで（BD-06 IF-001 3.2）
+      properties:
+        source: { type: string, const: brain-collect }
+        date:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+            - { type: string, const: today }
+        items:
+          type: array
+          minItems: 0
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NewsItem' }
+    NewsBatchResult:
+      type: object
+      required: [source, date, receivedAt, itemCount, rejected]
+      properties:
+        source: { type: string, const: brain-collect }
+        date: { $ref: '#/components/schemas/Date' }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        itemCount: { type: integer, minimum: 0 }
+        rejected: { type: array, items: { $ref: '#/components/schemas/RejectedItem' } }
+    EnglishSetPayload:
+      type: object
+      required: [date, lane, theme, lessonMd, problems]
+      description: 全体で 256 KiB まで（BD-06 IF-002 3.2）。届いたものを原文として残す
+      properties:
+        date:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+            - { type: string, const: today }
+        lane: { type: string, const: en }
+        theme: { type: string, minLength: 1 }
+        source: { type: string, enum: [theme, memo] }
+        lessonMd: { type: string, minLength: 1 }
+        problems:
+          type: array
+          minItems: 1
+          maxItems: 60
+          items: { $ref: '#/components/schemas/ProblemPayload' }
+        closingMd: { oneOf: [{ type: string }, { type: 'null' }] }
+        read: { oneOf: [{ $ref: '#/components/schemas/Reading' }, { type: 'null' }] }
+    EnglishResultForSender:
+      type: object
+      required: [date, grades, feeling, completedAt]
+      properties:
+        date: { $ref: '#/components/schemas/Date' }
+        grades:
+          type: array
+          items:
+            type: object
+            required: [no, grade]
+            properties:
+              no: { type: integer, minimum: 1 }
+              grade: { type: string, enum: [o, d, x] }
+              answer: { type: string, maxLength: 500 }
+        feeling: { type: string, const: '' }
+        completedAt: { $ref: '#/components/schemas/DateTime' }
