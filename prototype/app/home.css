@@ -17,15 +17,22 @@
 .seg.on .sector { fill: url(#goldFill); stroke: #ffd08a; filter: url(#glow); }
 .seg-label { fill: #d4d8e2; font-size: 11.5px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
 .seg.on .seg-label { fill: #fff; }
-.seg-icon { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.seg-icon { fill: none; stroke: color-mix(in srgb, currentColor 35%, white); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 1px currentColor) drop-shadow(0 0 3px currentColor) drop-shadow(0 0 7px color-mix(in srgb, currentColor 65%, transparent)); }
 .core-img { pointer-events: none; mix-blend-mode: screen; }
 .trace { position: absolute; z-index: 2; top: 50%; left: 50%; width: 18%; height: 1px; background: linear-gradient(90deg, #f5b05d, #f5b05d33); box-shadow: 0 0 8px #e9a14a99; }
 .stack { position: absolute; z-index: 4; left: min(64vw, 540px); right: 6px; top: 50%; height: 0; perspective: 900px; }
 .fcard { position: absolute; left: 0; right: 0; padding: 12px 11px; border-radius: 18px; display: flex; gap: 9px; align-items: center;
   background: linear-gradient(120deg, #2d2b2dce, #1b212df5 60%, #131925e8); border: 1px solid rgba(201,205,211,.17); box-shadow: 0 17px 25px #0008; backdrop-filter: blur(18px); cursor: pointer; overflow: hidden; }
 .fcard.main { border-color: #ffba6b; box-shadow: 0 0 0 1px #ffba6b4f, 0 0 30px #ed9f4b48, 0 22px 30px #0009; background: linear-gradient(120deg, #513926ea, #26252bf5 64%, #1f2431); align-items: flex-start; flex-direction: column; }
-.ficon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 11px; background: linear-gradient(145deg, #e6a24a30, #111821); border: 1px solid #dba66035; }
-.ficon svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ficon { position: relative; isolation: isolate; width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 11px;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, currentColor 24%, transparent), transparent 75%), linear-gradient(145deg, #27313d, #121824 70%);
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  box-shadow: inset 0 1px #ffffff26, inset 0 0 10px color-mix(in srgb, currentColor 15%, transparent), 0 0 12px color-mix(in srgb, currentColor 30%, transparent); }
+.ficon::before { content: ""; position: absolute; inset: -9px; z-index: -1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, currentColor 36%, transparent), transparent 70%); filter: blur(5px); }
+.ficon svg { width: 24px; height: 24px; overflow: visible; stroke: color-mix(in srgb, currentColor 30%, white); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 1px currentColor) drop-shadow(0 0 4px currentColor) drop-shadow(0 0 9px color-mix(in srgb, currentColor 70%, transparent)); }
 .ftitle { font-weight: 750; font-size: 13px; color: #f9f8fa; white-space: nowrap; }
 .fcard.main .ftitle { font-size: 15px; }
 .fsub { color: #b7bac5; font-size: 11px; margin-top: 3px; line-height: 1.4; }
@@ -40,6 +47,9 @@
 .stat-unit { font-size: 10px; color: #bcc2cc; margin-left: 2px; font-weight: 500; }
 .ask { display: flex; width: 100%; height: 58px; margin: 18px 0 22px; border-radius: 18px; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 16px; font-weight: 700;
   background: linear-gradient(100deg, #503421, #2c2524 67%, #34231c); border: 1px solid #ffb85c; box-shadow: 0 0 26px #d8863936, inset 0 1px #fbd09b35; color: #fff; }
+.ask-label { display: inline-flex; align-items: center; gap: 10px; }
+.ask-icon { width: 24px; height: 24px; flex: 0 0 24px; color: #ffbf70; fill: none; stroke: #fff1d9; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 6px currentColor); }
 .pickup { border: 1px solid #b3acb034; border-radius: 23px; background: linear-gradient(145deg, #161b25ed, #0d121af9); padding: 15px 13px; }
 .pickup-card { display: flex; gap: 12px; align-items: center; padding: 9px; border: 1px solid #81899533; border-radius: 16px; background: linear-gradient(125deg, #252831, #141b27); margin-top: 10px; cursor: pointer; }
 .pickup-card img { width: 96px; min-width: 96px; height: 72px; border-radius: 12px; object-fit: cover; border: 1px solid #fff2; }

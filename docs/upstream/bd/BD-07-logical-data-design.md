@@ -2,7 +2,7 @@
 id: BD-07
 name: データ論理設計書
 phase: 基本設計
-version: 0.2
+version: 1.0
 updated: 2026-11-24
 ---
 
@@ -12,6 +12,7 @@ updated: 2026-11-24
 - 配信元が今送っている形は、sharpen の `drills/en/2026-11-19/set.json` と `read.json`、cerebellum の `docs/specs/14-learning.md` 3.1〜3.3、`15-web-learning.md` 3.3、`31-learning-lanes.md` 3.2・3.6、brain-harness の `brain-collect/SKILL.md` の送信の形（2026-11-23 の作業ツリー）を読んで確かめた。
 - ENT-011〜ENT-013 は CR-001（2026-11-23 承認）で RD-09 に足したものである。
 - 0.2: X-05 RV06 の指摘と、Q-079〜Q-081 の答え、CR-003（2026-11-24 承認）で直した（2026-11-24）。RV07 の指摘も直した。
+- 1.0: 基本設計の完了判定（X-05 PG02。2026-11-24 RD-01 SH01。条件付きで進める）で承認した。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 論理 ER 図

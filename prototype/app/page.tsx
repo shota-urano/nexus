@@ -11,12 +11,13 @@ import { articles, TODAY, formatDate, imageOf } from "@/lib/data";
 import { Chat } from "@/components/Chat";
 
 const I = {
-  news: <><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
-  english: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M9 16l3-8 3 8M10 13.5h4" /></>,
-  inbox: <><rect x="3.5" y="6" width="17" height="12" rx="2" /><path d="M4 7l8 6 8-6" /></>,
-  explore: <><circle cx="12" cy="12" r="8" /><path d="M15 9l-2 4-4 2 2-4z" /></>,
-  library: <><path d="M12 4l8 4-8 4-8-4z" /><path d="M4 12l8 4 8-4M4 16l8 4 8-4" /></>,
-  chat: <><path d="M5 6h14v9H10l-4 3v-3H5z" /><path d="M9 10.5h.01M12 10.5h.01M15 10.5h.01" /></>,
+  // 32 × 32 の共通座標。ホイールとカードで同じ輪郭を使う。
+  news: <><ellipse cx="16" cy="16" rx="14" ry="7" transform="rotate(-32 16 16)" opacity=".65" /><path d="m7 20 8-13 5 12 6-7" /><circle cx="7" cy="20" r="2" /><circle cx="15" cy="7" r="2" /><circle cx="20" cy="19" r="2" /><circle cx="26" cy="12" r="1.5" /></>,
+  english: <><path d="M4 7c5-2 9-1 12 2 3-3 7-4 12-2v18c-5-2-9-1-12 2-3-3-7-4-12-2Z" /><path d="M16 9v18M8 18l3-7 3 7M9 16h4M21 13h3M21 17h3" /></>,
+  inbox: <><path d="m4 20 3-12h18l3 12v7H4Z" /><path d="M4 20h7l2 3h6l2-3h7M12 13h8M16 10v6" /></>,
+  explore: <><circle cx="16" cy="16" r="11" /><path d="m21 10-3 9-8 3 3-9Z" /><path d="M16 2v3M16 27v3M2 16h3M27 16h3" /></>,
+  library: <><path d="M5 7v20h22M9 6h5v17H9ZM17 5h5v18h-5ZM25 7l4 15" /><path d="M10 11h3M18 10h3" /></>,
+  chat: <><path d="M7 7h18a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H15l-7 5v-5H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" /><path d="M9 16h3l2-4 4 8 2-4h3" /></>,
 };
 const MODULES: { key: string; name: string; icon: ReactNode; href: string; sub: string; count?: string; color: string }[] = [
   { key: "galaxy", name: "News Galaxy", icon: I.news, href: "/galaxy", sub: "今日のニュース", count: "10件", color: "#ffb85e" },
@@ -129,7 +130,7 @@ export default function Home() {
                     <g key={m.key} className={`seg${on ? " on" : ""}`} onClick={() => { if (!dragging) pick(i); }} style={{ cursor: "pointer" }} role="button" aria-label={m.name}>
                       <path className="sector" d={d} />
                       <motion.g initial={false} animate={{ rotate: -turn }} transition={{ duration: dur, ease: "easeInOut" }} style={{ transformBox: "fill-box", originX: 0.5, originY: 0.5 }}>
-                        <g transform={`translate(${lx - 10} ${ly - 24}) scale(0.85)`} className="seg-icon" stroke={on ? "#fff" : m.color}>{m.icon}</g>
+                        <g transform={`translate(${lx - 12} ${ly - 25}) scale(0.75)`} className="seg-icon" color={on ? "#ffd08a" : m.color} aria-hidden="true">{m.icon}</g>
                         <text className="seg-label" x={lx} y={ly + 10}>{m.name}</text>
                       </motion.g>
                     </g>
@@ -160,7 +161,7 @@ export default function Home() {
                   {front ? (
                     <div className="fmain">
                       <div className="frow">
-                        <div className="ficon" style={{ color: m.color }}><svg viewBox="0 0 24 24">{m.icon}</svg></div>
+                        <div className="ficon" style={{ color: m.color }}><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">{m.icon}</svg></div>
                         <div className="ftitle wide">{m.name}</div>
                         <span style={{ opacity: 0.6, fontSize: 20, marginLeft: "auto" }}>›</span>
                       </div>
@@ -169,7 +170,7 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="frow">
-                      <div className="ficon" style={{ color: m.color }}><svg viewBox="0 0 24 24">{m.icon}</svg></div>
+                      <div className="ficon" style={{ color: m.color }}><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">{m.icon}</svg></div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="ftitle">{m.name}</div>
                         <div className="fsub">{m.sub} {m.count && <b>{m.count}</b>}</div>
@@ -197,7 +198,7 @@ export default function Home() {
           <div className="stat"><div className="stat-top">AI の応答中</div><div className="stat-value">0<span className="stat-unit">件</span></div></div>
         </section>
 
-        <button className="ask" onClick={() => setChat(true)}><span>✦ AI に質問</span><span style={{ color: "#ffcf87" }}>→</span></button>
+        <button className="ask" onClick={() => setChat(true)}><span className="ask-label"><svg className="ask-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">{I.chat}</svg>AI に質問</span><span style={{ color: "#ffcf87" }}>→</span></button>
 
         <section className="pickup">
           <div style={{ fontWeight: 700, fontSize: 16 }}>今日のピックアップ</div>
