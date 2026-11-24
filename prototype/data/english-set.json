@@ -1,0 +1,72 @@
+{
+ "date": "2026-11-19",
+ "lane": "en",
+ "theme": "英語: 文型（第3〜5文型・There ＋ be 動詞）",
+ "source": "theme",
+ "lessonMd": "## 昨日の英訳\n\n### 問8「誰か新しい人が、このチームに加わった」\n\n| | 英文 |\n|---|---|\n| あなたの英文 | Someone new joined this team. |\n| 直した英文 | Someone new joined this team. |\n\n採点は ○ です。new を someone の後ろに置けています。\n\n### 問9「このリリースには、新しいものは何もない」\n\n| | 英文 |\n|---|---|\n| あなたの英文 | This release nothing new. |\n| 直した英文 | There is nothing new in this release. |\n\n採点は × です。nothing new は正しく書けていますが、文に動詞がありません。\n「〜がある・ない」は There is で文を始めます。This release has nothing new. でも正しい文です。\n\n## 昨日の間違い\n\n問2: We did not ask help for anyone → We did not ask anyone for help\n「A に B を頼む」は ask A for B の順です。anyone は正しく使えています。\n\n問4: This everything in folder is ours → Everything in this folder is ours\nthis は folder の前に置きます。everything の前には this を付けません。\n\n## 今日の形\n\n| 形 | 意味 | 例 |\n|---|---|---|\n| S ＋ V ＋ O1 ＋ O2 | O1 に O2 を〜する | send us a report |\n| S ＋ V ＋ O2 ＋ to／for ＋ O1 | O2 を O1 に〜する | send a report to us ／ find a plan for us |\n| S ＋ V ＋ O ＋ C | O を C にする・呼ぶ・保つ | make the page fast |\n| There is／are ＋ 主語 | 〜がある | There are three changes |\n\ngive・send・show・tell は to、buy・find は for で書き換えます。\n説明は「読む」の本文にあります。紫の箇所をタップしてください。\n\n## 読む（リリースノート）\n\n**Release notes: version 2.4.0**\n\nVersion 2.4.0 is out. This release gives you faster search and a few fixes. There are three main changes.\n\nFirst, a new cache makes the search page fast on large projects. We cut the latency of the search API by half.\n\nSecond, the CLI now shows you a short report after each deploy. We call this report the deploy summary. You can send the report to your team with one command.\n\nThird, there is a new feature flag for the old export format. The flag keeps the old format available until March.\n\nThere is also one breaking change. We deprecated the legacy option, and it now returns an error. If your scripts use it, remove the option before you upgrade. As a workaround, you can pin the previous version in your lockfile. Please send us your feedback in the issues.\n\n**要旨**: バージョン 2.4.0 で、検索が速くなり、デプロイ後に短いレポートが出るようになりました。古い書き出し形式は3月まで使えますが、legacy オプションはエラーになるので、更新前に外す必要があります。",
+ "problems": [
+  {
+   "no": 1,
+   "kind": "quiz",
+   "questionMd": "## 問1\n\n語群を並べて、次の日本語に合う英文を作ってください。\n\n「ベンダーは、私たちに新しいプランを見つけてくれた」\n\n語群: to / plan / us / vendor / new / found / the / a\n\n- 余分な語が1つ混ざっています\n- ピリオドなし・語の間は半角スペース1つで答えてください",
+   "answerMd": "**正解**: The vendor found us a new plan\n\nfind ＋ 人 ＋ もの で「人に、ものを見つける」です。find は人を後ろに回すと for を使う語なので、to は使いません。なので、to が余分です。",
+   "answerType": "text",
+   "expected": "The vendor found us a new plan"
+  },
+  {
+   "no": 2,
+   "kind": "quiz",
+   "questionMd": "## 問2\n\n次の英文の意味として正しいものを選んでください。\n\n`The new cache made the dashboard fast.`",
+   "answerMd": "**正解**: 新しいキャッシュで、ダッシュボードが速くなった\n\nmake ＋ O ＋ C で「O を C にする」です。the dashboard が fast な状態になりました。\n\n| 誤答肢 | 違うところ |\n|---|---|\n| 新しいキャッシュは、速いダッシュボードを作った | made を「作った」と読み、fast を dashboard の説明にしています |\n| 新しいキャッシュで、ダッシュボードが遅くなった | fast を「遅い」と読んでいます |\n| 新しいキャッシュで、ダッシュボードが速くなる | 過去の made を今のことと読んでいます |",
+   "answerType": "choice",
+   "expected": "新しいキャッシュで、ダッシュボードが速くなった",
+   "choices": [
+    "新しいキャッシュで、ダッシュボードが速くなった",
+    "新しいキャッシュは、速いダッシュボードを作った",
+    "新しいキャッシュで、ダッシュボードが遅くなった",
+    "新しいキャッシュで、ダッシュボードが速くなる"
+   ]
+  },
+  {
+   "no": 3,
+   "kind": "quiz",
+   "questionMd": "## 問3\n\n語群を並べて、次の日本語に合う英文を作ってください。\n\n「このリポジトリには、未解決の issue が2つある」\n\n語群: issues / is / two / this / there / open / in / repo / are\n\n- 余分な語が1つ混ざっています\n- ピリオドなし・語の間は半角スペース1つで答えてください",
+   "answerMd": "**正解**: There are two open issues in this repo\n\nThere ＋ be 動詞の主語は、be 動詞の後ろの two open issues です。複数なので are にします。なので、is が余分です。",
+   "answerType": "text",
+   "expected": "There are two open issues in this repo"
+  },
+  {
+   "no": 4,
+   "kind": "quiz",
+   "questionMd": "## 問4\n\n語群を並べて、次の日本語に合う英文を作ってください。\n\n「私たちは、その見積もりをクライアントに送った」\n\n語群: client / the / estimate / we / to / sent / for / the\n\n- 余分な語が1つ混ざっています\n- ピリオドなし・語の間は半角スペース1つで答えてください",
+   "answerMd": "**正解**: We sent the estimate to the client\n\n「もの」を先に言うときは、人の前に to か for を置きます。send は to を使う語です。なので、for が余分です。",
+   "answerType": "text",
+   "expected": "We sent the estimate to the client"
+  },
+  {
+   "no": 5,
+   "kind": "quiz",
+   "questionMd": "## 問5\n\n語群を並べて、次の日本語に合う英文を作ってください。\n\n「このスクリプトは、自分自身を最新の状態に保つ」\n\n語群: keeps / up / it / to / script / this / date / itself\n\n- 余分な語が1つ混ざっています\n- ピリオドなし・語の間は半角スペース1つで答えてください",
+   "answerMd": "**正解**: This script keeps itself up to date\n\nもとにした規則は、今日の keep ＋ O ＋ C（O を C のままにしておく）です。\n混ぜたのは、再帰代名詞です。O が主語の this script 自身なので itself にします。なので、it が余分です。",
+   "answerType": "text",
+   "expected": "This script keeps itself up to date"
+  },
+  {
+   "no": 6,
+   "kind": "quiz",
+   "questionMd": "## 問6 英訳（翌日採点）\n\n次の日本語を英文で書いてください。その場の○×は気にしなくてよいです。翌朝の採点が正式です。\n\n「クライアントは、私たちに新しいスケジュールを見せてくれた」",
+   "answerMd": "**模範解答**: The client showed us a new schedule.\n\n使う規則は、今日の show ＋ 人 ＋ もの です。The client showed a new schedule to us. でも正しい文です。",
+   "answerType": "text",
+   "expected": "The client showed us a new schedule."
+  },
+  {
+   "no": 7,
+   "kind": "quiz",
+   "questionMd": "## 問7 英訳（翌日採点）\n\n次の日本語を英文で書いてください。その場の○×は気にしなくてよいです。翌朝の採点が正式です。\n\n「このボットは、毎朝私たちにレポートを送ってくる」",
+   "answerMd": "**模範解答**: This bot sends us a report every morning.\n\nもとにした規則は、今日の send ＋ 人 ＋ もの です。\n混ぜたのは、一般動詞の現在形の -s です。主語の this bot は1つで、毎朝のことなので sends にします。",
+   "answerType": "text",
+   "expected": "This bot sends us a report every morning."
+  }
+ ],
+ "closingMd": "「〜に〜を」は動詞の後ろに人、もの の順で並べます。「〜がある」は There is／are で始め、後ろの主語の数で is と are を選びます。"
+}

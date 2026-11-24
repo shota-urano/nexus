@@ -1,0 +1,222 @@
+{
+ "date": "2026-11-19",
+ "format": "リリースノート",
+ "title": "Release notes: version 2.4.0",
+ "scene": "開発ツールの新しい版について、作っている側が利用者に向けて変更点を知らせています。紫の箇所が今日の規則です。タップすると説明が出ます。",
+ "summary": "バージョン 2.4.0 で、検索が速くなり、デプロイ後に短いレポートが出るようになりました。古い書き出し形式は3月まで使えますが、legacy オプションはエラーになるので、更新前に外す必要があります。",
+ "paragraphs": [
+  {
+   "sentences": [
+    {
+     "en": "Release notes: version 2.4.0",
+     "ja": "リリースノート: バージョン 2.4.0",
+     "notes": []
+    }
+   ]
+  },
+  {
+   "sentences": [
+    {
+     "en": "Version 2.4.0 is out.",
+     "ja": "バージョン 2.4.0 を公開しました。",
+     "notes": []
+    },
+    {
+     "en": "This release gives you faster search and a few fixes.",
+     "ja": "このリリースでは、検索が速くなり、いくつかの修正が入ります。",
+     "notes": [
+      {
+       "text": "gives you faster search",
+       "kind": "today",
+       "ja": "give ＋ 人 ＋ もの で「人に、ものを与える」です。you が「〜に」、faster search が「〜を」に当たります。"
+      }
+     ]
+    },
+    {
+     "en": "There are three main changes.",
+     "ja": "主な変更は3つあります。",
+     "notes": [
+      {
+       "text": "There are three main changes",
+       "kind": "today",
+       "ja": "There ＋ be 動詞で「〜がある」です。主語は be 動詞の後ろの three main changes で、複数なので are にします。"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sentences": [
+    {
+     "en": "First, a new cache makes the search page fast on large projects.",
+     "ja": "1つ目に、新しいキャッシュによって、大きなプロジェクトでも検索ページが速くなります。",
+     "notes": [
+      {
+       "text": "makes the search page fast",
+       "kind": "today",
+       "ja": "make ＋ O ＋ C で「O を C にする」です。the search page が fast な状態になるので、O と C は「イコール」の関係です。"
+      },
+      {
+       "text": "cache",
+       "kind": "word",
+       "ja": "キャッシュ（一度読んだデータを手元に置いておく仕組み）"
+      }
+     ]
+    },
+    {
+     "en": "We cut the latency of the search API by half.",
+     "ja": "検索 API の待ち時間を半分にしました。",
+     "notes": [
+      {
+       "text": "latency",
+       "kind": "word",
+       "ja": "待ち時間・遅延"
+      },
+      {
+       "text": "by half",
+       "kind": "phrase",
+       "ja": "半分だけ（減らす）"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sentences": [
+    {
+     "en": "Second, the CLI now shows you a short report after each deploy.",
+     "ja": "2つ目に、CLI はデプロイのたびに短いレポートを表示するようになりました。",
+     "notes": [
+      {
+       "text": "shows you a short report",
+       "kind": "today",
+       "ja": "show ＋ 人 ＋ もの で「人に、ものを見せる」です。you と a short report は同じものではありません。"
+      }
+     ]
+    },
+    {
+     "en": "We call this report the deploy summary.",
+     "ja": "このレポートを「デプロイの要約」と呼んでいます。",
+     "notes": [
+      {
+       "text": "call this report the deploy summary",
+       "kind": "today",
+       "ja": "call ＋ O ＋ C で「O を C と呼ぶ」です。this report と the deploy summary は同じものを指します。"
+      }
+     ]
+    },
+    {
+     "en": "You can send the report to your team with one command.",
+     "ja": "コマンド1つで、このレポートをチームに送れます。",
+     "notes": [
+      {
+       "text": "send the report to your team",
+       "kind": "today",
+       "ja": "send your team the report と同じ意味です。「もの」を先に言うときは、人の前に to を置きます。send・give・show・tell は to です。"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sentences": [
+    {
+     "en": "Third, there is a new feature flag for the old export format.",
+     "ja": "3つ目に、古い書き出し形式のための新しい機能フラグがあります。",
+     "notes": [
+      {
+       "text": "there is a new feature flag",
+       "kind": "today",
+       "ja": "主語の a new feature flag は1つなので is です。feature flag は、機能の入り切りを切り替える設定です。"
+      }
+     ]
+    },
+    {
+     "en": "The flag keeps the old format available until March.",
+     "ja": "このフラグは、3月まで古い形式を使える状態に保ちます。",
+     "notes": [
+      {
+       "text": "keeps the old format available",
+       "kind": "today",
+       "ja": "keep ＋ O ＋ C で「O を C のままにしておく」です。the old format が available な状態に保たれます。"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "sentences": [
+    {
+     "en": "There is also one breaking change.",
+     "ja": "互換性のない変更も1つあります。",
+     "notes": [
+      {
+       "text": "There is also one breaking change",
+       "kind": "today",
+       "ja": "one breaking change は1つなので is です。also は be 動詞の後ろに置きます。breaking change は互換性のない変更です。"
+      }
+     ]
+    },
+    {
+     "en": "We deprecated the legacy option, and it now returns an error.",
+     "ja": "legacy オプションを非推奨にしたので、指定するとエラーが返ります。",
+     "notes": [
+      {
+       "text": "deprecated",
+       "kind": "word",
+       "ja": "非推奨にした"
+      },
+      {
+       "text": "returns an error",
+       "kind": "phrase",
+       "ja": "エラーを返す"
+      }
+     ]
+    },
+    {
+     "en": "If your scripts use it, remove the option before you upgrade.",
+     "ja": "スクリプトで使っている場合は、更新の前にこのオプションを外してください。",
+     "notes": [
+      {
+       "text": "upgrade",
+       "kind": "word",
+       "ja": "新しい版に上げる"
+      }
+     ]
+    },
+    {
+     "en": "As a workaround, you can pin the previous version in your lockfile.",
+     "ja": "回避策として、lockfile で前のバージョンに固定できます。",
+     "notes": [
+      {
+       "text": "workaround",
+       "kind": "word",
+       "ja": "回避策"
+      },
+      {
+       "text": "pin the previous version",
+       "kind": "phrase",
+       "ja": "前のバージョンに固定する"
+      },
+      {
+       "text": "lockfile",
+       "kind": "word",
+       "ja": "依存の版を固定するファイル"
+      }
+     ]
+    },
+    {
+     "en": "Please send us your feedback in the issues.",
+     "ja": "ご意見は issue で送ってください。",
+     "notes": [
+      {
+       "text": "send us your feedback",
+       "kind": "today",
+       "ja": "send ＋ 人 ＋ もの の形です。us が「〜に」、your feedback が「〜を」です。"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

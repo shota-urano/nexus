@@ -1,0 +1,25 @@
+{
+  "name": "nexus-prototype",
+  "private": true,
+  "version": "0.0.0",
+  "description": "BD-13 の試作。本番に使わない。確かめた後に消すかを本人に聞く。",
+  "scripts": {
+    "dev": "next dev -p 48390",
+    "build": "next build",
+    "start": "next start -p 48390 -H 127.0.0.1"
+  },
+  "dependencies": {
+    "@xyflow/react": "12.8.4",
+    "motion": "12.23.12",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-markdown": "^9.0.3",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.0",
+    "@types/react": "19.1.12",
+    "typescript": "5.9.2"
+  }
+}

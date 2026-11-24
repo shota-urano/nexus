@@ -1,0 +1,64 @@
+/* ホームの見た目。依頼の資料のモック（references/nexus-home-mock-v3-handoff.html）と参考の画像を方向として写した試作用の値。本番の値はデザインシステムで決める。 */
+.bg-stars { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 65% 35% at 45% 24%, rgba(113,71,34,.18), transparent 75%), radial-gradient(ellipse 50% 30% at 93% 14%, rgba(49,63,91,.21), transparent), #080b11; }
+.bg-stars::before { content: ""; position: absolute; inset: 0; opacity: .6;
+  background-image: radial-gradient(circle, #ffc47b 1px, transparent 1.6px), radial-gradient(circle, #fff .65px, transparent 1.5px), radial-gradient(circle, #f7b160 .8px, transparent 1.8px);
+  background-size: 163px 193px, 211px 151px, 277px 307px; background-position: 33px 74px, 88px 44px, 146px 137px; }
+.home { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 30px 14px 40px; }
+.brand { display: flex; align-items: center; gap: 12px; height: 64px; }
+.brand img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 0 10px #ef9e4c88); }
+.brand h1 { letter-spacing: 7px; font-size: 22px; margin: 0; font-weight: 750; }
+.brand span { display: block; font-size: 11px; color: #98a0b0; margin-top: 4px; letter-spacing: 1px; }
+.hero { position: relative; height: min(122vw, 620px); margin: 0 -14px; overflow: hidden; isolation: isolate; }
+.hero::before { position: absolute; content: ""; width: 150vw; height: 130vw; max-width: 900px; max-height: 780px; border: 1px solid #ad7c3522; border-radius: 50%; left: -55vw; top: 4%; transform: rotate(-17deg); pointer-events: none; }
+.wheel { position: absolute; left: -2vw; top: 50%; transform: translateY(-50%); width: min(68vw, 560px); aspect-ratio: 1; z-index: 3; filter: drop-shadow(0 0 26px rgba(238,164,68,.10)); }
+.wheel svg { width: 100%; height: 100%; overflow: visible; touch-action: none; }
+.sector { stroke: rgba(183,193,211,.22); stroke-width: 1.2; fill: url(#segFill); transition: fill .3s, stroke .3s; }
+.seg.on .sector { fill: url(#goldFill); stroke: #ffd08a; filter: url(#glow); }
+.seg-label { fill: #d4d8e2; font-size: 11.5px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
+.seg.on .seg-label { fill: #fff; }
+.seg-icon { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.core-img { pointer-events: none; mix-blend-mode: screen; }
+.trace { position: absolute; z-index: 2; top: 50%; left: 50%; width: 18%; height: 1px; background: linear-gradient(90deg, #f5b05d, #f5b05d33); box-shadow: 0 0 8px #e9a14a99; }
+.stack { position: absolute; z-index: 4; left: min(64vw, 540px); right: 6px; top: 50%; height: 0; perspective: 900px; }
+.fcard { position: absolute; left: 0; right: 0; padding: 12px 11px; border-radius: 18px; display: flex; gap: 9px; align-items: center;
+  background: linear-gradient(120deg, #2d2b2dce, #1b212df5 60%, #131925e8); border: 1px solid rgba(201,205,211,.17); box-shadow: 0 17px 25px #0008; backdrop-filter: blur(18px); cursor: pointer; overflow: hidden; }
+.fcard.main { border-color: #ffba6b; box-shadow: 0 0 0 1px #ffba6b4f, 0 0 30px #ed9f4b48, 0 22px 30px #0009; background: linear-gradient(120deg, #513926ea, #26252bf5 64%, #1f2431); align-items: flex-start; flex-direction: column; }
+.ficon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 11px; background: linear-gradient(145deg, #e6a24a30, #111821); border: 1px solid #dba66035; }
+.ficon svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ftitle { font-weight: 750; font-size: 13px; color: #f9f8fa; white-space: nowrap; }
+.fcard.main .ftitle { font-size: 15px; }
+.fsub { color: #b7bac5; font-size: 11px; margin-top: 3px; line-height: 1.4; }
+.fcard.main .fsub { color: #e7b981; }
+.fcard.main .fsub b { color: #ffc077; font-size: 18px; }
+.hint { position: absolute; bottom: 10px; left: 18px; color: #aab0c1; font-size: 10px; letter-spacing: 1.2px; }
+.status { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #d0c1b12f; border-radius: 19px; background: linear-gradient(140deg, rgba(44,43,45,.8), rgba(16,22,30,.9)); box-shadow: inset 0 1px rgba(255,255,255,.065), 0 16px 38px #0005; padding: 14px 3px; }
+.stat { text-align: center; border-right: 1px solid #b0b3be29; padding: 0 4px; }
+.stat:last-child { border: 0; }
+.stat-top { color: #aaafbf; font-size: 10px; white-space: nowrap; }
+.stat-value { font-weight: 750; font-size: 22px; margin-top: 6px; }
+.stat-unit { font-size: 10px; color: #bcc2cc; margin-left: 2px; font-weight: 500; }
+.ask { display: flex; width: 100%; height: 58px; margin: 18px 0 22px; border-radius: 18px; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 16px; font-weight: 700;
+  background: linear-gradient(100deg, #503421, #2c2524 67%, #34231c); border: 1px solid #ffb85c; box-shadow: 0 0 26px #d8863936, inset 0 1px #fbd09b35; color: #fff; }
+.pickup { border: 1px solid #b3acb034; border-radius: 23px; background: linear-gradient(145deg, #161b25ed, #0d121af9); padding: 15px 13px; }
+.pickup-card { display: flex; gap: 12px; align-items: center; padding: 9px; border: 1px solid #81899533; border-radius: 16px; background: linear-gradient(125deg, #252831, #141b27); margin-top: 10px; cursor: pointer; }
+.pickup-card img { width: 96px; min-width: 96px; height: 72px; border-radius: 12px; object-fit: cover; border: 1px solid #fff2; }
+.pickup-card h3 { font-size: 13px; line-height: 1.5; margin: 6px 0 0; color: #fff; font-weight: 600; }
+.ptag { display: inline-flex; border: 1px solid #e9a75a9a; background: #6c4c272b; color: #ffc077; border-radius: 99px; font-size: 10px; padding: 3px 9px; }
+
+.frow { display: flex; gap: 9px; align-items: center; width: 100%; }
+.fmain { width: 100%; }
+.ftitle.narrow { display: none; }
+@media (max-width: 480px) {
+  .fcard { padding: 10px 9px; }
+  .fcard:not(.main) .ficon { display: none; }
+  .ftitle { white-space: normal; font-size: 12px; }
+  .fsub { font-size: 10px; }
+  .ftitle.wide { display: none; }
+  .ftitle.narrow { display: block; font-size: 14px; margin-top: 6px; }
+  .fcard.main .ficon { width: 30px; height: 30px; flex-basis: 30px; }
+}
+
+/* 右上の惑星の飾り（2026-11-24 本人の希望。Codex が作った）。黒い背景の画像を screen で重ね、明るい部分だけを見せる */
+.planet { position: absolute; top: 20px; right: -14px; width: min(88vw, 640px); pointer-events: none; mix-blend-mode: screen; z-index: 0; opacity: 0.95; }
+.brand, .hero, .status, .ask, .pickup { position: relative; z-index: 1; }
