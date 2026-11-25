@@ -605,6 +605,18 @@ describe("渡す内容の組み立て（DD-02 3章 P07）", () => {
     expect(runs[0]?.failure_reason).toMatch(/^AI_INPUT_TOO_LARGE: /);
     expect(runs.filter((run) => run.attempt === 2)).toHaveLength(0);
     expect(messageRecord(reply.messageId).ai_input_copy).toBeNull();
+
+    // 送り直さない answer は、同じトランザクションで AI の発言も failed にする（DD-02 3章 P06 手順 5）。
+    expect(messageRecord(reply.messageId).reply_state).toBe("failed");
+    const detail = context.chat.getConversation(C1);
+    const failed = detail.messages.find(
+      (message) => message.messageId === reply.messageId,
+    );
+    expect(failed).toMatchObject({ replyState: "failed", notice: "MSG-012" });
+
+    // 作成中の応答が残らないので、次の質問を受け付ける（409 reply_in_progress にならない）。
+    const response = await callPost(C1, JSON.stringify({ text: "次の質問" }));
+    expect(response.status).toBe(202);
   });
 
   it("前の発言は新しい方から 20,000 文字を超えるまで足し、直近の 6 発言は必ず入れる（Q-085 の答え）", () => {

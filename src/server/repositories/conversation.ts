@@ -351,3 +351,14 @@ export function markReplyDone(db: Database, messageId: number): number {
       .run(messageId).changes,
   );
 }
+
+// 応答を失敗にする（`reply_state` が writing の行だけ。DD-02 3章 P06 手順 5）。変えた行の数を返す。
+export function markReplyFailed(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET reply_state = 'failed' WHERE message_id = ? AND reply_state = 'writing'",
+      )
+      .run(messageId).changes,
+  );
+}

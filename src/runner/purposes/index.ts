@@ -3,6 +3,7 @@ import type { Database } from "../../server/db/connection";
 import { inWriteTransaction } from "../../server/db/transaction";
 import type { Clock } from "../../server/shared/clock";
 import { type ErrorCode, NexusError } from "../../server/shared/errors";
+import { markReplyFailed } from "../../server/repositories/conversation";
 import type { Logger } from "../../server/shared/logger";
 import { formatMessage } from "../../server/shared/messages";
 import { type AiProvider, createAiProvider } from "../ai-provider";
@@ -69,7 +70,8 @@ export function createPurposes(deps: PurposesDeps): Purposes {
   // - `state` を running のときだけ failed にし、`failure_reason` に失敗の分類と短い理由を入れる。
   // - relate で `attempt` が 1 で、分類が E09、E10、E11 なら、同じ受け取りの記録で `attempt` 2 を待ちに入れる。
   // - それ以外の relate は、ログに MSG-037 を出す（記事は残したまま。RD-06 UC-001）。
-  // answer の送り直しと発言の扱いは 10-chat の実装単位で作る。分類の無い例外は E16（INTERNAL）。
+  // - それ以外の answer は、AI の発言を failed にする（writing のときだけ）。
+  // answer の送り直しは 10-chat の次の実装単位で作る。分類の無い例外は E16（INTERNAL）。
   function fail(run: PickedRun, error: unknown): void {
     const nexus =
       error instanceof NexusError
@@ -87,6 +89,9 @@ export function createPurposes(deps: PurposesDeps): Purposes {
       ) {
         requeueRelate(db, run.relateDeliveryId, run.attempt + 1, now);
         return "retried" as const;
+      }
+      if (run.purpose === "answer" && run.replyMessageId !== null) {
+        markReplyFailed(db, run.replyMessageId);
       }
       return "failed" as const;
     });
