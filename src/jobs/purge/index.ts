@@ -41,6 +41,8 @@ export function runPurge(deps: RunPurgeDeps): PurgeResult {
 
 // 日本時間の日時の文字の年を1つ戻す（DD-02 FN-022 手順 2）。
 // 2月29日は前の年に無いので、2月28日の同じ時刻にする（境を早めに取り、消しすぎない側に倒す）。
+// DD-02 FN-022 には閏日の定めが無い。この扱いは本人の決定（2026-11-25）による。
+// DD-02 への追記は、本人が変更要求（CR）として別に起こして承認する。
 export function oneYearBefore(dateTime: string): string {
   const year = Number(dateTime.slice(0, 4)) - 1;
   const rest = dateTime.slice(4);
