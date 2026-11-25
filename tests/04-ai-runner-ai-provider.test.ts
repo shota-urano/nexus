@@ -354,6 +354,19 @@ describe("stream-json の読み取り（DD-04 4.2）", () => {
     expect(
       parseEventLine(line({ type: "result", subtype: "error_max_turns" })),
     ).toMatchObject({ type: "result", ok: false });
+    // is_error が欠けている、または真偽値でないときは完了にしない（DD-04 4.2 の「is_error が偽」）。
+    expect(
+      parseEventLine(
+        line({ type: "result", subtype: "success", result: "{}" }),
+      ),
+    ).toMatchObject({ type: "result", ok: false });
+    for (const isError of ["true", "false", 0, null]) {
+      expect(
+        parseEventLine(
+          line({ type: "result", subtype: "success", is_error: isError }),
+        ),
+      ).toMatchObject({ type: "result", ok: false });
+    }
     expect(
       parseEventLine(line({ type: "system", subtype: "api_retry" })),
     ).toEqual({ type: "api_retry" });

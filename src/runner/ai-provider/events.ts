@@ -23,7 +23,8 @@ export function parseEventLine(line: string): AiEvent | null {
       const subtype = typeof value.subtype === "string" ? value.subtype : "";
       return {
         type: "result",
-        ok: subtype === "success" && value.is_error !== true,
+        // `is_error` が真偽値の偽のときだけ完了にする。欠けている・型が違うときは失敗（DD-04 4.2）。
+        ok: subtype === "success" && value.is_error === false,
         subtype,
         result: typeof value.result === "string" ? value.result : null,
         errors: Array.isArray(value.errors)
