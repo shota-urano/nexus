@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Clock } from "../shared/clock";
 import { formatDateTime } from "../shared/datetime";
+import { NexusError } from "../shared/errors";
 import type { Database } from "./connection";
 import { inWriteTransaction } from "./transaction";
 
@@ -77,4 +79,25 @@ export function applyMigrations(
     applied.push(migration.version);
   }
   return applied;
+}
+
+// このプロセスが知るマイグレーションの置き場所（リポジトリの根に依らない道）。
+// `new URL("./migrations/", import.meta.url)` と書くと、Next.js（Turbopack）が束ねるときに
+// フォルダを1つのファイルとして読み込もうとして失敗するので、このファイルの道から組み立てる。
+const KNOWN_MIGRATIONS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "migrations",
+);
+
+// Web サーバのほかのプロセス（AI Runner、定期ジョブ、管理のコマンド）が起動したときの確かめ（DD-03 5章）。
+// `schema_migration` の最後の番号が、このプロセスの知る番号と違えば E17（STARTUP_MISMATCH）を投げる。
+export function assertMigrationsApplied(db: Database): void {
+  const known = readMigrations(KNOWN_MIGRATIONS_DIR).length;
+  const applied = appliedVersion(db);
+  if (applied !== known) {
+    throw new NexusError(
+      "STARTUP_MISMATCH",
+      `DB の schema_migration の番号が ${applied} で、${known} でない`,
+    );
+  }
 }

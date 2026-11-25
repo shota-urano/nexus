@@ -50,9 +50,9 @@ DD-06 E03、E05、E07。
 
 ## 9. 実装単位
 
-- [ ] [Backend] API の入口の土台（要求ごとの番号、DD-06 の分類から DD-04 3.4 の状態の番号と MSG への変換）と、端末の鍵の確かめ P01（照合、最後に使った日時、オリジン、Cookie の付け直し、E03 のログの抑え）を作る（DD-01 M11・M12、DD-02 3章 P01、DD-04 3.1・3.4、DD-06）
+- [x] [Backend] API の入口の土台（要求ごとの番号、DD-06 の分類から DD-04 3.4 の状態の番号と MSG への変換）と、端末の鍵の確かめ P01（照合、最後に使った日時、オリジン、Cookie の付け直し、E03 のログの抑え）を作る（DD-01 M11・M12、DD-02 3章 P01、DD-04 3.1・3.4、DD-06）（se/03-auth-and-admin）
   - 受け入れ基準: DD-10 TC97、DD-10 TC98、DD-10 TC115 が通る
-- [ ] [Backend] 管理のコマンド M30 の `sender-key issue|list|revoke` と、配信元の鍵を M12 で作り照合する処理を作る（FN-024、DD-01 M30、DD-01 M12、DD-02 FN-024・3章 P05）
+- [x] [Backend] 管理のコマンド M30 の `sender-key issue|list|revoke` と、配信元の鍵を M12 で作り照合する処理を作る（FN-024、DD-01 M30、DD-01 M12、DD-02 FN-024・3章 P05）（se/03-auth-and-admin）
   - 受け入れ基準: DD-10 TC100 が通る
-- [ ] [Backend] 管理のコマンドの `device add|list|revoke` と、登録の URL を開く `openRegistration` を作る（FN-023、DD-02 FN-023、DD-05 3章）
+- [x] [Backend] 管理のコマンドの `device add|list|revoke` と、登録の URL を開く `openRegistration` を作る（FN-023、DD-02 FN-023、DD-05 3章）（se/03-auth-and-admin）
   - 受け入れ基準: DD-10 TC93、DD-10 TC94、DD-10 TC95、DD-10 TC96 が通る
