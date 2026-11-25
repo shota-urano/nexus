@@ -28,7 +28,9 @@ export type FakeStep =
   // そのままの1行（JSON でない文など）。
   | { raw: string }
   // 止められるまで終わらない。
-  | { hang: true };
+  | { hang: true }
+  // 次の歩みの前に、ミリ秒だけ待つ（文を少しずつ返すため）。
+  | { wait: number };
 
 export interface FakeScript {
   steps: readonly FakeStep[];
@@ -153,6 +155,13 @@ function launchFake(
         await terminatedSignal;
         return;
       }
+      if ("wait" in step) {
+        await Promise.race([
+          new Promise((resolve) => setTimeout(resolve, step.wait)),
+          terminatedSignal,
+        ]);
+        continue;
+      }
       lines.push(lineOf(step, index));
     }
     await nextTick();
@@ -177,7 +186,10 @@ function launchFake(
   };
 }
 
-function lineOf(step: Exclude<FakeStep, { hang: true }>, index: number) {
+function lineOf(
+  step: Exclude<FakeStep, { hang: true } | { wait: number }>,
+  index: number,
+) {
   if ("text" in step)
     return JSON.stringify({
       type: "stream_event",

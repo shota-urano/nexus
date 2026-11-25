@@ -25,6 +25,8 @@ export interface MessageRow {
   latestFailureReason: string | null;
   // その発言の `ai_run` があるか。
   hasAiRun: boolean;
+  // その発言の一番新しい `ai_run` の ID。無ければ null。
+  latestAiRunId: number | null;
 }
 
 const CONVERSATION_COLUMNS = `v.conversation_id AS conversation_id,
@@ -121,14 +123,7 @@ export function listConversationRows(
     .map(toConversationRow);
 }
 
-// 会話の発言を `message_id` の順に読む。AI の発言には、一番新しい `ai_run` の失敗の理由を添える。
-export function listMessageRows(
-  db: Database,
-  conversationId: number,
-): MessageRow[] {
-  return db
-    .prepare(
-      `SELECT m.message_id AS message_id,
+const MESSAGE_ROW_SELECT = `SELECT m.message_id AS message_id,
               m.conversation_id AS conversation_id,
               m.speaker AS speaker,
               m.body_md AS body_md,
@@ -143,25 +138,49 @@ export function listMessageRows(
             WHERE reply_message_id = m.message_id
             ORDER BY ai_run_id DESC
             LIMIT 1
-         )
+         )`;
+
+function toMessageRow(row: Record<string, unknown>): MessageRow {
+  return {
+    messageId: Number(row.message_id),
+    conversationId: Number(row.conversation_id),
+    speaker: row.speaker as MessageRow["speaker"],
+    bodyMd: row.body_md as string,
+    sentAt: row.sent_at as string,
+    replyState: (row.reply_state as MessageRow["replyState"]) ?? null,
+    replyToMessageId:
+      row.reply_to_message_id === null ? null : Number(row.reply_to_message_id),
+    latestFailureReason: (row.failure_reason as string | null) ?? null,
+    hasAiRun: row.ai_run_id !== null,
+    latestAiRunId: row.ai_run_id === null ? null : Number(row.ai_run_id),
+  };
+}
+
+// 会話の発言を `message_id` の順に読む。AI の発言には、一番新しい `ai_run` の失敗の理由を添える。
+export function listMessageRows(
+  db: Database,
+  conversationId: number,
+): MessageRow[] {
+  return db
+    .prepare(
+      `${MESSAGE_ROW_SELECT}
         WHERE m.conversation_id = ?
         ORDER BY m.message_id`,
     )
     .all(conversationId)
-    .map((row) => ({
-      messageId: Number(row.message_id),
-      conversationId: Number(row.conversation_id),
-      speaker: row.speaker as MessageRow["speaker"],
-      bodyMd: row.body_md as string,
-      sentAt: row.sent_at as string,
-      replyState: (row.reply_state as MessageRow["replyState"]) ?? null,
-      replyToMessageId:
-        row.reply_to_message_id === null
-          ? null
-          : Number(row.reply_to_message_id),
-      latestFailureReason: (row.failure_reason as string | null) ?? null,
-      hasAiRun: row.ai_run_id !== null,
-    }));
+    .map(toMessageRow);
+}
+
+// 発言を1つ、一番新しい `ai_run` の ID と失敗の理由を添えて読む（応答の続きを流す。DD-02 FN-015）。
+// 無ければ null。
+export function findMessageRow(
+  db: Database,
+  messageId: number,
+): MessageRow | null {
+  const row = db
+    .prepare(`${MESSAGE_ROW_SELECT} WHERE m.message_id = ?`)
+    .get(messageId);
+  return row === undefined ? null : toMessageRow(row);
 }
 
 // ---- 質問の受け付け（DD-02 FN-015 受け付けの手順 3）と応答（応答の手順 2〜5）----

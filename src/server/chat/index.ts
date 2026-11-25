@@ -8,6 +8,7 @@ import {
   type ReplyMessageRow,
   contentExists,
   findConversation,
+  findMessageRow,
   findWritingReply,
   insertConversation,
   insertOwnerMessage,
@@ -29,6 +30,8 @@ import { type Page, type PageQuery, toPage } from "../shared/paging";
 //   postQuestion       質問を受ける（DD-02 FN-015 受け付けの手順 2〜3）。同じ会話に作成中の応答があれば何も書かず、
 //                      その発言を返す。無ければ1つのトランザクションで、本人の発言、作成中の AI の発言、
 //                      最後に話した日時を書き、M20 で質問の応答を待ちに入れる。
+//   readReply          応答の続きを流すために、AI の発言の本文、応答の状態、一番新しい実行ID、知らせを読む
+//                      （DD-02 FN-015 続きを流すの手順 1、3、4。SSE の中継で M11 が 200 ミリ秒ごとに呼ぶ）。
 // 会話の作成は1文（DD-05 2章）。
 
 // `openapi.yaml` の `QuestionTarget`（質問の対象。BD-07 4.1）。形は入口層が M10 で確かめてから渡す。
@@ -86,6 +89,17 @@ export type QuestionPosted =
   // 同じ会話に作成中の応答がある（409 `reply_in_progress`）。
   | { kind: "reply_in_progress"; reply: ChatMessage };
 
+// 応答の続きを流すために読んだ AI の発言（DD-02 FN-015 続きを流す）。
+export interface ReplyProgress {
+  messageId: number;
+  bodyMd: string;
+  replyState: "writing" | "done" | "failed" | "cancelled";
+  // その発言の一番新しい `ai_run` の ID。無ければ 0（実行の無い発言は作らないが、読めるようにしておく）。
+  runId: number;
+  // `state` の出来事で出す MSG（FN-014 の手順 4 と同じ決め方）。
+  notice: MessageNotice | null;
+}
+
 export interface Chat {
   // 対象の内容（null なら対象の無い会話）の会話の一覧（FN-014 手順 2）。
   listConversations(
@@ -99,6 +113,8 @@ export interface Chat {
   // 質問を受ける（FN-015 受け付けの手順 2〜3）。会話が無ければ NOT_FOUND を投げる。
   // 文の長さ（2章 C05）は入口層が確かめてから渡す。
   postQuestion(conversationId: number, text: string): QuestionPosted;
+  // 応答の続きを読む（FN-015 続きを流す）。発言が無いか本人の発言なら NOT_FOUND を投げる。
+  readReply(messageId: number): ReplyProgress;
 }
 
 // AI を動かす仕組みが使えない失敗（DD-06 E12）の `failure_reason` の先頭（DD-02 3章 P06 手順 5）。
@@ -280,6 +296,23 @@ export function createChat(deps: { db: Database; clock: Clock }): Chat {
             },
           };
         });
+      } catch (error) {
+        throw toDbError(error);
+      }
+    },
+    readReply(messageId) {
+      try {
+        const row = findMessageRow(db, messageId);
+        if (row === null || row.speaker !== "ai" || row.replyState === null) {
+          throw new NexusError("NOT_FOUND", "AI の発言が無い");
+        }
+        return {
+          messageId: row.messageId,
+          bodyMd: row.bodyMd,
+          replyState: row.replyState,
+          runId: row.latestAiRunId ?? 0,
+          notice: noticeOf(row),
+        };
       } catch (error) {
         throw toDbError(error);
       }
