@@ -1,13 +1,20 @@
+import { enqueueAnswer } from "../ai-jobs";
 import type { Database } from "../db/connection";
 import { toDbError } from "../db/errors";
+import { inWriteTransaction } from "../db/transaction";
 import {
   type ConversationRow,
   type MessageRow,
+  type ReplyMessageRow,
   contentExists,
   findConversation,
+  findWritingReply,
   insertConversation,
+  insertOwnerMessage,
+  insertWritingReply,
   listConversationRows,
   listMessageRows,
+  updateLastSpokenAt,
 } from "../repositories/conversation";
 import type { Clock } from "../shared/clock";
 import { formatDateTime } from "../shared/datetime";
@@ -19,6 +26,9 @@ import { type Page, type PageQuery, toPage } from "../shared/paging";
 //                      3章 P03 で返す。
 //   createConversation 対象の形を確かめ（2章 C07）、内容が無ければ対象を捨てて MSG-011 を添え、会話を作る。
 //   getConversation    会話と発言を `message_id` の順に返し、AI の発言ごとに知らせを決める。
+//   postQuestion       質問を受ける（DD-02 FN-015 受け付けの手順 2〜3）。同じ会話に作成中の応答があれば何も書かず、
+//                      その発言を返す。無ければ1つのトランザクションで、本人の発言、作成中の AI の発言、
+//                      最後に話した日時を書き、M20 で質問の応答を待ちに入れる。
 // 会話の作成は1文（DD-05 2章）。
 
 // `openapi.yaml` の `QuestionTarget`（質問の対象。BD-07 4.1）。形は入口層が M10 で確かめてから渡す。
@@ -70,6 +80,12 @@ export interface ConversationDetail {
   messages: ChatMessage[];
 }
 
+// 質問を受けた結果（DD-02 FN-015 受け付けの手順 3）。
+export type QuestionPosted =
+  | { kind: "accepted"; question: ChatMessage; reply: ChatMessage }
+  // 同じ会話に作成中の応答がある（409 `reply_in_progress`）。
+  | { kind: "reply_in_progress"; reply: ChatMessage };
+
 export interface Chat {
   // 対象の内容（null なら対象の無い会話）の会話の一覧（FN-014 手順 2）。
   listConversations(
@@ -80,6 +96,9 @@ export interface Chat {
   createConversation(target: QuestionTarget | null): ConversationCreated;
   // 会話と発言（FN-014 手順 4）。会話が無ければ NOT_FOUND を投げる。
   getConversation(conversationId: number): ConversationDetail;
+  // 質問を受ける（FN-015 受け付けの手順 2〜3）。会話が無ければ NOT_FOUND を投げる。
+  // 文の長さ（2章 C05）は入口層が確かめてから渡す。
+  postQuestion(conversationId: number, text: string): QuestionPosted;
 }
 
 // AI を動かす仕組みが使えない失敗（DD-06 E12）の `failure_reason` の先頭（DD-02 3章 P06 手順 5）。
@@ -112,6 +131,20 @@ export function noticeOf(row: MessageRow): MessageNotice | null {
     return "MSG-013";
   }
   return "MSG-012";
+}
+
+// 受け付けで返す発言（作成中か本人の発言なので、知らせは無い）。
+function toPlainMessage(row: ReplyMessageRow): ChatMessage {
+  return {
+    messageId: row.messageId,
+    conversationId: row.conversationId,
+    speaker: row.speaker,
+    bodyMd: row.bodyMd,
+    sentAt: row.sentAt,
+    replyState: row.replyState,
+    replyToMessageId: row.replyToMessageId,
+    notice: null,
+  };
 }
 
 function toChatMessage(row: MessageRow): ChatMessage {
@@ -194,6 +227,59 @@ export function createChat(deps: { db: Database; clock: Clock }): Chat {
         }
         const messages = listMessageRows(db, conversationId).map(toChatMessage);
         return { conversation: toConversation(row), messages };
+      } catch (error) {
+        throw toDbError(error);
+      }
+    },
+    postQuestion(conversationId, text) {
+      try {
+        if (findConversation(db, conversationId) === null) {
+          throw new NexusError("NOT_FOUND", "会話が無い");
+        }
+        const now = clock.now();
+        const at = formatDateTime(now);
+        // 書き込みの権利を先に取ってから作成中の応答を読むので、2台から同時に送っても1つだけが通る（DD-05 3章）。
+        return inWriteTransaction(db, (): QuestionPosted => {
+          const writing = findWritingReply(db, conversationId);
+          if (writing !== null) {
+            return {
+              kind: "reply_in_progress",
+              reply: toPlainMessage(writing),
+            };
+          }
+          const questionId = insertOwnerMessage(db, conversationId, text, at);
+          const replyId = insertWritingReply(
+            db,
+            conversationId,
+            questionId,
+            at,
+          );
+          updateLastSpokenAt(db, conversationId, at);
+          enqueueAnswer(db, replyId, now);
+          return {
+            kind: "accepted",
+            question: {
+              messageId: questionId,
+              conversationId,
+              speaker: "owner",
+              bodyMd: text,
+              sentAt: at,
+              replyState: null,
+              replyToMessageId: null,
+              notice: null,
+            },
+            reply: {
+              messageId: replyId,
+              conversationId,
+              speaker: "ai",
+              bodyMd: "",
+              sentAt: at,
+              replyState: "writing",
+              replyToMessageId: questionId,
+              notice: null,
+            },
+          };
+        });
       } catch (error) {
         throw toDbError(error);
       }

@@ -1,6 +1,8 @@
 import type { Database } from "../db/connection";
 import { NexusError } from "../shared/errors";
+import { englishChat } from "./english/chat";
 import { englishIngest } from "./english/ingest";
+import { newsChat } from "./news/chat";
 import { newsIngest } from "./news/ingest";
 
 // 種類の一覧（DD-01 M14。NFR-004）。種類ごとの操作を種類の値から引けるようにする。
@@ -57,4 +59,42 @@ export function kindIngest(kind: string): KindIngest {
     throw new NexusError("INTERNAL", "種類の一覧に無い種類");
   }
   return KINDS[kind];
+}
+
+// 質問の対象（`question_target_json`。BD-07 4.1）。種類ごとの組み立てが使う項目。
+export interface ChatTarget {
+  kind: string;
+  contentId: number;
+  phrase?: string;
+  sentence?: string;
+  position?: {
+    part?: string;
+    paragraphIndex?: number;
+    sentenceIndex?: number;
+    problemNo?: number;
+  };
+}
+
+// 種類ごとの AI チャットに渡す内容の組み立て（DD-02 3章 P07 手順 3。BD-02 FN-015 業務ルール）。
+export interface KindChat {
+  kind: string;
+  // 対象の内容の読む材料の文。内容が無ければ null。
+  buildAnswerMaterial(
+    db: Database,
+    contentId: number,
+    target: ChatTarget,
+  ): string | null;
+}
+
+const CHAT_KINDS: Readonly<Record<string, KindChat>> = {
+  [newsChat.kind]: newsChat satisfies KindChat,
+  [englishChat.kind]: englishChat satisfies KindChat,
+};
+
+// 種類から AI チャットに渡す内容の組み立てを引く。一覧に無い種類は E16（プログラムの不具合）として断る。
+export function kindChat(kind: string): KindChat {
+  if (!Object.hasOwn(CHAT_KINDS, kind)) {
+    throw new NexusError("INTERNAL", "種類の一覧に無い種類");
+  }
+  return CHAT_KINDS[kind];
 }

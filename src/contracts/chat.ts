@@ -34,3 +34,24 @@ export type QuestionTarget = z.infer<typeof questionTargetSchema>;
 export type CreateConversationBody = z.infer<
   typeof createConversationBodySchema
 >;
+
+// 質問の文の長さ（DD-02 2章 C05。Q-079 の答え）。文字（コードポイント）で数える。
+export const QUESTION_MAX_CHARS = 4000;
+
+function countChars(text: string): number {
+  return [...text].length;
+}
+
+// `postQuestion` の本文（`openapi.yaml`）。`text` は 1〜4,000 文字。
+export const postQuestionBodySchema = z
+  .object({
+    text: z
+      .string()
+      .refine(
+        (text) =>
+          countChars(text) >= 1 && countChars(text) <= QUESTION_MAX_CHARS,
+      ),
+  })
+  .strict();
+
+export type PostQuestionBody = z.infer<typeof postQuestionBodySchema>;

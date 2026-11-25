@@ -163,3 +163,191 @@ export function listMessageRows(
       hasAiRun: row.ai_run_id !== null,
     }));
 }
+
+// ---- 質問の受け付け（DD-02 FN-015 受け付けの手順 3）と応答（応答の手順 2〜5）----
+
+export interface ReplyMessageRow {
+  messageId: number;
+  conversationId: number;
+  speaker: "owner" | "ai";
+  bodyMd: string;
+  sentAt: string;
+  replyState: "writing" | "done" | "failed" | "cancelled" | null;
+  replyToMessageId: number | null;
+}
+
+const MESSAGE_COLUMNS =
+  "message_id, conversation_id, speaker, body_md, sent_at, reply_state, reply_to_message_id";
+
+function toReplyMessageRow(row: Record<string, unknown>): ReplyMessageRow {
+  return {
+    messageId: Number(row.message_id),
+    conversationId: Number(row.conversation_id),
+    speaker: row.speaker as ReplyMessageRow["speaker"],
+    bodyMd: row.body_md as string,
+    sentAt: row.sent_at as string,
+    replyState: (row.reply_state as ReplyMessageRow["replyState"]) ?? null,
+    replyToMessageId:
+      row.reply_to_message_id === null ? null : Number(row.reply_to_message_id),
+  };
+}
+
+export function findMessage(
+  db: Database,
+  messageId: number,
+): ReplyMessageRow | null {
+  const row = db
+    .prepare(`SELECT ${MESSAGE_COLUMNS} FROM message WHERE message_id = ?`)
+    .get(messageId);
+  return row === undefined ? null : toReplyMessageRow(row);
+}
+
+// 同じ会話の、応答の状態が作成中の AI の発言（一番新しいもの）。無ければ null。
+export function findWritingReply(
+  db: Database,
+  conversationId: number,
+): ReplyMessageRow | null {
+  const row = db
+    .prepare(
+      `SELECT ${MESSAGE_COLUMNS} FROM message
+        WHERE conversation_id = ? AND speaker = 'ai' AND reply_state = 'writing'
+        ORDER BY message_id DESC LIMIT 1`,
+    )
+    .get(conversationId);
+  return row === undefined ? null : toReplyMessageRow(row);
+}
+
+// 本人の発言を作る。作った発言ID を返す。
+export function insertOwnerMessage(
+  db: Database,
+  conversationId: number,
+  bodyMd: string,
+  sentAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO message (conversation_id, speaker, body_md, sent_at) VALUES (?, 'owner', ?, ?)",
+    )
+    .run(conversationId, bodyMd, sentAt);
+  return Number(result.lastInsertRowid);
+}
+
+// 作成中の AI の発言（本文は空）を作る。作った発言ID を返す。
+export function insertWritingReply(
+  db: Database,
+  conversationId: number,
+  replyToMessageId: number,
+  sentAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO message (conversation_id, speaker, body_md, sent_at, reply_state, reply_to_message_id) VALUES (?, 'ai', '', ?, 'writing', ?)",
+    )
+    .run(conversationId, sentAt, replyToMessageId);
+  return Number(result.lastInsertRowid);
+}
+
+// 会話の最後に話した日時を変える。
+export function updateLastSpokenAt(
+  db: Database,
+  conversationId: number,
+  at: string,
+): void {
+  db.prepare(
+    "UPDATE conversation SET last_spoken_at = ? WHERE conversation_id = ?",
+  ).run(at, conversationId);
+}
+
+// 質問の応答に要る会話の値（DD-02 3章 P07 手順 3）。
+export interface AnswerConversationRow {
+  conversationId: number;
+  targetContentId: number | null;
+  targetKind: string | null;
+  questionTargetJson: string | null;
+  summaryMd: string | null;
+  summaryLastMessageId: number | null;
+}
+
+export function findAnswerConversation(
+  db: Database,
+  conversationId: number,
+): AnswerConversationRow | null {
+  const row = db
+    .prepare(
+      `SELECT v.conversation_id, v.target_content_id, c.kind, v.question_target_json,
+              v.summary_md, v.summary_last_message_id
+         FROM conversation AS v
+         LEFT JOIN content AS c ON c.content_id = v.target_content_id
+        WHERE v.conversation_id = ?`,
+    )
+    .get(conversationId);
+  if (row === undefined) return null;
+  return {
+    conversationId: Number(row.conversation_id),
+    targetContentId:
+      row.target_content_id === null ? null : Number(row.target_content_id),
+    targetKind: (row.kind as string | null) ?? null,
+    questionTargetJson: (row.question_target_json as string | null) ?? null,
+    summaryMd: (row.summary_md as string | null) ?? null,
+    summaryLastMessageId:
+      row.summary_last_message_id === null
+        ? null
+        : Number(row.summary_last_message_id),
+  };
+}
+
+// 会話の発言のうち、発言ID が `afterId` より大きく `beforeId` より小さいものを、新しい順に読む。
+// `afterId` が null なら最初から。
+export function listMessagesBetweenNewestFirst(
+  db: Database,
+  conversationId: number,
+  afterId: number | null,
+  beforeId: number,
+): ReplyMessageRow[] {
+  return db
+    .prepare(
+      `SELECT ${MESSAGE_COLUMNS} FROM message
+        WHERE conversation_id = ? AND message_id > ? AND message_id < ?
+        ORDER BY message_id DESC`,
+    )
+    .all(conversationId, afterId ?? 0, beforeId)
+    .map(toReplyMessageRow);
+}
+
+// AI に渡した内容の写しを入れる（BD-07 ENT-008。送り直しで置き換える）。
+export function setAiInputCopy(
+  db: Database,
+  messageId: number,
+  aiInputCopy: string,
+): void {
+  db.prepare("UPDATE message SET ai_input_copy = ? WHERE message_id = ?").run(
+    aiInputCopy,
+    messageId,
+  );
+}
+
+// 本文の末尾に書き足す（`reply_state` が writing の行だけ。DD-05）。変えた行の数を返す。
+export function appendReplyBody(
+  db: Database,
+  messageId: number,
+  text: string,
+): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET body_md = body_md || ? WHERE message_id = ? AND reply_state = 'writing'",
+      )
+      .run(text, messageId).changes,
+  );
+}
+
+// 応答を完了にする（`reply_state` が writing の行だけ）。変えた行の数を返す。
+export function markReplyDone(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET reply_state = 'done' WHERE message_id = ? AND reply_state = 'writing'",
+      )
+      .run(messageId).changes,
+  );
+}

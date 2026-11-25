@@ -255,3 +255,27 @@ export function upsertEnglishAnswerRow(
         SET answers_json = excluded.answers_json, completed_at = excluded.completed_at`,
   ).run(contentId, answersJson, completedAt);
 }
+
+// AI チャットに渡す英語のセット（DD-02 3章 P07 手順 3 の英語）。
+export interface ChatEnglishSetRow {
+  learningTheme: string;
+  lessonBodyMd: string;
+  readingJson: string | null;
+}
+
+export function findChatEnglishSet(
+  db: Database,
+  contentId: number,
+): ChatEnglishSetRow | null {
+  const row = db
+    .prepare(
+      "SELECT learning_theme, lesson_body_md, reading_json FROM english_set WHERE content_id = ?",
+    )
+    .get(contentId);
+  if (row === undefined) return null;
+  return {
+    learningTheme: String(row.learning_theme),
+    lessonBodyMd: String(row.lesson_body_md),
+    readingJson: (row.reading_json as string | null) ?? null,
+  };
+}

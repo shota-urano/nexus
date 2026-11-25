@@ -170,3 +170,39 @@ export function countQueue(db: Database): QueueCounts {
         : String(row.oldest_queued_at),
   };
 }
+
+// 質問の応答の実行を待ちに入れる。作った実行ID を返す。
+export function insertQueuedAnswerRun(
+  db: Database,
+  replyMessageId: number,
+  attempt: number,
+  createdAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO ai_run (purpose, state, reply_message_id, attempt, created_at) VALUES ('answer', 'queued', ?, ?, ?)",
+    )
+    .run(replyMessageId, attempt, createdAt);
+  return Number(result.lastInsertRowid);
+}
+
+// ツールを使った回数（ENT-009）。
+export interface ToolCounts {
+  webSearch: number;
+  webFetch: number;
+  folderRead: number;
+}
+
+// ツールを使った回数を足す（DD-04 4.2）。
+export function addToolCounts(
+  db: Database,
+  aiRunId: number,
+  counts: ToolCounts,
+): void {
+  db.prepare(
+    `UPDATE ai_run SET web_search_count = web_search_count + ?,
+       web_fetch_count = web_fetch_count + ?,
+       folder_read_count = folder_read_count + ?
+     WHERE ai_run_id = ?`,
+  ).run(counts.webSearch, counts.webFetch, counts.folderRead, aiRunId);
+}

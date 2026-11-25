@@ -1,10 +1,14 @@
-import { createConversationBodySchema } from "../../../contracts/chat";
+import {
+  createConversationBodySchema,
+  postQuestionBodySchema,
+} from "../../../contracts/chat";
 import type { Chat } from "../../../server/chat";
 import { logLevelOf } from "../../../server/shared/errors";
 import type { Logger } from "../../../server/shared/logger";
 import { readPageQuery } from "./content-list";
 import { type DeviceApiContext, deviceApi } from "./device-api";
-import { errorResponse } from "./errors";
+import { errorResponse, statusOfErrorCode } from "./errors";
+import { formatMessage } from "../../../server/shared/messages";
 
 // 会話の選択の端末の API（DD-01 M11。DD-02 FN-014、3章 P03、DD-04）。
 //   `listConversations`  GET  `/api/app/conversations`                   最後に話した日時の新しい順
@@ -16,6 +20,13 @@ import { errorResponse } from "./errors";
 //    `getConversation` は 400 を返さない操作なので（DD-04 2章）、会話ID の形が違えば会話が無いとして 404。
 // 3. M18 を呼び、`openapi.yaml` の形で返す。`createConversation` は 201。
 // 4. 会話が無ければ 404 と MSG-019（DD-06 E05）。失敗は 500 と MSG-019（DD-04 3.4）。
+//
+//   `postQuestion`       POST `/api/app/conversations/{conversationId}/questions`  本文 `{ "text": 質問 }`
+// 1. 3章 P01 で端末の鍵とオリジンを確かめる。
+// 2. 本文の形と、`text` が 1〜4,000 文字であることを確かめる（2章 C05）。外れたら 400 と MSG-019。
+//    会話ID の形が違えば、会話が無いとして 404 と MSG-019。
+// 3. M18 で受け、202 で本人の発言と作成中の AI の発言を返す。同じ会話に作成中の応答があれば、
+//    409 `reply_in_progress` と作成中の AI の発言を返す（DD-04 3.2、DD-06 E06）。
 
 const ID_PATTERN = /^[1-9][0-9]*$/;
 
@@ -124,5 +135,74 @@ export function getConversation(
       return Response.json(context.chat.getConversation(conversationId));
     },
     { target: TARGET },
+  );
+}
+
+const QUESTION_TARGET = "FN-015";
+
+export function postQuestion(
+  context: ConversationApiContext,
+): (
+  request: Request,
+  routeContext: ConversationRouteContext,
+) => Promise<Response> {
+  const { logger } = context.deviceApi;
+  return deviceApi<ConversationRouteContext>(
+    context.deviceApi,
+    async (request, { requestId }, routeContext) => {
+      const { conversationId: text } = await routeContext.params;
+      const conversationId = readId(text);
+      if (conversationId === null) {
+        logger.log({
+          level: logLevelOf("NOT_FOUND"),
+          code: "NOT_FOUND",
+          msg: "MSG-019",
+          target: QUESTION_TARGET,
+          requestId,
+        });
+        return errorResponse(404, "not_found", "MSG-019");
+      }
+      let body: unknown;
+      try {
+        body = JSON.parse(await request.text()) as unknown;
+      } catch {
+        body = undefined;
+      }
+      const parsed = postQuestionBodySchema.safeParse(body);
+      if (!parsed.success) {
+        logInvalid(logger, QUESTION_TARGET, requestId);
+        return errorResponse(400, "bad_request", "MSG-019");
+      }
+      const posted = context.chat.postQuestion(
+        conversationId,
+        parsed.data.text,
+      );
+      if (posted.kind === "reply_in_progress") {
+        logger.log({
+          level: logLevelOf("STATE_CONFLICT"),
+          code: "STATE_CONFLICT",
+          msg: "MSG-019",
+          target: QUESTION_TARGET,
+          requestId,
+        });
+        const { status, code } = statusOfErrorCode("STATE_CONFLICT");
+        return Response.json(
+          {
+            error: {
+              code,
+              message: formatMessage("MSG-019"),
+              messageId: "MSG-019",
+            },
+            reply: posted.reply,
+          },
+          { status },
+        );
+      }
+      return Response.json(
+        { question: posted.question, reply: posted.reply },
+        { status: 202 },
+      );
+    },
+    { target: QUESTION_TARGET },
   );
 }

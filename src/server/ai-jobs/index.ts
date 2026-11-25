@@ -11,6 +11,7 @@ import {
   type QueueCounts,
   claimNextQueuedRun,
   countQueue,
+  insertQueuedAnswerRun,
   insertQueuedRelateRun,
   listRunningRuns,
   markRunDone,
@@ -120,6 +121,16 @@ export function enqueueRelate(
   at: Date,
 ): number {
   return insertQueuedRelateRun(db, deliveryId, 1, formatDateTime(at));
+}
+
+// 質問の応答を待ちに入れる（`attempt` 1。DD-02 FN-015 受け付けの手順 3.5）。
+// 呼んだ側のトランザクションの中で呼ぶ。作った実行ID を返す。
+export function enqueueAnswer(
+  db: Database,
+  replyMessageId: number,
+  at: Date,
+): number {
+  return insertQueuedAnswerRun(db, replyMessageId, 1, formatDateTime(at));
 }
 
 // 記事の関係の判定を自動で送り直す（同じ受け取りの記録で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。

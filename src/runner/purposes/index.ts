@@ -8,6 +8,7 @@ import { formatMessage } from "../../server/shared/messages";
 import { type AiProvider, createAiProvider } from "../ai-provider";
 import type { Config } from "../../server/shared/config";
 import type { ExecuteContext } from "./context";
+import { runAnswer } from "./answer";
 import { runRelate } from "./relate";
 
 export type { ExecuteContext } from "./context";
@@ -49,11 +50,14 @@ export function createPurposes(deps: PurposesDeps): Purposes {
   return {
     async execute(run, context = {}) {
       try {
-        if (run.purpose !== "relate") {
-          // 質問の応答と会話の要約は 10-chat の実装単位で作る。
+        if (run.purpose === "relate") {
+          await runRelate(deps, run, context);
+        } else if (run.purpose === "answer") {
+          await runAnswer(deps, run, context);
+        } else {
+          // 会話の要約は 10-chat の実装単位で作る。
           throw new NexusError("INTERNAL", "この目的の処理はまだ無い");
         }
-        await runRelate(deps, run, context);
       } catch (error) {
         fail(run, error);
       }
