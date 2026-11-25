@@ -393,3 +393,34 @@ export function resetWritingReplyBody(db: Database, messageId: number): number {
       .run(messageId).changes,
   );
 }
+
+// ---- 会話の要約（DD-02 FN-015 会話の要約）----
+
+// 会話の発言のうち、発言ID が `afterId` より大きいもの（要約に含めていない発言）を、新しい順に読む。
+// `afterId` が null なら最初から。
+export function listMessagesAfterNewestFirst(
+  db: Database,
+  conversationId: number,
+  afterId: number | null,
+): ReplyMessageRow[] {
+  return db
+    .prepare(
+      `SELECT ${MESSAGE_COLUMNS} FROM message
+        WHERE conversation_id = ? AND message_id > ?
+        ORDER BY message_id DESC`,
+    )
+    .all(conversationId, afterId ?? 0)
+    .map(toReplyMessageRow);
+}
+
+// 会話の要約と、要約に含めた最後の発言を置き換える（DD-02 FN-015 会話の要約の手順 3）。
+export function updateConversationSummary(
+  db: Database,
+  conversationId: number,
+  summaryMd: string,
+  summaryLastMessageId: number,
+): void {
+  db.prepare(
+    "UPDATE conversation SET summary_md = ?, summary_last_message_id = ? WHERE conversation_id = ?",
+  ).run(summaryMd, summaryLastMessageId, conversationId);
+}

@@ -9,6 +9,7 @@ import { inWriteTransaction } from "../../server/db/transaction";
 import type { Clock } from "../../server/shared/clock";
 import { type ErrorCode, NexusError } from "../../server/shared/errors";
 import {
+  findMessage,
   markReplyFailed,
   resetWritingReplyBody,
 } from "../../server/repositories/conversation";
@@ -19,6 +20,7 @@ import type { Config } from "../../server/shared/config";
 import type { ExecuteContext } from "./context";
 import { runAnswer } from "./answer";
 import { runRelate } from "./relate";
+import { enqueueSummarizeIfNeeded, runSummarize } from "./summarize";
 
 export type { ExecuteContext } from "./context";
 
@@ -62,10 +64,9 @@ export function createPurposes(deps: PurposesDeps): Purposes {
         if (run.purpose === "relate") {
           await runRelate(deps, run, context);
         } else if (run.purpose === "answer") {
-          await runAnswer(deps, run, context);
+          if (await runAnswer(deps, run, context)) afterAnswer(run);
         } else {
-          // 会話の要約は 10-chat の実装単位で作る。
-          throw new NexusError("INTERNAL", "この目的の処理はまだ無い");
+          await runSummarize(deps, run, context);
         }
       } catch (error) {
         fail(run, error);
@@ -74,6 +75,29 @@ export function createPurposes(deps: PurposesDeps): Purposes {
     fail,
   };
 
+  // 質問の応答が完了した後に、会話の要約を待ちに入れるかを決める（DD-02 FN-015 応答の手順 7、会話の要約の手順 1）。
+  // 応答は完了しているので、ここで失敗しても応答の失敗にしない。入らなければ、次の質問の応答の後にもう一度判断する（DD-05 3章）。
+  function afterAnswer(run: PickedRun): void {
+    try {
+      const conversationId = findAnswerConversationId(run);
+      if (conversationId === null) return;
+      enqueueSummarizeIfNeeded(db, conversationId, clock.now());
+    } catch (error) {
+      logger.log({
+        level: "warn",
+        target: "FN-015",
+        aiRunId: run.aiRunId,
+        detail: "会話の要約を待ちに入れるかを決められなかった",
+        error,
+      });
+    }
+  }
+
+  function findAnswerConversationId(run: PickedRun): number | null {
+    if (run.replyMessageId === null) return null;
+    return findMessage(db, run.replyMessageId)?.conversationId ?? null;
+  }
+
   // 失敗の扱い（DD-02 3章 P06 手順 5）。1つのトランザクションで次を行う（DD-05 3章）。
   // - `state` を running のときだけ failed にし、`failure_reason` に失敗の分類と短い理由を入れる。
   // - relate で `attempt` が 1 で、分類が E09、E10、E11 なら、同じ受け取りの記録で `attempt` 2 を待ちに入れる。
@@ -81,6 +105,7 @@ export function createPurposes(deps: PurposesDeps): Purposes {
   //   同じ AI の発言で `attempt` 2 を待ちに入れる（発言が writing でなければ送り直さない）。
   // - それ以外の relate は、ログに MSG-037 を出す（記事は残したまま。RD-06 UC-001）。
   // - それ以外の answer は、AI の発言を failed にする（writing のときだけ）。
+  // - summarize は送り直さず、何もしない（次の質問の応答の完了の後にもう一度判断する。DD-02 FN-015 会話の要約の手順 4）。
   // E12、E13、E16 は送り直さない（DD-06 4章）。分類の無い例外は E16（INTERNAL）。
   function fail(run: PickedRun, error: unknown): void {
     const nexus =

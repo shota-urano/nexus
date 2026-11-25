@@ -13,6 +13,7 @@ import {
   countQueue,
   insertQueuedAnswerRun,
   insertQueuedRelateRun,
+  insertQueuedSummarizeRun,
   listRunningRuns,
   markRunDone,
   markRunFailed,
@@ -131,6 +132,17 @@ export function enqueueAnswer(
   at: Date,
 ): number {
   return insertQueuedAnswerRun(db, replyMessageId, 1, formatDateTime(at));
+}
+
+// 会話の要約を待ちに入れる（`attempt` 1。DD-02 FN-015 会話の要約の手順 1）。
+// 同じ会話の summarize が待ちか処理中でないことを確かめるのと同じトランザクションの中で呼ぶ（DD-05 3章）。
+// 作った実行ID を返す。
+export function enqueueSummarize(
+  db: Database,
+  conversationId: number,
+  at: Date,
+): number {
+  return insertQueuedSummarizeRun(db, conversationId, 1, formatDateTime(at));
 }
 
 // 記事の関係の判定を自動で送り直す（同じ受け取りの記録で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。

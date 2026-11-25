@@ -206,3 +206,32 @@ export function addToolCounts(
      WHERE ai_run_id = ?`,
   ).run(counts.webSearch, counts.webFetch, counts.folderRead, aiRunId);
 }
+
+// 会話の要約の実行を待ちに入れる。作った実行ID を返す。
+export function insertQueuedSummarizeRun(
+  db: Database,
+  conversationId: number,
+  attempt: number,
+  createdAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO ai_run (purpose, state, summary_conversation_id, attempt, created_at) VALUES ('summarize', 'queued', ?, ?, ?)",
+    )
+    .run(conversationId, attempt, createdAt);
+  return Number(result.lastInsertRowid);
+}
+
+// 同じ会話の summarize の実行が、待ちか処理中にあるか（DD-02 FN-015 会話の要約の手順 1。DD-05 3章）。
+export function hasActiveSummarizeRun(
+  db: Database,
+  conversationId: number,
+): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM ai_run WHERE purpose = 'summarize' AND summary_conversation_id = ? AND state IN ('queued', 'running') LIMIT 1",
+      )
+      .get(conversationId) !== undefined
+  );
+}

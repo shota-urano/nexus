@@ -65,7 +65,7 @@ const TOOL_COLUMNS: Readonly<Record<string, keyof ToolCounts>> = {
 };
 
 // 文字数は、UTF-16 の単位でなく文字（コードポイント）で数える。
-function chars(text: string): number {
+export function chars(text: string): number {
   return [...text].length;
 }
 
@@ -87,7 +87,7 @@ export function selectHistory(
   return selected.reverse();
 }
 
-function historyText(messages: readonly ReplyMessageRow[]): string {
+export function historyText(messages: readonly ReplyMessageRow[]): string {
   return messages
     .map(
       (message) =>
@@ -153,11 +153,12 @@ export function buildAnswerInput(db: Database, replyMessageId: number): string {
 // 完了にできなかった（実行が running でなくなった）ときに、トランザクションを戻すための印。
 class RunNotRunning extends Error {}
 
+// 応答と実行を完了にできたら真を返す（完了の後に会話の要約を待ちに入れるかを決めるため。応答の手順 7）。
 export async function runAnswer(
   deps: AnswerDeps,
   run: PickedRun,
   context: ExecuteContext = {},
-): Promise<void> {
+): Promise<boolean> {
   const { db, provider, clock, logger } = deps;
   const replyMessageId = run.replyMessageId;
   if (replyMessageId === null) {
@@ -238,6 +239,7 @@ export async function runAnswer(
       if (!completeRun(db, run.aiRunId, clock.now())) throw new RunNotRunning();
     });
     clearPending();
+    return true;
   } catch (error) {
     if (!(error instanceof RunNotRunning)) throw error;
     // 先に別の状態へ進んだ（DD-05 3章 ENT-009）。何もしない。
@@ -247,5 +249,6 @@ export async function runAnswer(
       aiRunId: run.aiRunId,
       detail: "実行が処理中でなくなったので、応答を完了にしなかった",
     });
+    return false;
   }
 }
