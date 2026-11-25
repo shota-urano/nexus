@@ -1,13 +1,17 @@
+import { z } from "zod";
 import {
+  type EnglishAnswer,
   type EnglishSetDetail,
   type EnglishSetPage,
+  type PutEnglishAnswerBody,
+  englishAnswerSchema,
   englishSetDetailSchema,
   englishSetPageSchema,
 } from "../contracts/english";
 import { deviceFetch } from "./device-api";
 
 // 通信層 M09（DD-01 1.1）。英語の教材の端末の API を呼び、応答を M10 の形で確かめる
-// （DD-04 `listEnglishSets`、`getEnglishSet`、`markOpened`）。
+// （DD-04 `listEnglishSets`、`getEnglishSet`、`markOpened`、`putEnglishAnswer`）。
 // 読む API の結果は次の3つのどれかで返す。
 // - ok: 応答の形が正しい
 // - unauthorized: 401（MSG-020）。全面の知らせは M01 の枠が出す（deviceFetch が届け先に渡す）
@@ -87,4 +91,63 @@ export async function markOpened(contentId: number): Promise<void> {
   } catch {
     // 知らせを出さない。
   }
+}
+
+// `putEnglishAnswer`（FN-012）の結果。
+// - ok: 残した答え（200 で、応答の形が正しい）
+// - unauthorized: 401（MSG-020）。全面の知らせは M01 の枠が出す
+// - ungraded: 400 で MSG-005（○△× の無い問題か、セットに無い問題番号がある。DD-04 3.4）
+// - failed: それ以外の失敗（つながらない、ほかの 400、403、404、500、形が違う）。画面は MSG-007 を出す
+//   （DD-04 3.2、3.4。DD-02 2章 C03）。自動では送り直さない。
+export type PutEnglishAnswerResult =
+  | { status: "ok"; value: EnglishAnswer }
+  | { status: "unauthorized" }
+  | { status: "ungraded" }
+  | { status: "failed" };
+
+async function messageIdOf(response: Response): Promise<string | null> {
+  try {
+    const parsed = errorBodySchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.error.messageId : null;
+  } catch {
+    return null;
+  }
+}
+
+const errorBodySchema = z.object({
+  error: z.object({ messageId: z.string() }),
+});
+
+// `putEnglishAnswer`（FN-012）。答えと採点を残して完了する。前の答えは置き換える。
+export async function putEnglishAnswer(
+  contentId: number,
+  body: PutEnglishAnswerBody,
+): Promise<PutEnglishAnswerResult> {
+  let response: Response;
+  try {
+    response = await deviceFetch(`/api/app/english/sets/${contentId}/answer`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { status: "failed" };
+  }
+  if (response.status === 401) return { status: "unauthorized" };
+  if (response.status === 400) {
+    return (await messageIdOf(response)) === "MSG-005"
+      ? { status: "ungraded" }
+      : { status: "failed" };
+  }
+  if (!response.ok) return { status: "failed" };
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    return { status: "failed" };
+  }
+  const parsed = englishAnswerSchema.safeParse(json);
+  return parsed.success
+    ? { status: "ok", value: parsed.data }
+    : { status: "failed" };
 }

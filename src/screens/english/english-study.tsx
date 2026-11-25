@@ -1,15 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import type { EnglishSetDetail } from "../../contracts/english";
+import { useRef, useState } from "react";
+import { putEnglishAnswer } from "../../client/english";
+import type {
+  EnglishAnswer,
+  EnglishSetDetail,
+  Grade,
+} from "../../contracts/english";
+import { type BottomNotice, BottomNotices } from "../../ui/bottom-notices";
+import { ConfirmPanel } from "../../ui/confirm-panel";
 import { ReceivedText } from "../../ui/received-text";
 import { EnglishMaterial } from "../../ui/kinds/english/lesson";
 import {
   EnglishProblemGrade,
   EnglishProblemQuestion,
   type GradeMark,
+  hasAnswerField,
 } from "../../ui/kinds/english/problem";
 import { autoGrade } from "./grading";
+import { ENGLISH_MESSAGES } from "./messages";
 
 // SCR-005 英語の学習の部品（DD-01 M04。BD-03 SCR-005、BD-02 FN-009〜FN-011）。
 // 段は教材 → 問題 → 採点の順で、通った段には戻れ、先へは飛ばせない（RD-03 R07）。
@@ -25,6 +34,16 @@ import { autoGrade } from "./grading";
 // 完了したことのある教材は、教材の段に前の答えと採点を出し、「やり直す」（A11）で前の答えを
 // 初めの値にして問題の段の1問目から始め直す（BD-02 FN-009 代替の流れ、SCR-005-A01・A11、
 // DD-02 FN-009 手順 6）。サーバは呼ばない。
+// 採点の段の「完了」（A07、FN-012）だけがサーバを呼ぶ（`putEnglishAnswer`）。
+// - ○△× の付いていない問題があれば、呼ばずに MSG-005 を下の知らせに出す。
+// - 完了したことのある教材なら、確認の面で MSG-006 を出し、「置き換える」を選んだときだけ呼ぶ。
+//   「やめる」では何もしない（BD-02 FN-012 代替の流れ、DD-02 FN-012 手順 5）。
+// - 押してから結果が出るまで「完了」を押せなくする（BD-09 5章 誤操作の防止、DD-05 4章）。
+// - 残せたら「完了」の近くに完了の印と、答えが翌朝の教材に反映されることを出す（RD-06 UC-010）。
+//   残した答えを前の答えにする（次の「完了」は置き換えの確認を出す）。
+// - 残せなければ MSG-007 を下の知らせに出し、答えと ○△× は画面に残す（DD-02 FN-012 手順 6）。
+//   400 で MSG-005 が返れば MSG-005 を出す。401（MSG-020）は M01 の枠が出すので何も出さない。
+// 知らせは本人が閉じるか、もう一度「完了」を押して残せるまで残す（BD-09 6章）。
 
 type Stage = "material" | "questions" | "grading";
 
@@ -34,19 +53,21 @@ const STAGES: { stage: Stage; label: string }[] = [
   { stage: "grading", label: "③ 採点" },
 ];
 
-function initialAnswers(set: EnglishSetDetail): Record<number, string> {
+function initialAnswers(
+  lastAnswer: EnglishAnswer | null,
+): Record<number, string> {
   const answers: Record<number, string> = {};
-  for (const grade of set.lastAnswer?.grades ?? []) {
+  for (const grade of lastAnswer?.grades ?? []) {
     if (grade.answer !== undefined) answers[grade.no] = grade.answer;
   }
   return answers;
 }
 
 function initialGrades(
-  set: EnglishSetDetail,
+  lastAnswer: EnglishAnswer | null,
 ): Record<number, GradeMark | null> {
   const grades: Record<number, GradeMark | null> = {};
-  for (const grade of set.lastAnswer?.grades ?? []) {
+  for (const grade of lastAnswer?.grades ?? []) {
     grades[grade.no] = grade.grade;
   }
   return grades;
@@ -56,15 +77,27 @@ const GRADE_LABELS: Record<GradeMark, string> = { o: "○", d: "△", x: "×" };
 
 const buttonClass = "min-h-11 rounded border px-4";
 
+type MessageId = keyof typeof ENGLISH_MESSAGES;
+
 export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
   const [stage, setStage] = useState<Stage>("material");
   const [index, setIndex] = useState(0);
+  // 前に完了した答え。完了で残せたら、残した答えに替える。
+  const [lastAnswer, setLastAnswer] = useState<EnglishAnswer | null>(
+    set.lastAnswer,
+  );
   const [answers, setAnswers] = useState<Record<number, string>>(() =>
-    initialAnswers(set),
+    initialAnswers(set.lastAnswer),
   );
   const [grades, setGrades] = useState<Record<number, GradeMark | null>>(() =>
-    initialGrades(set),
+    initialGrades(set.lastAnswer),
   );
+  const [confirming, setConfirming] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  // 続けて押されたとき、画面を描き直す前の2回目も止める。
+  const submittingRef = useRef(false);
+  const [completed, setCompleted] = useState(false);
+  const [notices, setNotices] = useState<BottomNotice[]>([]);
   const problems = set.problems;
   const answerOf = (no: number) => answers[no] ?? "";
 
@@ -84,13 +117,68 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
 
   const restart = () => {
     // やり直す（A11）: 前の答えと採点を初めの値に戻し、問題の段の1問目から始める。
-    setAnswers(initialAnswers(set));
-    setGrades(initialGrades(set));
+    setAnswers(initialAnswers(lastAnswer));
+    setGrades(initialGrades(lastAnswer));
+    setCompleted(false);
     setIndex(0);
     setStage("questions");
   };
 
-  const lastAnswer = set.lastAnswer;
+  const showNotice = (id: MessageId) => {
+    setNotices((previous) => [
+      ...previous.filter((notice) => notice.id !== id),
+      { id, kind: "error", text: ENGLISH_MESSAGES[id] },
+    ]);
+  };
+
+  const send = async () => {
+    if (submittingRef.current) return;
+    const body: Grade[] = [];
+    for (const item of problems) {
+      const grade = grades[item.no];
+      if (grade === null || grade === undefined) return;
+      body.push(
+        hasAnswerField(item)
+          ? { no: item.no, grade, answer: answerOf(item.no) }
+          : { no: item.no, grade },
+      );
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setCompleted(false);
+    try {
+      const result = await putEnglishAnswer(set.contentId, { grades: body });
+      if (result.status === "ok") {
+        setLastAnswer(result.value);
+        setCompleted(true);
+        setNotices([]);
+      } else if (result.status === "ungraded") {
+        showNotice("MSG-005");
+      } else if (result.status === "failed") {
+        showNotice("MSG-007");
+      }
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const complete = () => {
+    if (submittingRef.current) return;
+    const ungraded = problems.some(
+      (item) => grades[item.no] === null || grades[item.no] === undefined,
+    );
+    if (ungraded) {
+      showNotice("MSG-005");
+      return;
+    }
+    if (lastAnswer !== null) {
+      setConfirming(true);
+      return;
+    }
+    void send();
+  };
+
   const problem = problems[index];
 
   return (
@@ -217,7 +305,16 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
               <ReceivedText markdown={set.closingMd} />
             </section>
           )}
-          <div className="mt-6 flex gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={submitting}
+              aria-busy={submitting}
+              onClick={complete}
+            >
+              完了
+            </button>
             <button
               type="button"
               className={buttonClass}
@@ -226,8 +323,39 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
               問題へ戻る
             </button>
           </div>
+          {completed && (
+            <p role="status" className="mt-3 flex items-center gap-2">
+              <span
+                role="img"
+                aria-label="完了した印"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border font-bold"
+              >
+                ✓
+              </span>
+              答えは翌朝の教材に反映されます。
+            </p>
+          )}
         </section>
       )}
+      <ConfirmPanel
+        open={confirming}
+        message={ENGLISH_MESSAGES["MSG-006"]}
+        confirmLabel="置き換える"
+        cancelLabel="やめる"
+        onConfirm={() => {
+          setConfirming(false);
+          void send();
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+      <BottomNotices
+        notices={notices}
+        onClose={(id) =>
+          setNotices((previous) =>
+            previous.filter((notice) => notice.id !== id),
+          )
+        }
+      />
     </div>
   );
 }
