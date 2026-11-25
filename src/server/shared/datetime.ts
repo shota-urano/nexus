@@ -39,3 +39,11 @@ function dateToDayNumber(date: string): number | null {
   if (new Date(time).getUTCDate() !== day) return null;
   return time / DAY_MS;
 }
+
+// 日付（`YYYY-MM-DD`）に日数を足す（引くときは負の数）。日付として読めなければ投げる。
+export function addDays(date: string, days: number): string {
+  const day = dateToDayNumber(date);
+  if (day === null) throw new RangeError(`日付として読めない: ${date}`);
+  const at = new Date((day + days) * DAY_MS);
+  return `${pad(at.getUTCFullYear(), 4)}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`;
+}

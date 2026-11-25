@@ -52,11 +52,11 @@ DD-06 E09〜E13、E17。
 
 ## 9. 実装単位
 
-- [ ] [Backend] AI の呼び出し M26（偽の AI の筋書き、`claude -p` の引数の配列と設定と環境変数、stream-json の読み取り、SIGTERM と SIGKILL での止め方）を作る（IF-004、DD-01 M26、DD-04 4.2、DD-09 2.5、DD-06 4章）
+- [x] [Backend] AI の呼び出し M26（偽の AI の筋書き、`claude -p` の引数の配列と設定と環境変数、stream-json の読み取り、SIGTERM と SIGKILL での止め方）を作る（IF-004、DD-01 M26、DD-04 4.2、DD-09 2.5、DD-06 4章）（se/04-ai-runner）
   - 受け入れ基準: DD-10 TC56、DD-10 TC127 が通る
-- [ ] [Backend] 待ち行列 M20 と AI Runner M24 の拾う処理と、記事の関係の判定 M25・M15（渡す記事の選び方、結果の確かめと残し方）を作る（FN-002、DD-01 M20、DD-01 M24、DD-01 M25、DD-02 3章 P06・P07、Q-086）
+- [x] [Backend] 待ち行列 M20 と AI Runner M24 の拾う処理と、記事の関係の判定 M25・M15（渡す記事の選び方、結果の確かめと残し方）を作る（FN-002、DD-01 M20、DD-01 M24、DD-01 M25、DD-02 3章 P06・P07、Q-086）（se/04-ai-runner）
   - 受け入れ基準: DD-10 TC10、DD-10 TC11、DD-10 TC12、DD-10 TC13、DD-10 TC18、DD-10 TC122 が通る
-- [ ] [Backend] 記事の関係の判定の同時の置き換えと失敗の扱い（時間の上限、形が読めない、仕組みが使えない、自動の送り直し）を作る（FN-002、DD-02 3章 P06、DD-05 3章、DD-06 E09・E10・E12）
+- [x] [Backend] 記事の関係の判定の同時の置き換えと失敗の扱い（時間の上限、形が読めない、仕組みが使えない、自動の送り直し）を作る（FN-002、DD-02 3章 P06、DD-05 3章、DD-06 E09・E10・E12）（se/04-ai-runner）
   - 受け入れ基準: DD-10 TC14、DD-10 TC15、DD-10 TC16、DD-10 TC17 が通る
-- [ ] [Backend] 状態を返す API `getHealth` と、Web サーバの起動のときのマイグレーション、AI Runner の起動のときの番号の確かめを作る（DD-01 M20、DD-01 M21、DD-01 M24、DD-03 5章、CR-011、DD-06 E17）
+- [x] [Backend] 状態を返す API `getHealth` と、Web サーバの起動のときのマイグレーション、AI Runner の起動のときの番号の確かめを作る（DD-01 M20、DD-01 M21、DD-01 M24、DD-03 5章、CR-011、DD-06 E17）（se/04-ai-runner）
   - 受け入れ基準: DD-10 TC103、DD-10 TC108 が通る
