@@ -62,6 +62,17 @@ export function enqueueRelate(
   return insertQueuedRelateRun(db, deliveryId, 1, formatDateTime(at));
 }
 
+// 記事の関係の判定を自動で送り直す（同じ受け取りの記録で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。
+// 失敗にするのと同じトランザクションの中で呼ぶ（DD-05 3章）。作った実行ID を返す。
+export function requeueRelate(
+  db: Database,
+  deliveryId: number,
+  attempt: number,
+  at: Date,
+): number {
+  return insertQueuedRelateRun(db, deliveryId, attempt, formatDateTime(at));
+}
+
 // 実行を完了にする（running のときだけ。DD-02 3章 P06 手順 4）。
 // 目的ごとの結果を残すのと同じトランザクションの中で呼ぶ。完了にできたかを返す。
 export function completeRun(db: Database, aiRunId: number, at: Date): boolean {

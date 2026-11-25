@@ -8,6 +8,7 @@ import {
 } from "../../repositories/article-relation";
 import {
   findDeliveryTargetDate,
+  listContentIdsReceivedAfter,
   listNewsArticlesBetween,
 } from "../../repositories/news";
 import { addDays } from "../../shared/datetime";
@@ -185,12 +186,14 @@ export function checkRelations(
 
 const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
-// 確かめた組を残す（DD-02 FN-002 手順 7.2、7.3）。呼んだ側の書き込みのトランザクションの中で呼ぶ。
+// 確かめた組を残す（DD-02 FN-002 手順 7.1〜7.3）。呼んだ側の書き込みのトランザクションの中で呼ぶ。
+// `runCreatedAt` は判定の実行の `ai_run.created_at`。これより後に届いた記事は置き換えられた記事として扱う。
 export function saveRelations(
   db: Database,
   selection: RelateSelection,
   relations: readonly CheckedRelation[],
   judgedAt: string,
+  runCreatedAt: string,
 ): void {
   const currentIds = new Set(selection.current.map((a) => a.contentId));
   const passedIds = new Set([
@@ -198,20 +201,30 @@ export function saveRelations(
     ...selection.others.map((a) => a.contentId),
   ]);
 
+  // 7.1 組の2つの記事のどちらかが、実行を待ちに入れた後に置き換えられていたら、その組は残さない。
+  // 置き換えの有無は、書き込みの権利を取った後のこのトランザクションの中で読む（DD-05 3章 ENT-004）。
+  const replaced = new Set(
+    listContentIdsReceivedAfter(db, [...passedIds], runCreatedAt),
+  );
+  const touchesReplaced = (a: number, b: number) =>
+    replaced.has(a) || replaced.has(b);
+
   // 7.2 残す組ごとに、向きを問わず同じ2つの記事の行を消し、返った向きで作る。
   // 同じ2つの記事の組が2回返ったら、後の組が残る。
   const kept = new Set<string>();
   for (const relation of relations) {
+    if (touchesReplaced(relation.fromContentId, relation.toContentId)) continue;
     deleteRelationPair(db, relation.fromContentId, relation.toContentId);
     insertActiveRelation(db, { ...relation, judgedAt });
     kept.add(pairKey(relation.fromContentId, relation.toContentId));
   }
 
   // 7.3 今回照らした組（今回の記事のどれかを含み、相手が渡した記事である組）のうち、
-  // 残さなかった有効な行を無効にする（消さない。Q-038 の答え）。
+  // 残さなかった有効な行を無効にする（消さない。Q-038 の答え）。置き換えられた記事を含む組は変えない。
   for (const row of listActiveRelationsTouching(db, [...currentIds])) {
     const { fromContentId: from, toContentId: to } = row;
     if (!passedIds.has(from) || !passedIds.has(to)) continue;
+    if (touchesReplaced(from, to)) continue;
     if (kept.has(pairKey(from, to))) continue;
     deactivateRelation(db, from, to);
   }

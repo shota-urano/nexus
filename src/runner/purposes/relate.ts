@@ -14,6 +14,8 @@ import { formatDateTime } from "../../server/shared/datetime";
 import { NexusError } from "../../server/shared/errors";
 import type { Logger } from "../../server/shared/logger";
 import type { AiProvider } from "../ai-provider";
+import type { ExecuteContext } from "./context";
+import { readAiCall } from "./outcome";
 import { buildAiInput } from "./prompt";
 
 // 記事の関係の判定（FN-002。DD-02 FN-002 手順 1〜7）の M25 の受け持ち。
@@ -100,6 +102,7 @@ class RunNotRunning extends Error {}
 export async function runRelate(
   deps: RelateDeps,
   run: PickedRun,
+  context: ExecuteContext = {},
 ): Promise<void> {
   const { db, provider, clock, logger } = deps;
   if (run.relateDeliveryId === null) {
@@ -113,35 +116,23 @@ export async function runRelate(
   const call = provider.call({
     purpose: "relate",
     input,
+    signal: context.signal,
     runId: run.aiRunId,
   });
-  let resultText: string | null = null;
-  let resultOk = false;
-  for await (const event of call.events) {
-    if (event.type === "result") {
-      resultOk = event.ok;
-      resultText = event.result;
-    }
-  }
-  const exit = await call.exit;
-  if (
-    exit.kind !== "exited" ||
-    exit.exitCode !== 0 ||
-    !resultOk ||
-    resultText === null
-  ) {
-    // 失敗の分け方（DD-04 4.2、DD-06 E09〜E12）は、失敗の扱いの実装単位で細かくする。
-    throw new NexusError(
-      "AI_INTERRUPTED",
-      "CLI が完了の終わりの出来事を出さずに終わった",
-    );
-  }
+  // 失敗は DD-06 の分類（E09〜E12）で投げ、3章 P06 の失敗の扱いに渡す。
+  const resultText = await readAiCall(call, { signal: context.signal });
 
   const relations = checkRelations(selection, parseRelateResult(resultText));
   try {
     inWriteTransaction(db, () => {
       const now = clock.now();
-      saveRelations(db, selection, relations, formatDateTime(now));
+      saveRelations(
+        db,
+        selection,
+        relations,
+        formatDateTime(now),
+        run.createdAt,
+      );
       if (!completeRun(db, run.aiRunId, now)) throw new RunNotRunning();
     });
   } catch (error) {

@@ -62,3 +62,20 @@ export function listNewsContentIdsByDelivery(
     .all(deliveryId)
     .map((row) => Number(row.content_id));
 }
+
+// 渡した内容ID のうち、`received_at` が `since` より後の内容ID（置き換えられた記事。DD-02 FN-002 手順 7.1）。
+// 日時は DD-03 1章の形の文字なので、文字の大小で比べられる。
+export function listContentIdsReceivedAfter(
+  db: Database,
+  contentIds: readonly number[],
+  since: string,
+): number[] {
+  if (contentIds.length === 0) return [];
+  const placeholders = contentIds.map(() => "?").join(", ");
+  return db
+    .prepare(
+      `SELECT content_id FROM content WHERE content_id IN (${placeholders}) AND received_at > ? ORDER BY content_id`,
+    )
+    .all(...contentIds, since)
+    .map((row) => Number(row.content_id));
+}
