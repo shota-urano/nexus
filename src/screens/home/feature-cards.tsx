@@ -2,8 +2,15 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import type { MouseEvent, ReactNode } from "react";
+import {
+  type MouseEvent,
+  type ReactNode,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Home } from "../../contracts/home";
+import { narrowSlots, SLOTS } from "./card-slots";
 import { type Feature, FeatureIcon, type FeatureKey } from "./features";
 import { cardOffset } from "./hud-angle";
 import { HOME_MESSAGES } from "./messages";
@@ -16,20 +23,11 @@ import { HOME_MESSAGES } from "./messages";
 //   奥のカードを押すと、その機能を選ぶ（HUD が回る）。
 // - 知らせ（MSG-015〜MSG-017）は、該当する機能のカードの中に出す（BD-09 2章「ホームのカード」）。
 // - 幅 480 ピクセル以下では、前のカードは「アイコン、見出し、件数」を縦に並べ、隣のカードを
-//   前のカードのすぐ上と下に詰める（BD-03 SCR-001 3.2）。
+//   前のカードのすぐ上と下に詰める（BD-03 SCR-001 3.2）。カードの高さを描いた後に測って置く（card-slots）。
 // - 動きを減らす設定（NFR-008）のときは、カードの移動の動きを使わず、置いた後の位置で描く。
 
 // カードを動かす長さ（秒）。
 const MOVE_SECONDS = 0.5;
-
-interface Slot {
-  /** 上下の位置（ピクセル。並びの真ん中から） */
-  y: number;
-  /** 傾き（度） */
-  tilt: number;
-  scale: number;
-  opacity: number;
-}
 
 // 移る動きの段階（A03。home-screen の LeaveStep と同じ）。
 export type LeaveStep = "glow" | "move" | "expand";
@@ -38,24 +36,6 @@ export type LeaveStep = "glow" | "move" | "expand";
 const LEAVING_SLOT = { x: -36, y: -70, tilt: 0, scale: 1.08, opacity: 1 };
 // 移る動きでカードを動かす長さ（秒）。
 const LEAVE_MOVE_SECONDS = 0.28;
-
-// 並びの位置（cardOffset）ごとの置き方。
-const SLOTS: Record<number, Slot> = {
-  [-2]: { y: -210, tilt: -10, scale: 0.7, opacity: 0 },
-  [-1]: { y: -150, tilt: -7, scale: 0.84, opacity: 0.62 },
-  0: { y: -70, tilt: -4, scale: 1, opacity: 1 },
-  1: { y: 76, tilt: 5, scale: 0.87, opacity: 0.72 },
-  2: { y: 140, tilt: 8, scale: 0.74, opacity: 0.25 },
-  3: { y: 190, tilt: 10, scale: 0.6, opacity: 0 },
-};
-const SLOTS_NARROW: Record<number, Slot> = {
-  [-2]: { y: -160, tilt: -8, scale: 0.74, opacity: 0 },
-  [-1]: { y: -128, tilt: -6, scale: 0.86, opacity: 0.6 },
-  0: { y: -80, tilt: -3, scale: 1, opacity: 1 },
-  1: { y: 92, tilt: 4, scale: 0.88, opacity: 0.7 },
-  2: { y: 136, tilt: 6, scale: 0.76, opacity: 0.3 },
-  3: { y: 170, tilt: 8, scale: 0.6, opacity: 0 },
-};
 
 // カードの下の行（件数や学習テーマ）。データを読めていなければ出さない。
 function summaryOf(key: FeatureKey, home: Home | null): ReactNode {
@@ -154,6 +134,54 @@ function CardBody({
   );
 }
 
+// 幅 480 ピクセル以下のとき、カードごとの高さ（ピクセル）を測る。中身が変わって描き直したときと、
+// 写真を読み終えるなどで大きさが変わったとき（ResizeObserver）に測り直す。広い画面では測らない。
+// 高さは transform の影響を受けない offsetHeight で測る（縮める前の高さ）。
+function useCardHeights(narrow: boolean) {
+  const elements = useRef(new Map<string, HTMLElement>());
+  const refs = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const [heights, setHeights] = useState<Record<string, number>>({});
+
+  const measure = () => {
+    if (!narrow) return;
+    setHeights((old) => {
+      let changed = false;
+      const next: Record<string, number> = {};
+      for (const [key, el] of elements.current) {
+        next[key] = el.offsetHeight;
+        if (old[key] !== next[key]) changed = true;
+      }
+      return changed ? next : old;
+    });
+  };
+
+  // 描くたびに測る（変わらなければ状態を変えないので、描き直しは続かない）。
+  useLayoutEffect(measure);
+
+  useLayoutEffect(() => {
+    if (!narrow || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    for (const el of elements.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+    // measure は narrow だけに依る。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [narrow]);
+
+  const ref = (key: string) => {
+    let callback = refs.current.get(key);
+    if (callback === undefined) {
+      callback = (el: HTMLElement | null) => {
+        if (el === null) elements.current.delete(key);
+        else elements.current.set(key, el);
+      };
+      refs.current.set(key, callback);
+    }
+    return callback;
+  };
+
+  return { heights, ref };
+}
+
 export function FeatureCards({
   features,
   selected,
@@ -178,7 +206,14 @@ export function FeatureCards({
   /** 移る動きの段階。移っていなければ null */
   leaving?: LeaveStep | null;
 }) {
-  const slots = narrow ? SLOTS_NARROW : SLOTS;
+  const { heights, ref: measureRef } = useCardHeights(narrow);
+  const aboveIndex = (selected - 1 + features.length) % features.length;
+  const slots = narrow
+    ? narrowSlots(
+        heights[features[selected]?.key] ?? 0,
+        heights[features[aboveIndex]?.key] ?? 0,
+      )
+    : SLOTS;
   return (
     <div className="absolute top-1/2 right-1.5 left-[62%] h-0 [perspective:900px]">
       {features.map((feature, index) => {
@@ -238,6 +273,7 @@ export function FeatureCards({
           return (
             <div
               key={feature.key}
+              ref={measureRef(feature.key)}
               data-testid={`card-${feature.key}`}
               data-front={front}
               className="absolute right-0 left-0"
@@ -254,6 +290,7 @@ export function FeatureCards({
         return (
           <motion.div
             key={feature.key}
+            ref={measureRef(feature.key)}
             data-testid={`card-${feature.key}`}
             data-front={front}
             data-leaving={pulled || undefined}
