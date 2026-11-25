@@ -1,8 +1,15 @@
-import type { Database } from "../db/connection";
+import { type Database, databasePath, openDatabase } from "../db/connection";
+import { toDbError } from "../db/errors";
+import {
+  applyKnownMigrations,
+  assertMigrationsApplied,
+} from "../db/migrations";
 import { inWriteTransaction } from "../db/transaction";
 import {
   type AiRunPurpose,
+  type QueueCounts,
   claimNextQueuedRun,
+  countQueue,
   insertQueuedRelateRun,
   markRunDone,
   markRunFailed,
@@ -13,7 +20,7 @@ import { formatDateTime } from "../shared/datetime";
 // AI の実行（ENT-009）の待ち行列（DD-01 M20。DD-02 3章 P06、DD-05 3章）。
 // 状態を変えるのはこのモジュールだけで、遷移の前の状態を条件にした更新で行う（DD-02 2章 状態の実装）。
 
-export type { AiRunPurpose } from "../repositories/ai-run";
+export type { AiRunPurpose, QueueCounts } from "../repositories/ai-run";
 
 // 拾った実行。目的ごとに、対象の1つだけを持つ（BD-07 ENT-009）。
 export interface PickedRun {
@@ -29,6 +36,8 @@ export interface PickedRun {
 export interface AiQueue {
   // 次を拾う（DD-02 3章 P06 手順 2）。拾えなければ null。
   pickNext(): PickedRun | null;
+  // 待ちの数、処理中の数、一番古い待ちの日時（状態を返す API。DD-01 M20、DD-04 `getHealth`）。
+  counts(): QueueCounts;
 }
 
 export function createAiQueue(db: Database, clock: Clock): AiQueue {
@@ -50,6 +59,44 @@ export function createAiQueue(db: Database, clock: Clock): AiQueue {
         summaryConversationId: row.summaryConversationId,
       };
     },
+    counts() {
+      return countQueue(db);
+    },
+  };
+}
+
+// プロセスの起動のときに DB を開く（DD-03 5章）。
+// - `migrate`: Web サーバ。まだ当てていないマイグレーションを全て当ててから返す。
+// - `check`: AI Runner。`schema_migration` の最後の番号が知る番号と違えば E17（STARTUP_MISMATCH）を投げる。
+// 失敗したら DB を閉じて投げる。使い終わったら close で DB を閉じる。
+export interface OpenAiJobsDeps {
+  dataDir: string;
+  clock: Clock;
+  startup: "migrate" | "check";
+  // `check` で比べる番号。試験で、番号の違うプロセスの代わりに渡す（DD-10 TC108）。
+  knownVersion?: number;
+}
+
+export interface OpenedAiJobs {
+  queue: AiQueue;
+  close(): void;
+}
+
+export function openAiJobs(deps: OpenAiJobsDeps): OpenedAiJobs {
+  const db = openDatabase(databasePath(deps.dataDir));
+  try {
+    if (deps.startup === "migrate") {
+      applyKnownMigrations(db, deps.clock);
+    } else {
+      assertMigrationsApplied(db, deps.knownVersion);
+    }
+  } catch (error) {
+    db.close();
+    throw toDbError(error);
+  }
+  return {
+    queue: createAiQueue(db, deps.clock),
+    close: () => db.close(),
   };
 }
 

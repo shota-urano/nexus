@@ -89,10 +89,24 @@ const KNOWN_MIGRATIONS_DIR = join(
   "migrations",
 );
 
+// このプロセスが知るマイグレーションの最後の番号。
+export function knownMigrationVersion(): number {
+  return readMigrations(KNOWN_MIGRATIONS_DIR).length;
+}
+
+// Web サーバが起動したときに、まだ当てていないファイルを全て当てる（DD-03 5章）。当てた番号の一覧を返す。
+// 当てるのは Web サーバだけにする（2つのプロセスが同時に当てないため）。
+export function applyKnownMigrations(db: Database, clock: Clock): number[] {
+  return applyMigrations(db, readMigrations(KNOWN_MIGRATIONS_DIR), clock);
+}
+
 // Web サーバのほかのプロセス（AI Runner、定期ジョブ、管理のコマンド）が起動したときの確かめ（DD-03 5章）。
 // `schema_migration` の最後の番号が、このプロセスの知る番号と違えば E17（STARTUP_MISMATCH）を投げる。
-export function assertMigrationsApplied(db: Database): void {
-  const known = readMigrations(KNOWN_MIGRATIONS_DIR).length;
+// `known` は試験で、番号の違うプロセスの代わりに渡す（DD-10 TC108）。
+export function assertMigrationsApplied(
+  db: Database,
+  known: number = knownMigrationVersion(),
+): void {
   const applied = appliedVersion(db);
   if (applied !== known) {
     throw new NexusError(

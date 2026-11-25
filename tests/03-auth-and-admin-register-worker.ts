@@ -7,6 +7,7 @@ import { parentPort, workerData } from "node:worker_threads";
 // 結果の状態の番号、Location、Set-Cookie の数を親に返す。
 
 // src の中の拡張子の無い相対の読み込みを `.ts` で解決する（src/cli/main.ts と同じ）。
+// フォルダを指す読み込み（`../server/ai-jobs` など）は、そのフォルダの `index.ts` で解決する。
 registerHooks({
   resolve(specifier, context, nextResolve) {
     try {
@@ -15,7 +16,11 @@ registerHooks({
       const relative =
         specifier.startsWith("./") || specifier.startsWith("../");
       if (!relative || /\.[cm]?[jt]s$/.test(specifier)) throw error;
-      return nextResolve(`${specifier}.ts`, context);
+      try {
+        return nextResolve(`${specifier}.ts`, context);
+      } catch {
+        return nextResolve(`${specifier}/index.ts`, context);
+      }
     }
   },
 });

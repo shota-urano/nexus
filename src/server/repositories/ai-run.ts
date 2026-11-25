@@ -132,3 +132,31 @@ export function findAiRun(db: Database, aiRunId: number): AiRunRow | null {
     .get(aiRunId);
   return row === undefined ? null : toRow(row);
 }
+
+export interface QueueCounts {
+  queuedCount: number;
+  runningCount: number;
+  // 一番古い待ちの `created_at`。待ちが無ければ null。
+  oldestQueuedAt: string | null;
+}
+
+// 待ちの数、処理中の数、一番古い待ちの日時（状態を返す API。DD-04 `getHealth`）。
+export function countQueue(db: Database): QueueCounts {
+  const row = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(state = 'queued'), 0) AS queued_count,
+         COALESCE(SUM(state = 'running'), 0) AS running_count,
+         MIN(CASE WHEN state = 'queued' THEN created_at END) AS oldest_queued_at
+       FROM ai_run`,
+    )
+    .get();
+  return {
+    queuedCount: Number(row?.queued_count ?? 0),
+    runningCount: Number(row?.running_count ?? 0),
+    oldestQueuedAt:
+      row?.oldest_queued_at === null || row?.oldest_queued_at === undefined
+        ? null
+        : String(row.oldest_queued_at),
+  };
+}
