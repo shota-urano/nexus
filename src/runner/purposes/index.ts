@@ -1,4 +1,5 @@
 import {
+  cancelRunningRun,
   failRun,
   requeueAnswer,
   requeueRelate,
@@ -10,6 +11,7 @@ import type { Clock } from "../../server/shared/clock";
 import { type ErrorCode, NexusError } from "../../server/shared/errors";
 import {
   findMessage,
+  markReplyCancelled,
   markReplyFailed,
   resetWritingReplyBody,
 } from "../../server/repositories/conversation";
@@ -18,6 +20,7 @@ import { formatMessage } from "../../server/shared/messages";
 import { type AiProvider, createAiProvider } from "../ai-provider";
 import type { Config } from "../../server/shared/config";
 import type { ExecuteContext } from "./context";
+import { RunStopRequested } from "./outcome";
 import { runAnswer } from "./answer";
 import { runRelate } from "./relate";
 import { enqueueSummarizeIfNeeded, runSummarize } from "./summarize";
@@ -69,11 +72,32 @@ export function createPurposes(deps: PurposesDeps): Purposes {
           await runSummarize(deps, run, context);
         }
       } catch (error) {
-        fail(run, error);
+        if (error instanceof RunStopRequested) cancel(run);
+        else fail(run, error);
       }
     },
     fail,
   };
+
+  // 止める求めで止めたとき（DD-02 3章 P06 手順 3、FN-016 手順 3）。1つのトランザクションで、
+  // 実行を running のときだけ cancelled にし、answer なら AI の発言を writing のときだけ cancelled にする
+  // （本文は残す）。先に完了か失敗に進んでいたら何もしない（DD-05 3章 ENT-008・ENT-009）。
+  function cancel(run: PickedRun): void {
+    const cancelled = inWriteTransaction(db, () => {
+      if (!cancelRunningRun(db, run.aiRunId, clock.now())) return false;
+      if (run.purpose === "answer" && run.replyMessageId !== null) {
+        markReplyCancelled(db, run.replyMessageId);
+      }
+      return true;
+    });
+    logger.log({
+      level: "info",
+      aiRunId: run.aiRunId,
+      detail: cancelled
+        ? "止める求めで AI の実行を中止にした"
+        : "AI の実行が処理中でなかったので、中止にしなかった",
+    });
+  }
 
   // 質問の応答が完了した後に、会話の要約を待ちに入れるかを決める（DD-02 FN-015 応答の手順 7、会話の要約の手順 1）。
   // 応答は完了しているので、ここで失敗しても応答の失敗にしない。入らなければ、次の質問の応答の後にもう一度判断する（DD-05 3章）。

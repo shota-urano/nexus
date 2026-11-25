@@ -2,9 +2,9 @@ import type { AiQueue, PickedRun } from "../server/ai-jobs";
 import { NexusError } from "../server/shared/errors";
 import type { Logger } from "../server/shared/logger";
 import type { ExecuteContext } from "./purposes/context";
-import { timeoutError } from "./purposes/outcome";
+import { RunStopRequested, timeoutError } from "./purposes/outcome";
 
-// AI Runner の拾う処理（DD-01 M24。DD-02 3章 P06 手順 2）。
+// AI Runner の拾う処理（DD-01 M24。DD-02 3章 P06 手順 2、3）。
 // 空いている枠（同時に2つまで。NFR-017）に M20 から実行を拾わせ、M25 に渡す。
 
 // 同時に動かす実行の数（NFR-017）。
@@ -13,6 +13,8 @@ export const AI_RUNNER_SLOTS = 2;
 export const AI_RUNNER_POLL_MS = 500;
 // 1回の実行の時間の上限（NFR-017。DD-02 3章 P06 手順 3）。
 export const AI_RUN_TIMEOUT_MS = 5 * 60 * 1000;
+// 止める求め（`stop_requested`）を読む間隔（DD-02 3章 P06 手順 3）。
+export const AI_RUN_STOP_CHECK_MS = 1000;
 
 export interface AiRunnerOptions {
   queue: AiQueue;
@@ -23,6 +25,8 @@ export interface AiRunnerOptions {
   pollIntervalMs?: number;
   // 時間の上限。テストでは小さい値にする（DD-10 TC15）。
   timeoutMs?: number;
+  // 止める求めを読む間隔。テストでは小さい値にする。
+  stopCheckIntervalMs?: number;
 }
 
 export interface AiRunner {
@@ -41,6 +45,8 @@ export function createAiRunner(options: AiRunnerOptions): AiRunner {
   const slots = options.slots ?? AI_RUNNER_SLOTS;
   const pollIntervalMs = options.pollIntervalMs ?? AI_RUNNER_POLL_MS;
   const timeoutMs = options.timeoutMs ?? AI_RUN_TIMEOUT_MS;
+  const stopCheckIntervalMs =
+    options.stopCheckIntervalMs ?? AI_RUN_STOP_CHECK_MS;
   const inFlight = new Set<Promise<void>>();
   let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -67,6 +73,23 @@ export function createAiRunner(options: AiRunnerOptions): AiRunner {
       const timer = setTimeout(() => {
         controller.abort(timeoutError());
       }, timeoutMs);
+      // 止める求めを 1 秒ごとに読み、1 なら止める合図を送る。M26 が CLI を止め、M25 が中止にする
+      // （answer の発言も中止にし、本文は残す）。読めなかった回は、次の回にもう一度読む。
+      const watcher = setInterval(() => {
+        if (controller.signal.aborted) return;
+        try {
+          if (queue.isStopRequested(picked.aiRunId)) {
+            controller.abort(new RunStopRequested());
+          }
+        } catch (error) {
+          logger.log({
+            level: "warn",
+            aiRunId: picked.aiRunId,
+            detail: "止める求めを読めなかった",
+            error,
+          });
+        }
+      }, stopCheckIntervalMs);
       const task = execute(picked, { signal: controller.signal })
         .catch((error: unknown) => {
           logger.log({
@@ -78,6 +101,7 @@ export function createAiRunner(options: AiRunnerOptions): AiRunner {
         })
         .finally(() => {
           clearTimeout(timer);
+          clearInterval(watcher);
           inFlight.delete(task);
         });
       inFlight.add(task);

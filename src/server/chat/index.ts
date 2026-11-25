@@ -1,4 +1,4 @@
-import { enqueueAnswer } from "../ai-jobs";
+import { cancelQueuedRun, enqueueAnswer, requestStop } from "../ai-jobs";
 import type { Database } from "../db/connection";
 import { toDbError } from "../db/errors";
 import { inWriteTransaction } from "../db/transaction";
@@ -7,6 +7,7 @@ import {
   type MessageRow,
   type ReplyMessageRow,
   contentExists,
+  dismissFailedReply,
   findConversation,
   findMessageRow,
   findWritingReply,
@@ -15,8 +16,11 @@ import {
   insertWritingReply,
   listConversationRows,
   listMessageRows,
+  markReplyCancelled,
+  restartReply,
   updateLastSpokenAt,
 } from "../repositories/conversation";
+import { findLatestAnswerRun } from "../repositories/ai-run";
 import type { Clock } from "../shared/clock";
 import { formatDateTime } from "../shared/datetime";
 import { NexusError } from "../shared/errors";
@@ -32,6 +36,11 @@ import { type Page, type PageQuery, toPage } from "../shared/paging";
 //                      最後に話した日時を書き、M20 で質問の応答を待ちに入れる。
 //   readReply          応答の続きを流すために、AI の発言の本文、応答の状態、一番新しい実行ID、知らせを読む
 //                      （DD-02 FN-015 続きを流すの手順 1、3、4。SSE の中継で M11 が 200 ミリ秒ごとに呼ぶ）。
+//   retryReply         失敗か中止の応答を送り直す（DD-02 FN-016 手順 2）。
+//   stopReply          作成中の応答を止める（DD-02 FN-016 手順 3）。
+//   dismissReply       失敗した応答をやめる（DD-02 FN-016 手順 4）。
+//                      3つとも1つのトランザクションで、遷移の前の状態を条件にした更新で行う（DD-05 2章・3章）。
+//                      事前条件に合わなければ何もせずに、今の AI の発言を返す（DD-04 3.2、DD-06 E06）。
 // 会話の作成は1文（DD-05 2章）。
 
 // `openapi.yaml` の `QuestionTarget`（質問の対象。BD-07 4.1）。形は入口層が M10 で確かめてから渡す。
@@ -115,6 +124,10 @@ export interface Chat {
   postQuestion(conversationId: number, text: string): QuestionPosted;
   // 応答の続きを読む（FN-015 続きを流す）。発言が無いか本人の発言なら NOT_FOUND を投げる。
   readReply(messageId: number): ReplyProgress;
+  // 送り直す、止める、やめる（FN-016）。発言が無いか本人の発言なら NOT_FOUND を投げる。今の AI の発言を返す。
+  retryReply(messageId: number): ChatMessage;
+  stopReply(messageId: number): ChatMessage;
+  dismissReply(messageId: number): ChatMessage;
 }
 
 // AI を動かす仕組みが使えない失敗（DD-06 E12）の `failure_reason` の先頭（DD-02 3章 P06 手順 5）。
@@ -188,6 +201,28 @@ function isTargetComplete(target: QuestionTarget): boolean {
 
 export function createChat(deps: { db: Database; clock: Clock }): Chat {
   const { db, clock } = deps;
+
+  // FN-016 の手順 1 と、手順 2〜4 の1つを1つのトランザクションで行い、今の AI の発言を返す。
+  // `change` は事前条件に合うときだけ状態を変える（合わなければ何もしない）。
+  const changeReply = (
+    messageId: number,
+    change: (now: Date) => void,
+  ): ChatMessage => {
+    try {
+      return inWriteTransaction(db, () => {
+        const before = findMessageRow(db, messageId);
+        if (before === null || before.speaker !== "ai") {
+          throw new NexusError("NOT_FOUND", "AI の発言が無い");
+        }
+        change(clock.now());
+        const after = findMessageRow(db, messageId);
+        if (after === null) throw new NexusError("INTERNAL", "AI の発言が無い");
+        return toChatMessage(after);
+      });
+    } catch (error) {
+      throw toDbError(error);
+    }
+  };
 
   return {
     listConversations(targetContentId, { after, limit }) {
@@ -316,6 +351,36 @@ export function createChat(deps: { db: Database; clock: Clock }): Chat {
       } catch (error) {
         throw toDbError(error);
       }
+    },
+    retryReply(messageId) {
+      // 手順 2: failed か cancelled のときだけ、本文を空に、writing にし、`attempt` 1 を待ちに入れる。
+      // 2台から続けて押したら、先の1回だけが通る（条件付きの更新。DD-05 3章 ENT-008）。
+      return changeReply(messageId, (now) => {
+        if (restartReply(db, messageId) === 1)
+          enqueueAnswer(db, messageId, now);
+      });
+    },
+    stopReply(messageId) {
+      // 手順 3: writing のときだけ、一番新しい実行を見る。待ちなら実行と発言を cancelled に、
+      // 処理中なら `stop_requested` を 1 にする（M24 が止め、実行と発言を cancelled にする）。
+      return changeReply(messageId, (now) => {
+        if (findMessageRow(db, messageId)?.replyState !== "writing") return;
+        const run = findLatestAnswerRun(db, messageId);
+        if (run === null) return;
+        if (run.state === "queued") {
+          if (cancelQueuedRun(db, run.aiRunId, now)) {
+            markReplyCancelled(db, messageId);
+          }
+        } else if (run.state === "running") {
+          requestStop(db, run.aiRunId);
+        }
+      });
+    },
+    dismissReply(messageId) {
+      // 手順 4: failed のときだけ cancelled にする。`ai_run` は変えない（ホームの失敗の知らせは残す。Q-078 の答え）。
+      return changeReply(messageId, () => {
+        dismissFailedReply(db, messageId);
+      });
     },
   };
 }

@@ -424,3 +424,38 @@ export function updateConversationSummary(
     "UPDATE conversation SET summary_md = ?, summary_last_message_id = ? WHERE conversation_id = ?",
   ).run(summaryMd, summaryLastMessageId, conversationId);
 }
+
+// ---- 応答の送り直しと中止（DD-02 FN-016）----
+
+// 送り直す: failed か cancelled のときだけ、本文を空にして writing にする（手順 2）。変えた行の数を返す。
+export function restartReply(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET body_md = '', reply_state = 'writing' WHERE message_id = ? AND speaker = 'ai' AND reply_state IN ('failed', 'cancelled')",
+      )
+      .run(messageId).changes,
+  );
+}
+
+// 止める: writing のときだけ cancelled にする。本文は残す（手順 3、3章 P06 手順 3）。変えた行の数を返す。
+export function markReplyCancelled(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET reply_state = 'cancelled' WHERE message_id = ? AND reply_state = 'writing'",
+      )
+      .run(messageId).changes,
+  );
+}
+
+// やめる: failed のときだけ cancelled にする（手順 4）。変えた行の数を返す。
+export function dismissFailedReply(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET reply_state = 'cancelled' WHERE message_id = ? AND reply_state = 'failed'",
+      )
+      .run(messageId).changes,
+  );
+}
