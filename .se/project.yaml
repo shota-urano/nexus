@@ -1,0 +1,4 @@
+base_branch: main
+test_command: make verify
+test_report: reports/junit.xml
+test_report_format: junit
