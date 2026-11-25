@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AppFrame,
   SERVICE_WORKER_URL,
-  useDeviceApi,
 } from "../src/app/(screens)/_frame/app-frame";
 import { FULL_NOTICE_MESSAGES } from "../src/app/(screens)/_frame/full-notice-messages";
 import { TopBar } from "../src/app/(screens)/_frame/top-bar";
 import ScreensLayout from "../src/app/(screens)/layout";
 import HomeRoute from "../src/app/(screens)/page";
+import { deviceFetch } from "../src/client/device-api";
 import { MESSAGES } from "../src/server/shared/messages";
 
 // DD-10 TC116: 全面の知らせ（BD-09 1.1 MSG-020・MSG-021）を M01 の枠で確かめる。
@@ -34,12 +34,11 @@ async function renderHomeRoute(
 }
 
 // 端末の API を呼ぶ画面の代わり。機能ごとの画面（07〜11）はこの実装単位の範囲の外なので、
-// 画面が使う `useDeviceApi()` で `/api/app/` を呼ぶだけのものを置く。
+// 画面が通信層 M09 の `deviceFetch` で `/api/app/` を呼ぶだけのものを置く。
 function ScreenCallingApi() {
-  const deviceApi = useDeviceApi();
   useEffect(() => {
-    void deviceApi("/api/app/home");
-  }, [deviceApi]);
+    void deviceFetch("/api/app/home");
+  }, []);
   return <p>画面の中身</p>;
 }
 
