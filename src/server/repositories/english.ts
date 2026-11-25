@@ -67,3 +67,59 @@ export function updateEnglishSetRow(
     contentId,
   );
 }
+
+// sharpen に返すセット（DD-02 FN-013 手順 2）。届いた原文と、内容を受け取った日時。
+export interface EnglishSetForSenderRow {
+  rawPayloadJson: string;
+  receivedAt: string;
+}
+
+// 日付の英語のセットの原文を読む。内容かセットが無ければ null。
+export function findEnglishSetForSenderByDate(
+  db: Database,
+  targetDate: string,
+): EnglishSetForSenderRow | null {
+  const row = db
+    .prepare(
+      `SELECT s.raw_payload_json, c.received_at
+       FROM content AS c JOIN english_set AS s ON s.content_id = c.content_id
+       WHERE c.kind = 'english' AND c.target_date = ?`,
+    )
+    .get(targetDate);
+  if (row === undefined) return null;
+  return {
+    rawPayloadJson: String(row.raw_payload_json),
+    receivedAt: String(row.received_at),
+  };
+}
+
+// sharpen に返す答え（DD-02 FN-013 手順 3）。セットが無ければ null。
+// セットがあって答えが無ければ answer が null。
+export interface EnglishAnswerForSenderRow {
+  answer: { answersJson: string; completedAt: string } | null;
+}
+
+export function findEnglishAnswerForSenderByDate(
+  db: Database,
+  targetDate: string,
+): EnglishAnswerForSenderRow | null {
+  const row = db
+    .prepare(
+      `SELECT a.answers_json, a.completed_at
+       FROM content AS c
+         JOIN english_set AS s ON s.content_id = c.content_id
+         LEFT JOIN english_answer AS a ON a.content_id = s.content_id
+       WHERE c.kind = 'english' AND c.target_date = ?`,
+    )
+    .get(targetDate);
+  if (row === undefined) return null;
+  if (row.answers_json === null || row.answers_json === undefined) {
+    return { answer: null };
+  }
+  return {
+    answer: {
+      answersJson: String(row.answers_json),
+      completedAt: String(row.completed_at),
+    },
+  };
+}
