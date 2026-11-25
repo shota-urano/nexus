@@ -286,6 +286,33 @@ describe("TC43 自動の採点の比べ方（DD-02 FN-011 の表）", () => {
     expect(autoGrade({}, "何か")).toBeNull();
   });
 
+  it("number は十進の数の値を桁を落とさずに比べる", () => {
+    const big = { answerType: "number" as const, expected: "9007199254740992" };
+    expect(autoGrade(big, "9007199254740993")).toBe("x");
+    expect(autoGrade(big, "9007199254740992.0")).toBe("o");
+    expect(
+      autoGrade(
+        { answerType: "number", expected: "0.1" },
+        "0.10000000000000000001",
+      ),
+    ).toBe("x");
+    expect(
+      autoGrade({ answerType: "number", expected: "1.5" }, " +01.50 "),
+    ).toBe("o");
+    expect(autoGrade({ answerType: "number", expected: "0" }, "-0.0")).toBe(
+      "o",
+    );
+    expect(autoGrade({ answerType: "number", expected: "0.5" }, ".5")).toBe(
+      "o",
+    );
+    expect(autoGrade({ answerType: "number", expected: "5" }, "5.")).toBe("o");
+    expect(autoGrade({ answerType: "number", expected: "-2" }, "2")).toBe("x");
+    expect(autoGrade({ answerType: "number", expected: "1" }, ".")).toBe("x");
+    expect(autoGrade({ answerType: "number", expected: "100" }, "1e2")).toBe(
+      "x",
+    );
+  });
+
   it("どの答えの形でも、未回答は ×", () => {
     for (const answerType of ["choice", "number", "text"] as const) {
       expect(autoGrade({ answerType, expected: "1" }, undefined)).toBe("x");
