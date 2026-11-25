@@ -9,7 +9,7 @@ export const LIST_MESSAGES = {
   "MSG-019": "内容を読み込めませんでした。もう一度開いてください。",
 } as const;
 
-// MSG-009 に検索の言葉を差し込む。
+// MSG-009 に検索の言葉を差し込む。置換関数で渡し、言葉の中の $& などを置換の記号として読ませない。
 export function noSearchResultMessage(term: string): string {
-  return LIST_MESSAGES["MSG-009"].replace("{検索の言葉}", term);
+  return LIST_MESSAGES["MSG-009"].replace("{検索の言葉}", () => term);
 }
