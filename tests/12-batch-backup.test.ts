@@ -513,6 +513,45 @@ describe("TC88 バッチの多重起動（DD-05 4章）", () => {
   });
 });
 
+describe("M27 ログを書けないとき（DD-05 4章、BD-02 5.4、DD-09 2.6）", () => {
+  it("ログの置き場所が普通のファイルでも、印を消し、写しを作り、標準エラーに出して終了コード 2", async () => {
+    const logDir = join(dir, "not-a-dir");
+    writeFileSync(logDir, "");
+    const errors: string[] = [];
+
+    const code = await runBackupJob({
+      env: env({ NEXUS_LOG_DIR: logDir }),
+      stderr: (line) => errors.push(line),
+    });
+
+    expect(code).toBe(2);
+    expect(lockRows()).toEqual([]);
+    expect(backupNames()).toEqual(["nexus-2026-12-01.db"]);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.join("\n")).toContain("BAT-001 のログを書けない");
+  });
+
+  it("本番と同じ入口（src/jobs/main.ts）を子のプロセスで動かしても、印を残さずに終了コード 2 で終わり、標準エラーに出す", async () => {
+    const logDir = join(dir, "not-a-dir");
+    writeFileSync(logDir, "");
+    const child = spawnLauncher({
+      command: process.execPath,
+      args: [MAIN, "backup"],
+      env: {
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        ...env({ NEXUS_LOG_DIR: logDir }),
+      },
+      cwd: dir,
+    });
+    child.writeInput("");
+    const { code } = await child.ended;
+
+    expect(code, child.stderr()).toBe(2);
+    expect(child.stderr()).toContain("BAT-001 のログを書けない");
+    expect(lockRows()).toEqual([]);
+  });
+});
+
 describe("TC89 写している間の書き込み（DD-05 3章 DB の全体）", () => {
   it("写している間に別の接続で postNewsBatch を流しても、送信は 200 で、写しは integrity_check で ok", async () => {
     const key = createSenderKeys({ db, clock }).issue("brain-harness").key;
