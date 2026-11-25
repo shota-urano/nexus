@@ -11,10 +11,16 @@ import {
   type QueueCounts,
   claimNextQueuedRun,
   countQueue,
+  insertQueuedAnswerRun,
   insertQueuedRelateRun,
+  insertQueuedSummarizeRun,
+  isRunStopRequested,
   listRunningRuns,
+  markQueuedRunCancelled,
   markRunDone,
   markRunFailed,
+  markRunningRunCancelled,
+  requestRunStop,
 } from "../repositories/ai-run";
 import type { Clock } from "../shared/clock";
 import { formatDateTime } from "../shared/datetime";
@@ -42,6 +48,8 @@ export interface AiQueue {
   listRunning(): PickedRun[];
   // 待ちの数、処理中の数、一番古い待ちの日時（状態を返す API。DD-01 M20、DD-04 `getHealth`）。
   counts(): QueueCounts;
+  // 止める求め（`stop_requested`）があるか（M24 が見張る。DD-02 3章 P06 手順 3）。
+  isStopRequested(aiRunId: number): boolean;
 }
 
 function toPicked(row: AiRunRow): PickedRun {
@@ -71,6 +79,9 @@ export function createAiQueue(db: Database, clock: Clock): AiQueue {
     },
     counts() {
       return countQueue(db);
+    },
+    isStopRequested(aiRunId) {
+      return isRunStopRequested(db, aiRunId);
     },
   };
 }
@@ -122,6 +133,27 @@ export function enqueueRelate(
   return insertQueuedRelateRun(db, deliveryId, 1, formatDateTime(at));
 }
 
+// 質問の応答を待ちに入れる（`attempt` 1。DD-02 FN-015 受け付けの手順 3.5）。
+// 呼んだ側のトランザクションの中で呼ぶ。作った実行ID を返す。
+export function enqueueAnswer(
+  db: Database,
+  replyMessageId: number,
+  at: Date,
+): number {
+  return insertQueuedAnswerRun(db, replyMessageId, 1, formatDateTime(at));
+}
+
+// 会話の要約を待ちに入れる（`attempt` 1。DD-02 FN-015 会話の要約の手順 1）。
+// 同じ会話の summarize が待ちか処理中でないことを確かめるのと同じトランザクションの中で呼ぶ（DD-05 3章）。
+// 作った実行ID を返す。
+export function enqueueSummarize(
+  db: Database,
+  conversationId: number,
+  at: Date,
+): number {
+  return insertQueuedSummarizeRun(db, conversationId, 1, formatDateTime(at));
+}
+
 // 記事の関係の判定を自動で送り直す（同じ受け取りの記録で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。
 // 失敗にするのと同じトランザクションの中で呼ぶ（DD-05 3章）。作った実行ID を返す。
 export function requeueRelate(
@@ -131,6 +163,17 @@ export function requeueRelate(
   at: Date,
 ): number {
   return insertQueuedRelateRun(db, deliveryId, attempt, formatDateTime(at));
+}
+
+// 質問の応答を自動で送り直す（同じ AI の発言で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。
+// 失敗にするのと同じトランザクションの中で呼ぶ（DD-05 3章）。作った実行ID を返す。
+export function requeueAnswer(
+  db: Database,
+  replyMessageId: number,
+  attempt: number,
+  at: Date,
+): number {
+  return insertQueuedAnswerRun(db, replyMessageId, attempt, formatDateTime(at));
 }
 
 // 実行を完了にする（running のときだけ。DD-02 3章 P06 手順 4）。
@@ -148,4 +191,30 @@ export function failRun(
   at: Date,
 ): boolean {
   return markRunFailed(db, aiRunId, failureReason, formatDateTime(at)) === 1;
+}
+
+// 待ちの実行を中止にする（queued のときだけ。DD-02 FN-016 手順 3）。
+// AI の発言を中止にするのと同じトランザクションの中で呼ぶ（DD-05 2章）。中止にできたかを返す。
+export function cancelQueuedRun(
+  db: Database,
+  aiRunId: number,
+  at: Date,
+): boolean {
+  return markQueuedRunCancelled(db, aiRunId, formatDateTime(at)) === 1;
+}
+
+// 処理中の実行を、止める求めで中止にする（running のときだけ。DD-02 3章 P06 手順 3）。
+// AI の発言を中止にするのと同じトランザクションの中で呼ぶ（DD-05 3章 ENT-008・ENT-009）。中止にできたかを返す。
+export function cancelRunningRun(
+  db: Database,
+  aiRunId: number,
+  at: Date,
+): boolean {
+  return markRunningRunCancelled(db, aiRunId, formatDateTime(at)) === 1;
+}
+
+// 処理中の実行に止める求めを出す（`stop_requested` を偽から真にだけ変える。DD-02 FN-016 手順 3、DD-05 3章）。
+// 求めを出せたかを返す。
+export function requestStop(db: Database, aiRunId: number): boolean {
+  return requestRunStop(db, aiRunId) === 1;
 }

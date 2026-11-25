@@ -224,3 +224,63 @@ export function listNewsTargetDates(db: Database, limit: number): string[] {
     .all(limit)
     .map((row) => String(row.target_date));
 }
+
+// AI チャットに渡す記事（DD-02 3章 P07 手順 3 のニュース）。
+export interface ChatArticleRow {
+  title: string;
+  theme: string;
+  guideMd: string;
+  sourceUrl: string;
+}
+
+export function findChatArticle(
+  db: Database,
+  contentId: number,
+): ChatArticleRow | null {
+  const row = db
+    .prepare(
+      `SELECT c.title, a.theme, a.guide_md, a.source_url
+       FROM content AS c JOIN article AS a ON a.content_id = c.content_id
+       WHERE c.content_id = ?`,
+    )
+    .get(contentId);
+  if (row === undefined) return null;
+  return {
+    title: String(row.title),
+    theme: String(row.theme),
+    guideMd: String(row.guide_md),
+    sourceUrl: String(row.source_url),
+  };
+}
+
+// 記事と有効な関係のある記事の見出しと関係の種類。`direction` は、その記事が関係の元（from）か先（to）か。
+export interface ChatRelatedArticleRow {
+  contentId: number;
+  title: string;
+  relationType: string;
+  direction: "from" | "to";
+}
+
+export function listChatRelatedArticles(
+  db: Database,
+  contentId: number,
+): ChatRelatedArticleRow[] {
+  return db
+    .prepare(
+      `SELECT r.to_content_id AS other_id, c.title, r.relation_type, 'to' AS direction
+         FROM article_relation AS r JOIN content AS c ON c.content_id = r.to_content_id
+        WHERE r.is_active = 1 AND r.from_content_id = ?
+       UNION ALL
+       SELECT r.from_content_id AS other_id, c.title, r.relation_type, 'from' AS direction
+         FROM article_relation AS r JOIN content AS c ON c.content_id = r.from_content_id
+        WHERE r.is_active = 1 AND r.to_content_id = ?
+       ORDER BY other_id`,
+    )
+    .all(contentId, contentId)
+    .map((row) => ({
+      contentId: Number(row.other_id),
+      title: String(row.title),
+      relationType: String(row.relation_type),
+      direction: row.direction === "from" ? "from" : "to",
+    }));
+}
