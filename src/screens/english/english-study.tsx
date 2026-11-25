@@ -154,6 +154,8 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
         setNotices([]);
       } else if (result.status === "ungraded") {
         showNotice("MSG-005");
+      } else if (result.status === "rejected") {
+        showNotice("MSG-019");
       } else if (result.status === "failed") {
         showNotice("MSG-007");
       }

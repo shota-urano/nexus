@@ -103,6 +103,8 @@ export type PutEnglishAnswerResult =
   | { status: "ok"; value: EnglishAnswer }
   | { status: "unauthorized" }
   | { status: "ungraded" }
+  // 403 と、MSG-005 でない 400。送り直しても通らないので MSG-019 を出す（DD-04 3.4）。
+  | { status: "rejected" }
   | { status: "failed" };
 
 async function messageIdOf(response: Response): Promise<string | null> {
@@ -134,10 +136,11 @@ export async function putEnglishAnswer(
     return { status: "failed" };
   }
   if (response.status === 401) return { status: "unauthorized" };
+  if (response.status === 403) return { status: "rejected" };
   if (response.status === 400) {
     return (await messageIdOf(response)) === "MSG-005"
       ? { status: "ungraded" }
-      : { status: "failed" };
+      : { status: "rejected" };
   }
   if (!response.ok) return { status: "failed" };
   let json: unknown;

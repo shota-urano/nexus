@@ -286,6 +286,37 @@ describe("TC48 API が 500 を返すと MSG-007 が出て、採点の段に答�
       ENGLISH_MESSAGES["MSG-005"],
     );
   });
+
+  // DD-04 3.4: 403 と、MSG-005 でない 400 は MSG-019。送り直しを案内する MSG-007 は出さない。
+  it.each([
+    { status: 403, code: "forbidden_origin" },
+    { status: 400, code: "bad_request" },
+  ])(
+    "$status（$code）では MSG-019 を出し、MSG-007 は出さず、採点の段は残る",
+    async ({ status, code }) => {
+      fetchMock.mockImplementation(async () =>
+        Response.json(
+          {
+            error: {
+              code,
+              message: ENGLISH_MESSAGES["MSG-019"],
+              messageId: "MSG-019",
+            },
+          },
+          { status },
+        ),
+      );
+      render(<EnglishStudy set={e1()} />);
+      fireEvent.click(screen.getByRole("button", { name: "問題へ" }));
+      answerAndGrade();
+      fireEvent.click(completeButton());
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toContain(ENGLISH_MESSAGES["MSG-019"]);
+      expect(alert.textContent).not.toContain(ENGLISH_MESSAGES["MSG-007"]);
+      expect(screen.queryByText(DONE_TEXT)).toBeNull();
+      expect(screen.getByRole("region", { name: "採点の段" })).toBeTruthy();
+    },
+  );
 });
 
 describe("TC49 「完了」を続けて2回押しても API の呼び出しは1回（BD-09 5章、DD-05 4章）", () => {
