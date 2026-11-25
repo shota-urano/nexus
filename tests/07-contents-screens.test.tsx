@@ -213,6 +213,15 @@ describe("M05 画面の状態（BD-03 3.5）", () => {
     ).toBeTruthy();
   });
 
+  it("Explore の0件は、置換の特殊な文字（$& など）を含む言葉もそのまま差し込む", async () => {
+    stubFetch(() => jsonResponse({ items: [], nextCursor: null }));
+    render(<ExploreScreen />);
+    await searchFor("$& $' $$");
+    expect(
+      await screen.findByText("「$& $' $$」に当たる内容はありません。"),
+    ).toBeTruthy();
+  });
+
   it.each([
     ["500", () => jsonResponse({ code: "x", message: "MSG-019" }, 500)],
     ["形が違う応答", () => jsonResponse({ items: [{ contentId: 1 }] })],
