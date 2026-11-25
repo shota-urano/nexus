@@ -48,5 +48,5 @@ BD-07 のエンティティ ENT-001〜ENT-013 と、検索の索引、マイグ�
 
 ## 9. 実装単位
 
-- [ ] [Backend] マイグレーション 0001 で、DD-03 2.2 の16のテーブル（`search_index` は FTS5 の trigram）と、3章の全ての索引を作る（ENT-001〜ENT-013、DD-03）
+- [x] [Backend] マイグレーション 0001 で、DD-03 2.2 の16のテーブル（`search_index` は FTS5 の trigram）と、3章の全ての索引を作る（ENT-001〜ENT-013、DD-03）（se/02-data-model）
   - 受け入れ基準: 空の DB に当てると DD-03 2.1 の16のテーブルと、3章の22の索引（主キーと FTS5 の索引を除く）ができる; `PRAGMA foreign_key_check` が行を返さず、`PRAGMA integrity_check` が ok を返す; `content.kind` に空の文字を入れる、`ai_run` の目的が answer で `reply_message_id` が空、`message` の話し手が owner で `reply_state` がある、のどれも挿入が拒まれる
