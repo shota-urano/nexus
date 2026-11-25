@@ -3,7 +3,11 @@ import { type JobName, createJobLock, openJobDatabase } from "./lock";
 import { type Clock, systemClock } from "../server/shared/clock";
 import { type Config, loadConfig } from "../server/shared/config";
 import { NexusError } from "../server/shared/errors";
-import { type Logger, createLogger } from "../server/shared/logger";
+import {
+  type Logger,
+  createLogger,
+  describeError,
+} from "../server/shared/logger";
 import { type MessageId, formatMessage } from "../server/shared/messages";
 
 // 定期ジョブの入口（DD-01 M27。DD-02 FN-021 手順 1、DD-05 4章、BD-02 5.4）。
@@ -12,6 +16,7 @@ import { type MessageId, formatMessage } from "../server/shared/messages";
 // 2. M31 で多重起動の印を取る。同じバッチが動いていたら、何もせずにログに残し、終了コード 0 で終わる。
 // 3. 開始をログに出し、バッチを動かし、件数と結果をログに出す。
 // 4. 印を消し（異常で終わるときも）、終了をログに出し、終了コード（0、1、2）を返す。
+// ログを書けないときは、標準エラーに出して続け（印は必ず消す）、終了コードを 2 にする（DD-05 4章、BD-02 5.4）。
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -88,7 +93,33 @@ export async function runJobProcess(
     stderr(`NEXUS の定期ジョブを起動できない: ${reasonOf(error)}`);
     return EXIT_ERROR;
   }
-  const logger = createLogger({ process: "job", clock, dir: config.logDir });
+  const logger = guardLogger(
+    createLogger({ process: "job", clock, dir: config.logDir }),
+    job,
+    stderr,
+  );
+  const exitCode = await runJob(name, job, {
+    clock,
+    config,
+    logger,
+    options,
+    pid,
+  });
+  return logger.failed() ? EXIT_ERROR : exitCode;
+}
+
+async function runJob(
+  name: JobName,
+  job: JobDefinition,
+  context: {
+    clock: Clock;
+    config: Config;
+    logger: Logger;
+    options: RunJobProcessOptions;
+    pid: number;
+  },
+): Promise<number> {
+  const { clock, config, logger, options, pid } = context;
 
   let db: JobContext["db"];
   try {
@@ -131,24 +162,25 @@ export async function runJobProcess(
       return EXIT_OK;
     }
 
-    logger.log({
-      level: "info",
-      target: job.target,
-      detail: `${job.target} ${job.title}を始めた`,
-    });
-    let exitCode: number;
+    let exitCode = EXIT_ERROR;
     try {
+      logger.log({
+        level: "info",
+        target: job.target,
+        detail: `${job.target} ${job.title}を始めた`,
+      });
       exitCode = await job.run({ db, clock, config, logger, options });
     } catch (error) {
       logFailure(logger, job, error);
       exitCode = EXIT_ERROR;
-    }
-    // 異常で終わるときも、自分の番号の印だけを消す（DD-05 4章）。
-    try {
-      lock.release(name, pid);
-    } catch (error) {
-      logFailure(logger, job, error);
-      exitCode = EXIT_ERROR;
+    } finally {
+      // 異常で終わるときも、自分の番号の印だけを消す（DD-05 4章）。
+      try {
+        lock.release(name, pid);
+      } catch (error) {
+        logFailure(logger, job, error);
+        exitCode = EXIT_ERROR;
+      }
     }
     logger.log({
       level: "info",
@@ -201,6 +233,37 @@ async function runBackupJob(context: JobContext): Promise<number> {
       });
       return EXIT_ERROR;
   }
+}
+
+// ログを書けない（置き場所が使えないなど）ときも、印を消して終わるために、例外を外に出さない。
+// 書けなかったことを標準エラー（launchd の標準エラーのファイル。DD-09 2.6）に出し、終了コードを 2 にする。
+// 標準エラーには、書けなかった行の中身を出さず、行の level・code・msg・target と原因の種類だけを出す。
+function guardLogger(
+  logger: Logger,
+  job: JobDefinition,
+  stderr: (line: string) => void,
+): Logger & { failed(): boolean } {
+  let failed = false;
+  return {
+    log(entry) {
+      try {
+        logger.log(entry);
+      } catch (error) {
+        failed = true;
+        const fields = [entry.level, entry.code, entry.msg, entry.target]
+          .filter((value) => value !== undefined)
+          .join(" ");
+        try {
+          stderr(
+            `NEXUS の定期ジョブ ${job.target} のログを書けない（${fields}）: ${describeError(error)}`,
+          );
+        } catch {
+          // 標準エラーにも出せないときは、終了コード 2 だけで知らせる。
+        }
+      }
+    },
+    failed: () => failed,
+  };
 }
 
 // DB が使えない（E08）か予期しない失敗（E16）。バッチは MSG を出して終了コード 2（DD-06 2章）。
