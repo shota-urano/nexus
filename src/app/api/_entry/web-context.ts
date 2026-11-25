@@ -7,6 +7,7 @@ import {
 } from "../../../server/auth/sender-key";
 import { type Chat, createChat } from "../../../server/chat";
 import { createContents, type Contents } from "../../../server/contents";
+import { createHomeView, type HomeView } from "../../../server/home";
 import { createIngest, type Ingest } from "../../../server/ingest";
 import { createNewsView, type NewsView } from "../../../server/kinds/news/view";
 import {
@@ -48,6 +49,8 @@ export interface WebContext {
   english: EnglishLearning;
   // 会話（DD-01 M18）。
   chat: Chat;
+  // ホームの表示（DD-01 M19。FN-020）。
+  home: HomeView;
   clock: Clock;
 }
 
@@ -87,6 +90,7 @@ export function createWebContext(
     const news = createNewsView({ db });
     const english = createEnglishLearning({ db, clock });
     const chat = createChat({ db, clock });
+    const home = createHomeView({ db, clock });
     return {
       logger,
       devices,
@@ -99,6 +103,7 @@ export function createWebContext(
       news,
       english,
       chat,
+      home,
       clock,
     };
   } catch (error) {
