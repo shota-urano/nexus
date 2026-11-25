@@ -583,6 +583,67 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
     expect(screen.getByText("am")).toBeTruthy();
   });
 
+  it("A02 会話2、会話3と続けて選び、会話2の結果が後から返っても、最後に選んだ会話3を出したままにする", async () => {
+    let answerSecond: (response: Response) => void = () => {};
+    let secondCalls = 0;
+    const detail2 = () =>
+      jsonResponse({
+        conversation: conversation({ conversationId: 2 }),
+        messages: [
+          message({ messageId: 30, conversationId: 2, bodyMd: "会話2の質問" }),
+        ],
+      });
+    stubFetch({
+      [LIST_KEY]: () =>
+        jsonResponse({
+          items: [
+            conversation(),
+            conversation({ conversationId: 2 }),
+            conversation({ conversationId: 3 }),
+          ],
+          nextCursor: null,
+        }),
+      [DETAIL_KEY]: () =>
+        jsonResponse({ conversation: conversation(), messages: [message()] }),
+      // 1回目は書き出しを取る呼び出し。2回目（選んだとき）の応答を遅らせる。
+      "GET /api/app/conversations/2": () => {
+        secondCalls += 1;
+        if (secondCalls === 1) return detail2();
+        return new Promise<Response>((resolve) => {
+          answerSecond = resolve;
+        });
+      },
+      "GET /api/app/conversations/3": () =>
+        jsonResponse({
+          conversation: conversation({ conversationId: 3 }),
+          messages: [
+            message({
+              messageId: 40,
+              conversationId: 3,
+              bodyMd: "会話3の質問",
+            }),
+          ],
+        }),
+    });
+    openSheet();
+    const select = screen.getByRole("combobox", {
+      name: "前の会話",
+    }) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(select.options[2]?.textContent).toContain("会話3の質問"),
+    );
+    fireEvent.change(select, { target: { value: "2" } });
+    fireEvent.change(select, { target: { value: "3" } });
+    await waitFor(() => expect(select.value).toBe("3"));
+    await act(async () => {
+      answerSecond(detail2());
+    });
+    expect(select.value).toBe("3");
+    expect(screen.getAllByTestId("owner-message")[0].textContent).toContain(
+      "会話3の質問",
+    );
+  });
+
   it("A03 「新しい会話」は結果が出るまで押せなくし、空の会話を出す", async () => {
     let created: (response: Response) => void = () => {};
     stubFetch({
@@ -619,6 +680,49 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
     }) as HTMLSelectElement;
     expect(select.value).toBe("9");
     expect((button as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("A04 空の会話に最初の質問を受け付けたら、O02 の選択肢を質問の書き出しと最後に話した日時に変える", async () => {
+    stubFetch({
+      [LIST_KEY]: () =>
+        jsonResponse({ items: [conversation()], nextCursor: null }),
+      [DETAIL_KEY]: () =>
+        jsonResponse({ conversation: conversation(), messages: [] }),
+      [QUESTION_KEY]: () =>
+        jsonResponse(
+          {
+            question: message({
+              messageId: 20,
+              bodyMd: "はじめての質問",
+              sentAt: "2026-11-25T12:00:00.000+09:00",
+            }),
+            reply: aiMessage({
+              messageId: 21,
+              bodyMd: "",
+              replyState: "writing",
+              replyToMessageId: 20,
+              sentAt: "2026-11-25T12:00:00.000+09:00",
+            }),
+          },
+          202,
+        ),
+      "GET /api/app/messages/21/stream": never,
+    });
+    openSheet();
+    const select = screen.getByRole("combobox", {
+      name: "前の会話",
+    }) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(select.options[0]?.textContent).toBe(
+        "新しい会話（11月24日（火） 05:30）",
+      ),
+    );
+    typeQuestion("はじめての質問");
+    fireEvent.click(sendButton());
+    await screen.findByText("応答を作成中");
+    expect(select.options[0].textContent).toBe(
+      "はじめての質問（11月25日（水） 12:00）",
+    );
   });
 
   it("A04 送れなかったら MSG-019 を出し、質問の文を欄に残す", async () => {

@@ -147,6 +147,8 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
   const [pending, setPending] = useState<ReadonlySet<number>>(new Set());
   const pendingRef = useRef(new Set<number>());
   const unmountRef = useRef(new AbortController());
+  // 会話を選ぶか作るたびに増やす。古い求めの結果で、後から選んだ会話を置き換えないため（SCR-006-A02）。
+  const selectionRef = useRef(0);
   const thisYear = thisYearInJapan(new Date());
 
   useEffect(() => {
@@ -180,6 +182,7 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
     const { signal } = controller;
     const target = JSON.parse(targetKey) as QuestionTarget | null;
     const run = async () => {
+      const selection = selectionRef.current;
       const list = await fetchConversations(target?.contentId ?? null, signal);
       if (list.status !== "ok") {
         setPhase(list.status);
@@ -229,7 +232,8 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
         setPhase(newest.status);
         return;
       }
-      setCurrent(newest.value);
+      // 読むあいだに会話を選んだか作ったなら、そちらを出したままにする。
+      if (selectionRef.current === selection) setCurrent(newest.value);
       setPhase("ready");
       // 続きのページの会話も選べるよう、最後のページまで読む（DD-04 ページング）。
       let cursor = list.value.nextCursor;
@@ -339,11 +343,15 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
   async function selectConversation(id: number) {
     setError(null);
     setOpenNotice(null);
+    const selection = ++selectionRef.current;
     try {
       const result = await fetchConversation(id, unmountRef.current.signal);
+      // 後から別の会話を選んだか作ったなら、この結果は出さない。
+      if (selection !== selectionRef.current) return;
       if (result.status === "ok") setCurrent(result.value);
       else if (result.status === "failed") setError(CHAT_MESSAGES["MSG-019"]);
     } catch (caught) {
+      if (selection !== selectionRef.current) return;
       if (!isAbortError(caught)) setError(CHAT_MESSAGES["MSG-019"]);
     }
   }
@@ -354,6 +362,7 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
     creatingRef.current = true;
     setCreating(true);
     setError(null);
+    const selection = ++selectionRef.current;
     try {
       const result = await createConversation(
         target,
@@ -365,8 +374,11 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
           { conversation, snippet: null },
           ...previous,
         ]);
-        setCurrent({ conversation, messages: [] });
-        setOpenNotice(notice);
+        // 作るあいだに別の会話を選んだなら、選んだ会話を出したままにする。
+        if (selection === selectionRef.current) {
+          setCurrent({ conversation, messages: [] });
+          setOpenNotice(notice);
+        }
         setPhase("ready");
       } else if (result.status === "failed") {
         setError(CHAT_MESSAGES["MSG-019"]);
@@ -389,13 +401,32 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
     try {
       const result = await postQuestion(id, text, unmountRef.current.signal);
       if (result.status === "accepted") {
+        const { question } = result;
         setCurrent((detail) =>
           detail === null || detail.conversation.conversationId !== id
             ? detail
             : {
                 ...detail,
-                messages: [...detail.messages, result.question, result.reply],
+                conversation: {
+                  ...detail.conversation,
+                  lastSpokenAt: question.sentAt,
+                },
+                messages: [...detail.messages, question, result.reply],
               },
+        );
+        // 選択肢（O02）の、最初の質問の書き出しと最後に話した日時を変える。
+        setOptions((previous) =>
+          previous.map((option) =>
+            option.conversation.conversationId === id
+              ? {
+                  conversation: {
+                    ...option.conversation,
+                    lastSpokenAt: question.sentAt,
+                  },
+                  snippet: option.snippet ?? snippetOf([question]),
+                }
+              : option,
+          ),
         );
         setText("");
       } else if (result.status === "reply_in_progress") {
