@@ -1,5 +1,14 @@
 import { type OpenedAiJobs, openAiJobs } from "../../../server/ai-jobs";
 import { createDevices, type Devices } from "../../../server/auth/devices";
+import {
+  createSenderKeys,
+  type SenderKeys,
+} from "../../../server/auth/sender-key";
+import { createIngest, type Ingest } from "../../../server/ingest";
+import {
+  createEnglishForSender,
+  type EnglishForSender,
+} from "../../../server/kinds/english/provide";
 import { type Clock, systemClock } from "../../../server/shared/clock";
 import { loadConfig } from "../../../server/shared/config";
 import { NexusError } from "../../../server/shared/errors";
@@ -18,6 +27,10 @@ export interface WebContext {
   logger: Logger;
   devices: Devices;
   aiJobs: OpenedAiJobs;
+  senderKeys: SenderKeys;
+  ingest: Ingest;
+  englishForSender: EnglishForSender;
+  clock: Clock;
 }
 
 let context: WebContext | null = null;
@@ -28,7 +41,7 @@ export function webContext(): WebContext {
 }
 
 // 部品を作る。DB を1つだけ開き（DD-01 2.1 M21 の接続はプロセスごとに1つ）、マイグレーションを当ててから
-// （DD-03 5章）、端末の部品も同じ接続を使う。
+// （DD-03 5章）、端末の部品、配信元の鍵の部品、受け取りの部品、sharpen に返す読み取りも同じ接続を使う。
 // 失敗したら、ログに出せるときはログに出し（DD-06 E17 は致命的）、開いた DB を閉じて投げる。
 export function createWebContext(
   env: Env,
@@ -39,8 +52,20 @@ export function createWebContext(
   let aiJobs: OpenedAiJobs | null = null;
   try {
     aiJobs = openAiJobs({ dataDir: config.dataDir, clock, startup: "migrate" });
-    const devices = createDevices({ db: aiJobs.db, clock });
-    return { logger, devices, aiJobs };
+    const { db } = aiJobs;
+    const devices = createDevices({ db, clock });
+    const senderKeys = createSenderKeys({ db, clock });
+    const ingest = createIngest({ db, clock, logger });
+    const englishForSender = createEnglishForSender({ db });
+    return {
+      logger,
+      devices,
+      aiJobs,
+      senderKeys,
+      ingest,
+      englishForSender,
+      clock,
+    };
   } catch (error) {
     aiJobs?.close();
     const code = error instanceof NexusError ? error.code : "INTERNAL";

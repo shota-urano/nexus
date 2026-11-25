@@ -79,3 +79,63 @@ export function listContentIdsReceivedAfter(
     .all(...contentIds, since)
     .map((row) => Number(row.content_id));
 }
+
+// 置き換えに使う、記事ごとの値（DD-02 FN-001 手順 7.2）。
+export interface ArticleValues {
+  guideMd: string;
+  sourceUrl: string;
+  imageUrl: string | null;
+  theme: string;
+}
+
+// 対象日と slug でニュースの記事の内容ID を探す（DD-02 FN-001 手順 7.2）。無ければ null。
+export function findNewsContentIdBySlug(
+  db: Database,
+  targetDate: string,
+  slug: string,
+): number | null {
+  const row = db
+    .prepare(
+      `SELECT c.content_id FROM content AS c JOIN article AS a ON a.content_id = c.content_id
+       WHERE c.kind = 'news' AND c.target_date = ? AND a.slug = ?
+       ORDER BY c.content_id LIMIT 1`,
+    )
+    .get(targetDate, slug);
+  return row === undefined ? null : Number(row.content_id);
+}
+
+// 記事を作る（内容を作った後に呼ぶ）。
+export function insertArticleRow(
+  db: Database,
+  contentId: number,
+  slug: string,
+  values: ArticleValues,
+): void {
+  db.prepare(
+    "INSERT INTO article (content_id, slug, guide_md, source_url, image_url, theme) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(
+    contentId,
+    slug,
+    values.guideMd,
+    values.sourceUrl,
+    values.imageUrl,
+    values.theme,
+  );
+}
+
+// 記事の案内、元の記事の URL、画像の URL、テーマを新しい値にする（BD-02 FN-001 業務ルール）。
+export function updateArticleRow(
+  db: Database,
+  contentId: number,
+  values: ArticleValues,
+): void {
+  db.prepare(
+    "UPDATE article SET guide_md = ?, source_url = ?, image_url = ?, theme = ? WHERE content_id = ?",
+  ).run(
+    values.guideMd,
+    values.sourceUrl,
+    values.imageUrl,
+    values.theme,
+    contentId,
+  );
+}

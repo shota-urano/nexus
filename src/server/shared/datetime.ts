@@ -35,8 +35,15 @@ function dateToDayNumber(date: string): number | null {
   if (!match) return null;
   const [year, month, day] = match.slice(1).map(Number);
   const time = Date.UTC(year, month - 1, day);
-  // 2月30日のような、存在しない日付を断る。
-  if (new Date(time).getUTCDate() !== day) return null;
+  // 2月30日や13月のような、存在しない日付を断る。年・月・日の全てを照合する。
+  const at = new Date(time);
+  if (
+    at.getUTCFullYear() !== year ||
+    at.getUTCMonth() !== month - 1 ||
+    at.getUTCDate() !== day
+  ) {
+    return null;
+  }
   return time / DAY_MS;
 }
 

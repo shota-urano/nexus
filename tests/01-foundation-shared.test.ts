@@ -238,6 +238,8 @@ describe("M23 時計と日時の形（DD-02 3章 P09）", () => {
   it("日付の間の日数を数え、存在しない日付は null にする", () => {
     expect(daysBetween("2026-10-31", "2026-12-01")).toBe(31);
     expect(daysBetween("2026-02-30", "2026-12-01")).toBeNull();
+    expect(daysBetween("2026-13-01", "2026-12-01")).toBeNull();
+    expect(daysBetween("2026-00-01", "2026-12-01")).toBeNull();
   });
 });
 
