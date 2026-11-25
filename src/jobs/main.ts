@@ -1,7 +1,7 @@
 import { registerHooks } from "node:module";
 
 // 定期ジョブのプロセスの入口（DD-01 M27）。launchd が起動し、本人も手で動かす（DD-09 2.6）。
-//   node dist/jobs/main.js backup
+//   node dist/jobs/main.js backup|purge
 // 設定は環境変数から読む（DD-09 2.3）。流れは process.ts に書く。終了コードは 0、1、2（BD-02 5.4）。
 //
 // Node.js は TypeScript の型を取り除いて動かすが、拡張子の無い相対の読み込みを解決しない。

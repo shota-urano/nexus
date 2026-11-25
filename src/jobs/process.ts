@@ -1,5 +1,6 @@
 import { type BackupResult, type RunBackupDeps, runBackup } from "./backup";
 import { type JobName, createJobLock, openJobDatabase } from "./lock";
+import { type RunPurgeDeps, runPurge } from "./purge";
 import { type Clock, systemClock } from "../server/shared/clock";
 import { type Config, loadConfig } from "../server/shared/config";
 import { NexusError } from "../server/shared/errors";
@@ -36,6 +37,8 @@ export interface RunJobProcessOptions {
   knownVersion?: number;
   // BAT-001 の写し方。試験で写している間を作るときに渡す（DD-10 TC89）。
   backupCopy?: RunBackupDeps["copy"];
+  // BAT-002 で受け取りの記録を消す直前に動かす関数。試験で失敗を差し込むときに渡す（DD-10 TC92）。
+  purgeBeforeDeleteDeliveries?: RunPurgeDeps["beforeDeleteDeliveries"];
 }
 
 interface JobContext {
@@ -61,6 +64,12 @@ const JOBS: Partial<Record<JobName, JobDefinition>> = {
     title: "データのバックアップ",
     failureMsg: "MSG-039",
     run: runBackupJob,
+  },
+  purge: {
+    target: "BAT-002",
+    title: "古い記録の削除",
+    failureMsg: "MSG-041",
+    run: runPurgeJob,
   },
 };
 
@@ -233,6 +242,24 @@ async function runBackupJob(context: JobContext): Promise<number> {
       });
       return EXIT_ERROR;
   }
+}
+
+// BAT-002（DD-02 FN-022 手順 2〜4）。M29 が消し終えたら MSG-040 と終了コード 0。
+// 失敗したら M29 がトランザクションを戻して投げ、runJob が MSG-041 と終了コード 2 にする（DD-06 E08、E16）。
+async function runPurgeJob(context: JobContext): Promise<number> {
+  const { db, clock, logger, options } = context;
+  const result = runPurge({
+    db,
+    clock,
+    beforeDeleteDeliveries: options.purgeBeforeDeleteDeliveries,
+  });
+  logger.log({
+    level: "info",
+    msg: "MSG-040",
+    target: "BAT-002",
+    detail: `${formatMessage("MSG-040", { 件数1: result.aiRuns, 件数2: result.deliveries })} 境の日時 ${result.before}`,
+  });
+  return EXIT_OK;
 }
 
 // ログを書けない（置き場所が使えないなど）ときも、印を消して終わるために、例外を外に出さない。
