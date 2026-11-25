@@ -47,7 +47,7 @@ AI チャットを開く入口の中身（10-chat.md）。
 
 ## 9. 実装単位
 
-- [ ] [Backend] `getGalaxy` と `getArticle` を作る（FN-003、FN-004、DD-01 M15、DD-02 FN-003・FN-004）
+- [x] [Backend] `getGalaxy` と `getArticle` を作る（FN-003、FN-004、DD-01 M15、DD-02 FN-003・FN-004）（se/08-news）
   - 受け入れ基準: DD-10 TC19、DD-10 TC20、DD-10 TC22、DD-10 TC23 が通る
-- [ ] [Frontend] News Galaxy と記事の案内の画面 M03 と、ニュースの表示部品 M08 を作る（SCR-002、SCR-003、ADR-015）
+- [x] [Frontend] News Galaxy と記事の案内の画面 M03 と、ニュースの表示部品 M08 を作る（SCR-002、SCR-003、ADR-015）（se/08-news）
   - 受け入れ基準: DD-10 TC21、DD-10 TC29 が通る
