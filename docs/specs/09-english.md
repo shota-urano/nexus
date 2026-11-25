@@ -48,9 +48,9 @@ AI チャットを開く入口の中身（10-chat.md）。
 
 ## 9. 実装単位
 
-- [ ] [Backend] `listEnglishSets`、`getEnglishSet`、`putEnglishAnswer` を作る（FN-008、FN-009、FN-012、DD-01 M16、DD-02 FN-009・FN-012）
+- [x] [Backend] `listEnglishSets`、`getEnglishSet`、`putEnglishAnswer` を作る（FN-008、FN-009、FN-012、DD-01 M16、DD-02 FN-009・FN-012）（se/09-english）
   - 受け入れ基準: DD-10 TC38、DD-10 TC40、DD-10 TC45、DD-10 TC46 が通る
-- [ ] [Frontend] 教材の一覧と学習の画面 M04（教材、問題、採点の段と自動の採点）と、英語の表示部品 M08 を作る（SCR-004、SCR-005、FN-010、FN-011）
+- [x] [Frontend] 教材の一覧と学習の画面 M04（教材、問題、採点の段と自動の採点）と、英語の表示部品 M08 を作る（SCR-004、SCR-005、FN-010、FN-011）（se/09-english）
   - 受け入れ基準: DD-10 TC39、DD-10 TC41、DD-10 TC42、DD-10 TC43、DD-10 TC44 が通る
-- [ ] [Frontend] 完了の確認（MSG-006）、失敗の知らせ（MSG-007）、二重送信の防止を作る（SCR-005-A07、BD-09 5章、DD-05 4章）
+- [x] [Frontend] 完了の確認（MSG-006）、失敗の知らせ（MSG-007）、二重送信の防止を作る（SCR-005-A07、BD-09 5章、DD-05 4章）（se/09-english）
   - 受け入れ基準: DD-10 TC47、DD-10 TC48、DD-10 TC49 が通る
