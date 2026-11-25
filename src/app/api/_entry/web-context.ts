@@ -9,6 +9,10 @@ import { createContents, type Contents } from "../../../server/contents";
 import { createIngest, type Ingest } from "../../../server/ingest";
 import { createNewsView, type NewsView } from "../../../server/kinds/news/view";
 import {
+  createEnglishLearning,
+  type EnglishLearning,
+} from "../../../server/kinds/english/learning";
+import {
   createEnglishForSender,
   type EnglishForSender,
 } from "../../../server/kinds/english/provide";
@@ -39,6 +43,8 @@ export interface WebContext {
   contents: Contents;
   // 記事の図と案内（M15。FN-003、FN-004）。
   news: NewsView;
+  // 英語の教材の一覧、教材、完了（DD-01 M16）。
+  english: EnglishLearning;
   clock: Clock;
 }
 
@@ -51,7 +57,7 @@ export function webContext(): WebContext {
 
 // 部品を作る。DB を1つだけ開き（DD-01 2.1 M21 の接続はプロセスごとに1つ）、マイグレーションを当ててから
 // （DD-03 5章）、端末の部品、配信元の鍵の部品、受け取りの部品、sharpen に返す読み取りも同じ接続を使う。
-// 端末の API の入口と内容の状態も同じ接続を使う。
+// 端末の API の入口と内容の状態と英語の教材も同じ接続を使う。
 // 失敗したら、ログに出せるときはログに出し（DD-06 E17 は致命的）、開いた DB を閉じて投げる。
 export function createWebContext(
   env: Env,
@@ -75,6 +81,7 @@ export function createWebContext(
     });
     const contents = createContents({ db, clock });
     const news = createNewsView({ db });
+    const english = createEnglishLearning({ db, clock });
     return {
       logger,
       devices,
@@ -85,6 +92,7 @@ export function createWebContext(
       deviceApi,
       contents,
       news,
+      english,
       clock,
     };
   } catch (error) {
