@@ -49,7 +49,7 @@ MSG-018、MSG-019、MSG-020、MSG-021（BD-09 1.1）。
 
 ## 9. 実装単位
 
-- [ ] [Frontend] 画面の枠 M01（上の帯、全面の知らせ MSG-020・MSG-021、PWA の manifest と service worker）と、CSP の nonce と応答の欄を付ける middleware を作る（DD-01 M01、DD-09 2.1・2.4、BD-09 1.1）
+- [x] [Frontend] 画面の枠 M01（上の帯、全面の知らせ MSG-020・MSG-021、PWA の manifest と service worker）と、CSP の nonce と応答の欄を付ける middleware を作る（DD-01 M01、DD-09 2.1・2.4、BD-09 1.1）（se/06-app-shell）
   - 受け入れ基準: DD-10 TC104、DD-10 TC116 が通る; service worker の保存の対象が `/_next/static/` の中だけである（service worker のファイルの保存の条件を見て一つに決まる）
-- [ ] [Frontend] 共通部品 M07（下から出る面、内容の一覧の行、空の状態、下の知らせ、確認の面、質問の対象の印、届いた文の表示、動きを減らす設定）を作る（DD-01 M07、NFR-008、NFR-018、ADR-018）
+- [x] [Frontend] 共通部品 M07（下から出る面、内容の一覧の行、空の状態、下の知らせ、確認の面、質問の対象の印、届いた文の表示、動きを減らす設定）を作る（DD-01 M07、NFR-008、NFR-018、ADR-018）（se/06-app-shell）
   - 受け入れ基準: DD-10 TC105 が通る
