@@ -7,6 +7,8 @@ import {
   listInboxRows,
   listSavedRows,
   markContentOpened,
+  type SearchCondition,
+  searchContentRows,
   setContentRead,
   setContentSaved,
 } from "../repositories/content-state";
@@ -15,7 +17,7 @@ import { formatDateTime } from "../shared/datetime";
 import { NexusError } from "../shared/errors";
 import { type Page, type PageQuery, toPage } from "../shared/paging";
 
-// 種類を問わない内容の状態と一覧（DD-01 M17。DD-02 FN-004 手順 4、FN-005、FN-006、FN-017、FN-019、
+// 種類を問わない内容の状態と一覧と検索（DD-01 M17。DD-02 FN-004 手順 4、FN-005、FN-006、FN-017、FN-018、FN-019、
 // 3章 P03、P04、DD-05 3章）。
 // 内容（ENT-001）と内容の状態（ENT-006）だけで動く（BD-02 4章）。
 // 書き込みは P04 の1文で行う（DD-05 2章）。SQLite の書き込みの権利を `busy_timeout`（5 秒）待っても
@@ -63,6 +65,39 @@ export interface Contents {
   listInbox(query: PageQuery): Page<ContentSummary>;
   // 保存した内容の一覧（FN-019）。保存した日時の新しい順に 3章 P03 で返す。
   listSaved(query: PageQuery): Page<ContentSummary>;
+  // 検索（FN-018）。言葉を全て含む内容を、届いた日時の新しい順に 3章 P03 で返す。
+  // 空白でない言葉が1つも無ければ INPUT_INVALID を投げる（DD-02 2章 C06）。
+  searchContents(q: string, query: PageQuery): Page<ContentSummary>;
+}
+
+// 3文字以上の言葉は FTS5 の一致で、2文字以下は部分の一致で探す（DD-03 3章。trigram は
+// 3文字より短い言葉を索引で探せないため）。文字は Unicode の符号位置で数える。
+const MATCH_MIN_LENGTH = 3;
+
+// 検索の言葉を条件にする（DD-02 FN-018 手順 2〜3）。`q` を `search_index` の `body` と同じく
+// NFKC で正規化して小文字にし、空白で区切る。空の言葉は捨てる。言葉が無ければ null。
+export function toSearchCondition(q: string): SearchCondition | null {
+  const words = q
+    .normalize("NFKC")
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter((word) => word !== "");
+  if (words.length === 0) return null;
+
+  const phrases: string[] = [];
+  const likes: string[] = [];
+  for (const word of words) {
+    if ([...word].length >= MATCH_MIN_LENGTH) {
+      // 二重引用符で囲み、中の二重引用符は2つに重ねる。並べた句は全て含むもの（AND）になる。
+      phrases.push(`"${word.replaceAll('"', '""')}"`);
+    } else {
+      likes.push(`%${word.replace(/[\\%_]/gu, (c) => `\\${c}`)}%`);
+    }
+  }
+  return {
+    match: phrases.length === 0 ? null : phrases.join(" "),
+    likes,
+  };
 }
 
 function toContentSummary(row: ContentListRow): ContentSummary {
@@ -148,6 +183,23 @@ export function createContents(deps: { db: Database; clock: Clock }): Contents {
           limit,
           // 保存した内容の行は `saved_at` が必ずある（DD-03 の CHECK）。
           (row) => ({ value: row.savedAt ?? "", id: row.contentId }),
+          toContentSummary,
+        );
+      } catch (error) {
+        throw toDbError(error);
+      }
+    },
+    searchContents(q, { after, limit }) {
+      const condition = toSearchCondition(q);
+      if (condition === null) {
+        throw new NexusError("INPUT_INVALID", "検索の言葉が無い");
+      }
+      try {
+        const rows = searchContentRows(db, condition, after, limit + 1);
+        return toPage(
+          rows,
+          limit,
+          (row) => ({ value: row.receivedAt, id: row.contentId }),
           toContentSummary,
         );
       } catch (error) {
