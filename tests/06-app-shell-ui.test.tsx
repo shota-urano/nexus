@@ -108,6 +108,49 @@ describe("下から出る面（BD-09 6章）", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("開いている間は後ろを操作できず、閉じると戻る", () => {
+    const onBackground = vi.fn();
+    const props = {
+      message: "置き換えますか。",
+      confirmLabel: "置き換える",
+      cancelLabel: "やめる",
+      onConfirm: () => {},
+      onCancel: () => {},
+    };
+    const { rerender } = render(
+      <>
+        <button type="button" onClick={onBackground}>
+          後ろのボタン
+        </button>
+        <ConfirmPanel open {...props} />
+      </>,
+    );
+    const background = screen.getByText("後ろのボタン");
+    // 後ろは inert になる。
+    expect(background.closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("alertdialog").closest("[inert]")).toBeNull();
+    // 後ろへ操作を移しても、面の中へ戻る。
+    background.focus();
+    expect(document.activeElement?.textContent).toBe("やめる");
+    // 後ろを押しても実行されない。
+    fireEvent.click(background);
+    expect(onBackground).not.toHaveBeenCalled();
+
+    rerender(
+      <>
+        <button type="button" onClick={onBackground}>
+          後ろのボタン
+        </button>
+        <ConfirmPanel open={false} {...props} />
+      </>,
+    );
+    expect(background.closest("[inert]")).toBeNull();
+    background.focus();
+    expect(document.activeElement).toBe(background);
+    fireEvent.click(background);
+    expect(onBackground).toHaveBeenCalledTimes(1);
+  });
+
   it("閉じているときは出ない", () => {
     render(
       <BottomSheet open={false} title="AI チャット" onClose={() => {}}>
@@ -125,6 +168,7 @@ describe("内容の一覧の行（BD-09 6章、5章 表示書式）", () => {
         <ContentListRow
           href="/news/c1"
           kindLabel="ニュース"
+          kindColor="rgb(37, 99, 235)"
           isNew
           title="記事の見出し"
           date="2026-11-23"
@@ -140,12 +184,47 @@ describe("内容の一覧の行（BD-09 6章、5章 表示書式）", () => {
     expect(link.textContent).toContain("11月23日（月）");
   });
 
+  it("種類を名前と、渡された色の印で出す（BD-09 3章、BD-03 SCR-007-O01）", () => {
+    render(
+      <ul>
+        <ContentListRow
+          href="/news/c1"
+          kindLabel="ニュース"
+          kindColor="rgb(37, 99, 235)"
+          isNew={false}
+          title="記事"
+          date="2026-11-23"
+          thisYear={2026}
+        />
+        <ContentListRow
+          href="/english/c2"
+          kindLabel="英語"
+          kindColor="rgb(22, 163, 74)"
+          isNew={false}
+          title="教材"
+          date="2026-11-23"
+          thisYear={2026}
+        />
+      </ul>,
+    );
+    const marks = screen.getAllByTestId("kind-mark");
+    expect(marks.map((mark) => mark.style.backgroundColor)).toEqual([
+      "rgb(37, 99, 235)",
+      "rgb(22, 163, 74)",
+    ]);
+    expect(marks[0].getAttribute("aria-hidden")).toBe("true");
+    const links = screen.getAllByRole("link");
+    expect(links[0].textContent).toContain("ニュース");
+    expect(links[1].textContent).toContain("英語");
+  });
+
   it("新着でなければタグを出さない", () => {
     render(
       <ul>
         <ContentListRow
           href="/english/c2"
           kindLabel="英語"
+          kindColor="rgb(22, 163, 74)"
           isNew={false}
           title="教材"
           date="2025-11-23"
@@ -224,6 +303,49 @@ describe("確認の面（BD-09 2章）", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "やめる" }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("開いている間は後ろを操作できず、閉じると戻る", () => {
+    const onBackground = vi.fn();
+    const props = {
+      message: "置き換えますか。",
+      confirmLabel: "置き換える",
+      cancelLabel: "やめる",
+      onConfirm: () => {},
+      onCancel: () => {},
+    };
+    const { rerender } = render(
+      <>
+        <button type="button" onClick={onBackground}>
+          後ろのボタン
+        </button>
+        <ConfirmPanel open {...props} />
+      </>,
+    );
+    const background = screen.getByText("後ろのボタン");
+    // 後ろは inert になる。
+    expect(background.closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("alertdialog").closest("[inert]")).toBeNull();
+    // 後ろへ操作を移しても、面の中へ戻る。
+    background.focus();
+    expect(document.activeElement?.textContent).toBe("やめる");
+    // 後ろを押しても実行されない。
+    fireEvent.click(background);
+    expect(onBackground).not.toHaveBeenCalled();
+
+    rerender(
+      <>
+        <button type="button" onClick={onBackground}>
+          後ろのボタン
+        </button>
+        <ConfirmPanel open={false} {...props} />
+      </>,
+    );
+    expect(background.closest("[inert]")).toBeNull();
+    background.focus();
+    expect(document.activeElement).toBe(background);
+    fireEvent.click(background);
+    expect(onBackground).toHaveBeenCalledTimes(1);
   });
 
   it("閉じているときは出ない", () => {
