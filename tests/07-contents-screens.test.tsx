@@ -23,7 +23,7 @@ const NOW = new Date("2026-11-25T03:00:00.000Z"); // 日本時間 2026-11-25 12:
 
 function summary(overrides: Partial<ContentSummary> = {}): ContentSummary {
   return {
-    contentId: "c1",
+    contentId: 1,
     kind: "news",
     title: "記事の見出し",
     targetDate: "2026-11-24",
@@ -40,7 +40,7 @@ const PAGE = {
   items: [
     summary(),
     summary({
-      contentId: "c2",
+      contentId: 2,
       kind: "english",
       title: "英語の教材",
       receivedAt: "2025-12-31T23:59:59.000+09:00",
@@ -140,10 +140,10 @@ describe("M05 一覧の行", () => {
     stubFetch(() => jsonResponse(PAGE));
     render(<InboxScreen />);
     const links = await screen.findAllByRole("link");
-    expect(links[0].getAttribute("href")).toBe("/news?article=c1");
+    expect(links[0].getAttribute("href")).toBe("/news?article=1");
     expect(links[0].textContent).toContain("ニュース");
     expect(links[0].textContent).toContain("記事の見出し");
-    expect(links[1].getAttribute("href")).toBe("/english/c2");
+    expect(links[1].getAttribute("href")).toBe("/english/2");
     expect(links[1].textContent).toContain("英語");
     const marks = screen.getAllByTestId("kind-mark");
     expect(marks[0].style.backgroundColor).toBe("rgb(90, 169, 255)");
@@ -154,9 +154,9 @@ describe("M05 一覧の行", () => {
     stubFetch(() =>
       jsonResponse({
         items: [
-          summary({ contentId: "a", isNew: true, isRead: false }),
-          summary({ contentId: "b", isNew: false, isRead: false }),
-          summary({ contentId: "c", isNew: true, isRead: true }),
+          summary({ contentId: 11, isNew: true, isRead: false }),
+          summary({ contentId: 12, isNew: false, isRead: false }),
+          summary({ contentId: 13, isNew: true, isRead: true }),
         ],
         nextCursor: null,
       }),
@@ -287,7 +287,7 @@ describe("M05 続きを読む（BD-09 5章 一覧の決まり）", () => {
     expect(calledUrls()[1]).toBe("/api/app/contents/inbox?cursor=next1");
     resolveSecond(
       jsonResponse({
-        items: [summary({ contentId: "c9", title: "続きの記事" })],
+        items: [summary({ contentId: 9, title: "続きの記事" })],
         nextCursor: null,
       }),
     );
