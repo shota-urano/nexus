@@ -453,6 +453,26 @@ describe("TC06 一部の記事の形が正しくない（FN-001 異常系、DD-0
         .get(),
     ).toEqual({ item_count: 7, result: "accepted" });
   });
+  it("TC06 同じ slug の最初の記事の形が正しくなくても、2回目の記事は断る", async () => {
+    const list = items(3);
+    list[0].url = "javascript:alert(1)";
+    list[1].slug = list[0].slug; // 形は正しいが、同じ送信の中の2回目
+    const before = counts();
+    const { status, json } = await send(batch(list));
+
+    expect(status).toBe(200);
+    expect(json.itemCount).toBe(1);
+    expect(json.rejected).toEqual([
+      { slug: slugOf(0), reason: formatMessage("MSG-033", { 項目: "url" }) },
+      { slug: slugOf(0), reason: formatMessage("MSG-033", { 項目: "slug" }) },
+    ]);
+    expect(counts().news - before.news).toBe(1);
+    expect(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM article WHERE slug = ?")
+        .get(slugOf(0)),
+    ).toEqual({ n: 0 });
+  });
 });
 
 describe("TC07 全体の形が正しくない（FN-001 異常系、DD-06 E01）", () => {
@@ -505,6 +525,31 @@ describe("TC07 全体の形が正しくない（FN-001 異常系、DD-06 E01）"
       },
     ]);
   });
+  it.each(["2026-13-01", "2026-00-01", "2026-02-30"])(
+    "TC07 存在しない日付 %s は 400 と MSG-033（項目「date」）。何も残らない",
+    async (date) => {
+      const before = counts();
+      const { status, json } = await send(batch(items(2), date));
+
+      expect(status).toBe(400);
+      expect(errorOf(json)).toEqual({
+        code: "bad_request",
+        messageId: "MSG-033",
+        message: formatMessage("MSG-033", { 項目: "date" }),
+      });
+      const after = counts();
+      expect(after.news).toBe(before.news);
+      expect(after.aiRun).toBe(before.aiRun);
+      expect(rejectedDeliveries()).toEqual([
+        {
+          sender: "brain-harness",
+          target_date: null,
+          item_count: 0,
+          rejection_reason: "MSG-033（項目: date）",
+        },
+      ]);
+    },
+  );
 });
 
 describe("TC08 鍵が通らない（FN-001 異常系、DD-02 3章 P02、DD-06 E03）", () => {

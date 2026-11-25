@@ -140,6 +140,10 @@ export function createIngest(deps: {
       const rejected: RejectedItem[] = [];
       for (const raw of batch.items) {
         const checked = ops.checkItem(raw);
+        // 2回目かどうかは、形の正否にかかわらず slug の初出で決める。
+        const key = checked.ok ? checked.item.key : checked.label;
+        const repeated = key !== "" && seen.has(key);
+        if (key !== "") seen.add(key);
         if (!checked.ok) {
           rejected.push({
             slug: checked.label,
@@ -147,14 +151,13 @@ export function createIngest(deps: {
           });
           continue;
         }
-        if (seen.has(checked.item.key)) {
+        if (repeated) {
           rejected.push({
             slug: checked.item.key,
             reason: formatMessage("MSG-033", { 項目: ops.keyField }),
           });
           continue;
         }
-        seen.add(checked.item.key);
         kept.push(checked.item);
       }
 
