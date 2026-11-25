@@ -49,11 +49,11 @@ DD-06 E08（DB が使えない）、E16（予期しない失敗）、E17（起�
 
 ## 9. 実装単位
 
-- [ ] [Backend] Next.js（App Router）と TypeScript のリポジトリの足場、Tailwind CSS、Prettier、ESLint（Next.js の標準）、Vitest と Testing Library と jsdom、Redocly CLI、`make verify`、`.nvmrc` と `engines`、`.gitignore`（`.data/`）を置く（NFR-011、DD-01 M01、DD-09 5章、X-07 3章、ADR-006、ADR-021、ADR-022）
+- [x] [Backend] Next.js（App Router）と TypeScript のリポジトリの足場、Tailwind CSS、Prettier、ESLint（Next.js の標準）、Vitest と Testing Library と jsdom、Redocly CLI、`make verify`、`.nvmrc` と `engines`、`.gitignore`（`.data/`）を置く（NFR-011、DD-01 M01、DD-09 5章、X-07 3章、ADR-006、ADR-021、ADR-022）（se/01-foundation）
   - 受け入れ基準: Makefile の verify の目標が、Prettier の確かめ、ESLint、型の確かめ、Redocly CLI の lint、Vitest の5つの手順をこの順に呼ぶ（Makefile を見て一つに決まる）; .nvmrc と package.json の engines に同じ Node.js の番号がある; .gitignore に .data/ がある; verify の5つの手順に、npm の置き場所へ通信する手順が無い
-- [ ] [Backend] 層の規則（`import/no-restricted-paths`、`import/no-cycle`、`node:child_process` の制限）と空の `catch` の禁止を ESLint の設定に入れる（NFR-016、DD-01 M26、DD-06 1章）
+- [x] [Backend] 層の規則（`import/no-restricted-paths`、`import/no-cycle`、`node:child_process` の制限）と空の `catch` の禁止を ESLint の設定に入れる（NFR-016、DD-01 M26、DD-06 1章）（se/01-foundation）
   - 受け入れ基準: DD-10 TC101 が通る
-- [ ] [Backend] 共通層 M23（時計と偽の時計、日時の形、乱数と照合値、MSG の一覧、エラーの型と内部のエラーコード、設定の読み込み、日ごとのファイルに書くログ）を作る（DD-01 M23、DD-02 3章 P05・P09、DD-06 2章・5章、CR-013）
+- [x] [Backend] 共通層 M23（時計と偽の時計、日時の形、乱数と照合値、MSG の一覧、エラーの型と内部のエラーコード、設定の読み込み、日ごとのファイルに書くログ）を作る（DD-01 M23、DD-02 3章 P05・P09、DD-06 2章・5章、CR-013）（se/01-foundation）
   - 受け入れ基準: DD-10 TC106、DD-10 TC111 が通る
-- [ ] [Backend] DB の接続 M21（WAL、外部キー、`busy_timeout`、トランザクションの関数、マイグレーションを番号の順に当てる仕組み、起動のときの FTS5 の trigram と `backup` の確かめ）を作る（DD-01 M21、DD-03 5章、DD-05 1章、DD-09 2.1、ADR-020）
+- [x] [Backend] DB の接続 M21（WAL、外部キー、`busy_timeout`、トランザクションの関数、マイグレーションを番号の順に当てる仕組み、起動のときの FTS5 の trigram と `backup` の確かめ）を作る（DD-01 M21、DD-03 5章、DD-05 1章、DD-09 2.1、ADR-020）（se/01-foundation）
   - 受け入れ基準: DD-10 TC109 が通る

@@ -1,0 +1,7 @@
+# API の定義ファイルの検査（DD-04 1章、ADR-021）。
+# 目的は形式の誤りと参照の抜けを見つけること。minimal は構造と参照の解決を誤りとして扱う。
+apis:
+  nexus:
+    root: docs/api/openapi.yaml
+extends:
+  - minimal
