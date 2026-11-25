@@ -39,3 +39,57 @@ export function updateDeviceLastUsedAt(
     .run(at, deviceId);
   return Number(result.changes);
 }
+
+// 名前で端末を読む。無ければ null。
+export function findDeviceByName(
+  db: Database,
+  deviceName: string,
+): DeviceRow | null {
+  const row = db
+    .prepare(
+      "SELECT device_id, device_name, registered_at, last_used_at FROM device WHERE device_name = ?",
+    )
+    .get(deviceName);
+  if (row === undefined) return null;
+  return {
+    deviceId: Number(row.device_id),
+    deviceName: String(row.device_name),
+    registeredAt: String(row.registered_at),
+    lastUsedAt: String(row.last_used_at),
+  };
+}
+
+// 端末を作る（`registered_at` と `last_used_at` は同じ今。DD-02 FN-023 手順 2）。
+export function insertDevice(
+  db: Database,
+  deviceName: string,
+  keyHash: string,
+  at: string,
+): void {
+  db.prepare(
+    "INSERT INTO device (device_name, device_key_hash, registered_at, last_used_at) VALUES (?, ?, ?, ?)",
+  ).run(deviceName, keyHash, at, at);
+}
+
+// 端末の一覧（名前の順）。照合値は読まない（DD-02 FN-023 手順 3）。
+export function listDevices(db: Database): DeviceRow[] {
+  return db
+    .prepare(
+      "SELECT device_id, device_name, registered_at, last_used_at FROM device ORDER BY device_name",
+    )
+    .all()
+    .map((row) => ({
+      deviceId: Number(row.device_id),
+      deviceName: String(row.device_name),
+      registeredAt: String(row.registered_at),
+      lastUsedAt: String(row.last_used_at),
+    }));
+}
+
+// 名前で端末を消す。消した行の数を返す（DD-02 FN-023 手順 4）。
+export function deleteDeviceByName(db: Database, deviceName: string): number {
+  return Number(
+    db.prepare("DELETE FROM device WHERE device_name = ?").run(deviceName)
+      .changes,
+  );
+}

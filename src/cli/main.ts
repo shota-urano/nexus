@@ -1,7 +1,7 @@
 import { registerHooks } from "node:module";
 
 // 管理のコマンドのプロセスの入口（DD-01 M30）。Mac mini の本人のユーザでターミナルから打つ（DD-09 2.1）。
-//   node src/cli/main.ts sender-key issue|list|revoke ...
+//   node src/cli/main.ts device add|list|revoke ... / sender-key issue|list|revoke ...
 // 設定は環境変数から読む（DD-09 2.3）。終了コードはコマンドの結果（DD-06 E07 は 1）。
 //
 // Node.js は TypeScript の型を取り除いて動かすが、拡張子の無い相対の読み込みを解決しない。

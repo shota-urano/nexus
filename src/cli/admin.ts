@@ -1,8 +1,10 @@
+import { type Devices, openDevices } from "../server/auth/devices";
 import { type SenderKeys, openSenderKeys } from "../server/auth/sender-key";
 import { type Clock, systemClock } from "../server/shared/clock";
 import { type Config, loadConfig } from "../server/shared/config";
 import { NexusError } from "../server/shared/errors";
 import { createLogger } from "../server/shared/logger";
+import { runDeviceCommand } from "./device";
 import { type CommandOutput, runSenderKeyCommand } from "./sender-key";
 
 // 管理のコマンドの入口（DD-01 M30）。最初の引数でコマンドを選び、終了コードを返す。
@@ -10,6 +12,8 @@ import { type CommandOutput, runSenderKeyCommand } from "./sender-key";
 
 export interface AdminCommandDeps {
   senderKeys: SenderKeys;
+  // `device` のコマンドが使う部品と NEXUS のオリジン（DD-09 の設定 NEXUS_ORIGIN）。
+  device?: { devices: Devices; origin: string };
   output: CommandOutput;
 }
 
@@ -21,7 +25,15 @@ export function runAdminCommand(
   if (command === "sender-key") {
     return runSenderKeyCommand(args, deps);
   }
-  deps.output.err("使い方: sender-key issue|list|revoke");
+  if (command === "device") {
+    if (deps.device === undefined) {
+      throw new Error("device のコマンドの部品が渡されていない");
+    }
+    return runDeviceCommand(args, { ...deps.device, output: deps.output });
+  }
+  deps.output.err(
+    "使い方: device add|list|revoke | sender-key issue|list|revoke",
+  );
   return 1;
 }
 
@@ -47,8 +59,15 @@ export function runAdminProcess(
     return startupMismatch(error, output);
   }
   let senderKeys: ReturnType<typeof openSenderKeys>;
+  let devices: ReturnType<typeof openDevices>;
   try {
     senderKeys = openSenderKeys({ dataDir: config.dataDir, clock });
+    try {
+      devices = openDevices({ dataDir: config.dataDir, clock });
+    } catch (error) {
+      senderKeys.close();
+      throw error;
+    }
   } catch (error) {
     if (error instanceof NexusError) {
       createLogger({ process: "cli", clock, dir: config.logDir }).log({
@@ -60,9 +79,14 @@ export function runAdminProcess(
     return startupMismatch(error, output);
   }
   try {
-    return runAdminCommand(argv, { senderKeys, output });
+    return runAdminCommand(argv, {
+      senderKeys,
+      device: { devices, origin: config.origin },
+      output,
+    });
   } finally {
     senderKeys.close();
+    devices.close();
   }
 }
 
