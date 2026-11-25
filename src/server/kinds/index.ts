@@ -1,5 +1,6 @@
 import type { Database } from "../db/connection";
 import { NexusError } from "../shared/errors";
+import { englishIngest } from "./english/ingest";
 import { newsIngest } from "./news/ingest";
 
 // 種類の一覧（DD-01 M14。NFR-004）。種類ごとの操作を種類の値から引けるようにする。
@@ -8,7 +9,7 @@ import { newsIngest } from "./news/ingest";
 
 // 形の正しい1件。見出しと検索の本文と、種類ごとの中身を残す処理を持つ。
 export interface KindItem {
-  // 同じ対象日で置き換える相手を決める値（ニュースは slug）。
+  // 同じ対象日で置き換える相手を決める値（ニュースは slug。英語は日付だけで決まるので空の文字）。
   key: string;
   title: string;
   // 検索の本文（DD-02 3章 P08）。
@@ -34,14 +35,16 @@ export interface KindIngest {
   keyField: string;
   // 1件以上残したら、記事の関係の判定を待ちに入れるか。
   relatesAfterIngest: boolean;
-  checkBatch(payload: unknown): KindBatchCheck;
+  // `rawBody` は届いた本文の文字（原文を残す種類が使う。DD-02 FN-007 手順 4.3）。
+  checkBatch(payload: unknown, rawBody?: string): KindBatchCheck;
   checkItem(raw: unknown): KindItemCheck;
-  // 同じ対象日の同じ値の内容ID。無ければ null。
+  // 同じ対象日の同じ値の内容ID。無ければ null（英語は日付だけで決まる）。
   findContentId(db: Database, date: string, key: string): number | null;
 }
 
 const KINDS: Readonly<Record<string, KindIngest>> = {
   [newsIngest.kind]: newsIngest satisfies KindIngest,
+  [englishIngest.kind]: englishIngest satisfies KindIngest,
 };
 
 export function isKind(kind: string): boolean {

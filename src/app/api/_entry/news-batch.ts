@@ -8,7 +8,7 @@ import {
 import { NexusError, logLevelOf } from "../../../server/shared/errors";
 import type { Logger } from "../../../server/shared/logger";
 import { errorResponse } from "./errors";
-import { senderApi } from "./sender-api";
+import { readJsonBody, senderApi } from "./sender-api";
 
 // ニュースの受け取り `postNewsBatch`（POST `/api/inbox/batches`。DD-01 M11、DD-02 FN-001、DD-04、IF-001）。
 //   1. 本文が 1 MiB を超えたら 413 と MSG-034（P02 の入口が鍵より先に確かめる）。
@@ -27,17 +27,6 @@ export interface NewsBatchContext {
   ingest: Ingest;
 }
 
-function readJson(
-  body: Uint8Array,
-): { ok: true; value: unknown } | { ok: false } {
-  try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(body);
-    return { ok: true, value: JSON.parse(text) as unknown };
-  } catch {
-    return { ok: false };
-  }
-}
-
 export function postNewsBatch(
   context: NewsBatchContext,
 ): (request: Request, routeContext?: unknown) => Promise<Response> {
@@ -45,7 +34,7 @@ export function postNewsBatch(
   return senderApi(
     context,
     (_request, { requestId, body }) => {
-      const json = readJson(body ?? new Uint8Array(0));
+      const json = readJsonBody(body ?? new Uint8Array(0));
       if (!json.ok) {
         const message = { id: "MSG-033", values: { 項目: "本文" } } as const;
         logger.log({

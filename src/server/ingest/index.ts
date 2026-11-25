@@ -49,8 +49,14 @@ export type IngestOutcome =
   | { ok: false; message: MessageRef };
 
 export interface Ingest {
-  // 受け取る（DD-02 FN-001 手順 4〜7）。手順 7 の途中で失敗したら、断った記録を作ってから投げる。
-  receive(sender: IngestSender, kind: string, payload: unknown): IngestOutcome;
+  // 受け取る（DD-02 FN-001 手順 4〜7、FN-007 手順 2〜4）。手順 7（FN-007 は手順 4）の途中で
+  // 失敗したら、断った記録を作ってから投げる。`rawBody` は届いた本文の文字（原文を残す種類が使う）。
+  receive(
+    sender: IngestSender,
+    kind: string,
+    payload: unknown,
+    rawBody?: string,
+  ): IngestOutcome;
   // 断った記録を、別のトランザクションで作る（DD-02 FN-001「結果とメッセージ」、DD-05 2章）。
   // 作れなくても投げず、ログに出す（DD-06 1章。応答は変えない）。
   recordRejected(
@@ -114,13 +120,13 @@ export function createIngest(deps: {
 
   return {
     recordRejected,
-    receive(sender, kind, payload) {
+    receive(sender, kind, payload, rawBody) {
       const ops = kindIngest(kind);
       const now = clock.now();
       const today = formatDate(now);
 
       // 手順 4: 全体の形と件数。
-      const batch = ops.checkBatch(payload);
+      const batch = ops.checkBatch(payload, rawBody);
       if (!batch.ok) {
         const message: MessageRef =
           batch.msg === "MSG-034"

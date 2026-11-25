@@ -1,8 +1,10 @@
 import { registerHooks } from "node:module";
 import { parentPort, workerData } from "node:worker_threads";
 
-// TC120 の接続の1つの代わり（tests/05-ingest-news-batch.test.ts から Worker で動かす）。
-// 自分の DB の接続で `postNewsBatch` を用意し、もう1つの Worker と待ち合わせてから送る。
+// TC120、TC121 の接続の1つの代わり（tests/05-ingest-news-batch.test.ts、
+// tests/05-ingest-english-set.test.ts から Worker で動かす）。
+// 自分の DB の接続で `postNewsBatch`（`entry` が english なら `postEnglishSet`）を用意し、
+// もう1つの Worker と待ち合わせてから送る。
 // 応答の状態の番号と本文を親に返す。
 
 // src の中の拡張子の無い相対の読み込みを `.ts` か、フォルダの `index.ts` で解決する。
@@ -33,9 +35,12 @@ interface Input {
   // 待ち合わせの数え。[0] に用意のできた Worker の数を入れる。
   barrier: SharedArrayBuffer;
   parties: number;
+  // 送る操作。省くと news。
+  entry?: "news" | "english";
 }
 
-const { path, logDir, now, key, body, barrier, parties } = workerData as Input;
+const { path, logDir, now, key, body, barrier, parties, entry } =
+  workerData as Input;
 
 const src = (file: string) => new URL(`../src/${file}`, import.meta.url).href;
 
@@ -57,17 +62,24 @@ const { createLogger } = (await import(
 const { postNewsBatch } = (await import(
   src("app/api/_entry/news-batch.ts")
 )) as typeof import("../src/app/api/_entry/news-batch");
+const { postEnglishSet } = (await import(
+  src("app/api/_entry/english-set.ts")
+)) as typeof import("../src/app/api/_entry/english-set");
 
 // 接続と handler を先に用意しておき、待ち合わせのあとは送る処理だけが走るようにする。
 const db = openDatabase(path);
 const clock = createFakeClock(now);
 const logger = createLogger({ process: "web", clock, dir: logDir });
-const handler = postNewsBatch({
+const handler = (entry === "english" ? postEnglishSet : postNewsBatch)({
   logger,
   senderKeys: createSenderKeys({ db, clock }),
   ingest: createIngest({ db, clock, logger }),
 });
-const request = new Request("http://127.0.0.1:48400/api/inbox/batches", {
+const url =
+  entry === "english"
+    ? "http://127.0.0.1:48400/api/learning/sets"
+    : "http://127.0.0.1:48400/api/inbox/batches";
+const request = new Request(url, {
   method: "POST",
   headers: {
     authorization: `Bearer ${key}`,

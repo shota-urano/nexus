@@ -85,6 +85,19 @@ export async function readBodyWithin(
   return body;
 }
 
+// 読んだ本文を UTF-8 の文字として JSON で読む（DD-02 FN-001 手順 3）。読めなければ ok が偽。
+// `text` は届いた本文の文字（原文を残す操作が使う。DD-02 FN-007 手順 4.3）。
+export function readJsonBody(
+  body: Uint8Array,
+): { ok: true; value: unknown; text: string } | { ok: false } {
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(body);
+    return { ok: true, value: JSON.parse(text) as unknown, text };
+  } catch {
+    return { ok: false };
+  }
+}
+
 // handler を P02 で包み、Route Handler の形にする。
 export function senderApi<C = unknown>(
   context: SenderApiContext,
