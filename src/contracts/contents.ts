@@ -12,7 +12,8 @@ const DATE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const dateTime = z.string().regex(DATE_TIME_PATTERN);
 
 export const contentSummarySchema = z.object({
-  contentId: z.string().min(1),
+  // `openapi.yaml` の `Id`（1 以上の整数）。
+  contentId: z.number().int().min(1),
   // 種類を足すときに値が増えるので、値の一覧で絞らない（NFR-004）。
   kind: z.string().min(1),
   title: z.string(),

@@ -6,19 +6,19 @@
 interface KindDisplay {
   label: string;
   color: string;
-  href: (contentId: string) => string;
+  href: (contentId: number) => string;
 }
 
 const KIND_DISPLAYS: Record<string, KindDisplay> = {
   news: {
     label: "ニュース",
     color: "#5aa9ff",
-    href: (contentId) => `/news?article=${encodeURIComponent(contentId)}`,
+    href: (contentId) => `/news?article=${contentId}`,
   },
   english: {
     label: "英語",
     color: "#ffb040",
-    href: (contentId) => `/english/${encodeURIComponent(contentId)}`,
+    href: (contentId) => `/english/${contentId}`,
   },
 };
 
