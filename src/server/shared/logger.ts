@@ -31,7 +31,7 @@ export interface LogEntry extends LogTargetIds {
   requestId?: string;
   // 原因の詳細（例外の種類と文、SQLite のエラーの名前）。
   detail?: string;
-  // 原因の例外。種類と文だけを detail に入れ、例外が持つほかの値は書かない。
+  // 原因の例外。種類と、中身を含まないと分かる文だけを detail に入れる（describeError）。
   error?: unknown;
 }
 
@@ -59,7 +59,9 @@ const ID_KEYS = [
 ] as const satisfies readonly (keyof LogTargetIds)[];
 
 // 鍵の形（43 文字の base64url）と、`sk-` で始まる文字列を伏せる（DD-06 5章、NFR-019）。
+// 鍵の照合値（SHA-256 の16進 64 文字。DD-02 3章 P05）も残してはいけないので伏せる。
 const SECRET_PATTERNS = [
+  /(?<![A-Za-z0-9_-])[0-9a-fA-F]{64}(?![A-Za-z0-9_-])/g,
   /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g,
   /(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]*/g,
 ];
@@ -162,16 +164,31 @@ export function createLogger(options: LoggerOptions): Logger {
   };
 }
 
-// 例外の種類と文だけを取り出す。SQLite の例外はエラーの名前（errstr）も足す。
+// 例外の種類と文を取り出す。
+// 例外の文には、届いた本文、質問、鍵、照合値が入ることがある（JSON の読み取りの失敗、
+// SQLite の検索の構文の失敗、外の部品の例外など）。そのため文を書くのは NexusError だけにする。
+// NexusError の文は NEXUS のコードが書く内部の短い理由で、本文を入れない決まり（errors.ts）。
+// それ以外の例外は、種類、SQLite のエラーの名前（errstr）、Node.js のエラーの符号（code）だけを書く。
+// cause や例外が持つほかの値は書かない。
 function describeError(error: unknown): string {
   if (error === undefined) return "";
   // 例外でない値は中身を書かない（本文が入っていることがあるため）。
   if (!(error instanceof Error)) return `例外でない値（${typeof error}）`;
-  const kind =
-    error instanceof NexusError ? `${error.name}(${error.code})` : error.name;
-  const errstr = (error as { errstr?: unknown }).errstr;
-  const sqlite = typeof errstr === "string" ? ` [${errstr}]` : "";
-  return `${kind}: ${error.message}${sqlite}`;
+  if (error instanceof NexusError)
+    return `${error.name}(${error.code}): ${error.message}`;
+  const { errstr, code } = error as { errstr?: unknown; code?: unknown };
+  const parts = [safeName(error.name)];
+  if (typeof code === "string" && SYMBOL.test(code)) parts.push(`(${code})`);
+  if (typeof errstr === "string" && ERRSTR.test(errstr))
+    parts.push(` [${errstr}]`);
+  return `${parts.join("")}（文は残さない）`;
+}
+
+// 種類と符号は、決まった形の短い名前のときだけ書く（name や code に本文を入れた例外への備え）。
+const SYMBOL = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const ERRSTR = /^[A-Za-z ]{1,64}$/;
+function safeName(name: string): string {
+  return SYMBOL.test(name) ? name : "Error";
 }
 
 function isNotFound(error: unknown): boolean {

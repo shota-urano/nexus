@@ -107,6 +107,52 @@ describe("TC106 ログに残してはいけない項目（DD-06 5章、NFR-019�
     expect(line.detail).toContain("NexusError(AI_INTERRUPTED)");
   });
 
+  it("例外の文にある質問の本文と照合値は残さない", () => {
+    const dir = tempDir();
+    const clock = createFakeClock("2026-12-01T08:00:00.000+09:00");
+    const logger = createLogger({ process: "web", clock, dir });
+    const question = "私的な質問の本文: 来月の通院の予定を整理して";
+    const key = createSecret();
+    const hash = hashSecret(key);
+
+    // 外の部品の例外（文に本文と照合値。SQLite の形）。
+    const sqlite = Object.assign(
+      new Error(`fts5: syntax error near "${question}" ${hash}`),
+      { code: "SQLITE_ERROR", errstr: "SQL logic error" },
+    );
+    logger.log({ level: "error", code: "INTERNAL", error: sqlite });
+    // 文に本文を入れた種類の名前と符号。
+    const odd = Object.assign(new Error(question), {
+      code: question,
+      errstr: question,
+    });
+    odd.name = question;
+    logger.log({ level: "error", code: "INTERNAL", error: odd });
+    // NexusError の文にある照合値も伏せる。
+    logger.log({
+      level: "warn",
+      code: "AUTH_DENIED",
+      error: new NexusError("AUTH_DENIED", `照合値 ${hash} が無い`),
+    });
+    // 渡した detail にある照合値も伏せる。
+    logger.log({ level: "warn", detail: `hash=${hash}` });
+
+    const text = readFileSync(join(dir, "web-2026-12-01.log"), "utf8");
+    expect(text).not.toContain(question);
+    expect(text).not.toContain("通院");
+    expect(text).not.toContain(hash);
+    expect(text).not.toContain(key);
+    const lines = readLines(dir, "web-2026-12-01.log");
+    expect(lines[0].detail).toBe(
+      "Error(SQLITE_ERROR) [SQL logic error]（文は残さない）",
+    );
+    expect(lines[1].detail).toBe("Error（文は残さない）");
+    expect(lines[2].detail).toBe(
+      `NexusError(AUTH_DENIED): 照合値 ${REDACTED} が無い`,
+    );
+    expect(lines[3].detail).toBe(`hash=${REDACTED}`);
+  });
+
   it("例外でない値は中身を書かない", () => {
     const dir = tempDir();
     const clock = createFakeClock("2026-12-01T08:00:00.000+09:00");
@@ -281,6 +327,24 @@ describe("M23 設定の読み込み（DD-09 2.3）", () => {
     }
     expect(caught).toBeInstanceOf(NexusError);
     expect((caught as NexusError).code).toBe("STARTUP_MISMATCH");
+  });
+
+  it("試験だけの NEXUS_AI_EVENT_LOG_DIR は本番では E17 で止まり、試験では読む（DD-09 2.5）", () => {
+    let caught: unknown;
+    try {
+      loadConfig({ ...production, NEXUS_AI_EVENT_LOG_DIR: "/tmp/evidence" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(NexusError);
+    expect((caught as NexusError).code).toBe("STARTUP_MISMATCH");
+    expect(
+      loadConfig({
+        NEXUS_ENV: "test",
+        NEXUS_DATA_DIR: "/tmp/nexus-test",
+        NEXUS_AI_EVENT_LOG_DIR: "/tmp/nexus-test/evidence/ac22/2026-12-01",
+      }).aiEventLogDir,
+    ).toBe("/tmp/nexus-test/evidence/ac22/2026-12-01");
   });
 
   it("開発と試験は DD-09 2.2 の値を既定にする", () => {

@@ -132,6 +132,11 @@ export function loadConfig(
     ? requiredPath("NEXUS_BRAIN_HARNESS_DIR")
     : optionalPath("NEXUS_BRAIN_HARNESS_DIR");
 
+  // AI の出来事の記録は会話の中身を含むので、本番では設定させない（DD-09 2.5 AC22 の 1）。
+  const aiEventLogDir = optionalPath("NEXUS_AI_EVENT_LOG_DIR");
+  if (production && aiEventLogDir !== null)
+    throw mismatch("設定 NEXUS_AI_EVENT_LOG_DIR は本番では設定しない");
+
   return {
     env: nexusEnv,
     dataDir,
@@ -142,7 +147,7 @@ export function loadConfig(
     aiProvider,
     claudeBin,
     brainHarnessDir,
-    aiEventLogDir: optionalPath("NEXUS_AI_EVENT_LOG_DIR"),
+    aiEventLogDir,
   };
 }
 
