@@ -28,6 +28,8 @@ export const BACKUP_KEEP_DAYS = 7;
 export const BACKUP_FILE_MODE = 0o600;
 
 const BACKUP_NAME = /^nexus-(\d{4}-\d{2}-\d{2})\.db$/;
+// 作りかけの写しの名前。前の回が日をまたいで残したものも含める（DD-02 FN-021 手順 3）。
+const PARTIAL_NAME = /^nexus-\d{4}-\d{2}-\d{2}\.db\.partial$/;
 
 export function backupFileName(date: string): string {
   return `nexus-${date}.db`;
@@ -76,8 +78,8 @@ export async function runBackup(deps: RunBackupDeps): Promise<BackupResult> {
   const partialPath = `${finalPath}.partial`;
   let size: number;
   try {
-    // 前の回の作りかけが残っていれば先に消す。
-    rmSync(partialPath, { force: true });
+    // 前の回の作りかけが残っていれば、日付にかかわらず先に消す。
+    removeLeftoverPartials(backupDir);
     // 写す前から本人のユーザだけが読める権限のファイルにしておく（作っている間も他人に読ませない）。
     writeFileSync(partialPath, "", { mode: BACKUP_FILE_MODE, flag: "wx" });
     await copyDatabase(db, partialPath, deps.copy);
@@ -122,6 +124,12 @@ export async function runBackup(deps: RunBackupDeps): Promise<BackupResult> {
     size,
     removed: removedOrFailed.removed,
   };
+}
+
+function removeLeftoverPartials(backupDir: string): void {
+  for (const name of readdirSync(backupDir)) {
+    if (PARTIAL_NAME.test(name)) rmSync(join(backupDir, name), { force: true });
+  }
 }
 
 function removeOldBackups(
