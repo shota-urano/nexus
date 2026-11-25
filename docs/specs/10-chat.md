@@ -51,19 +51,19 @@ MSG-011〜MSG-014、MSG-019。DD-06 E01、E05、E06、E09〜E13。
 
 ## 9. 実装単位
 
-- [ ] [Backend] 会話の API `listConversations`、`createConversation`、`getConversation` を作る（FN-014、DD-01 M18、DD-02 FN-014）
+- [x] [Backend] 会話の API `listConversations`、`createConversation`、`getConversation` を作る（FN-014、DD-01 M18、DD-02 FN-014）（se/10-chat）
   - 受け入れ基準: DD-10 TC50、DD-10 TC51、DD-10 TC52、DD-10 TC53 が通る
-- [ ] [Backend] `postQuestion` と、AI Runner の質問の応答 M25（渡す内容の組み立て P07、ニュースと英語の組み立て M15・M16、写し、書き足し、ツールの回数）を作る（FN-015、DD-01 M18、DD-01 M25、DD-02 3章 P07、NFR-016）
+- [x] [Backend] `postQuestion` と、AI Runner の質問の応答 M25（渡す内容の組み立て P07、ニュースと英語の組み立て M15・M16、写し、書き足し、ツールの回数）を作る（FN-015、DD-01 M18、DD-01 M25、DD-02 3章 P07、NFR-016）（se/10-chat）
   - 受け入れ基準: DD-10 TC54、DD-10 TC55、DD-10 TC57、DD-10 TC58、DD-10 TC59、DD-10 TC70 が通る
-- [ ] [Backend] 質問の応答の失敗の扱いと、拾う順と同時に動かす数を作る（FN-015、DD-02 3章 P06、NFR-017、DD-06 E09・E11・E12）
+- [x] [Backend] 質問の応答の失敗の扱いと、拾う順と同時に動かす数を作る（FN-015、DD-02 3章 P06、NFR-017、DD-06 E09・E11・E12）（se/10-chat）
   - 受け入れ基準: DD-10 TC60、DD-10 TC61、DD-10 TC62、DD-10 TC63、DD-10 TC64、DD-10 TC65、DD-10 TC129 が通る
-- [ ] [Backend] 応答の続きを流す `streamReply`（SSE、`Last-Event-ID`、`retry`、空のコメント行）を作る（FN-015、ADR-013、DD-04 3.5）
+- [x] [Backend] 応答の続きを流す `streamReply`（SSE、`Last-Event-ID`、`retry`、空のコメント行）を作る（FN-015、ADR-013、DD-04 3.5）（se/10-chat）
   - 受け入れ基準: DD-10 TC66、DD-10 TC117 が通る
-- [ ] [Backend] 会話の要約（待ちに入れる判断、要約の実行、失敗の扱い）を作る（FN-015、DD-01 M25、DD-02 FN-015、Q-076、Q-085）
+- [x] [Backend] 会話の要約（待ちに入れる判断、要約の実行、失敗の扱い）を作る（FN-015、DD-01 M25、DD-02 FN-015、Q-076、Q-085）（se/10-chat）
   - 受け入れ基準: DD-10 TC67、DD-10 TC68、DD-10 TC69 が通る
-- [ ] [Backend] `retryReply`、`stopReply`、`dismissReply` と、AI Runner の止める求めの見張りを作る（FN-016、DD-02 FN-016、DD-05 3章）
+- [x] [Backend] `retryReply`、`stopReply`、`dismissReply` と、AI Runner の止める求めの見張りを作る（FN-016、DD-02 FN-016、DD-05 3章）（se/10-chat）
   - 受け入れ基準: DD-10 TC71、DD-10 TC72、DD-10 TC74、DD-10 TC123 が通る
-- [ ] [Frontend] AI チャットの面 M06（対象の印、前の会話、質問、応答の続きの受け取り、状態ごとの操作、二重送信の防止）を作る（SCR-006、DD-01 M06・M09、BD-09 5章）
+- [x] [Frontend] AI チャットの面 M06（対象の印、前の会話、質問、応答の続きの受け取り、状態ごとの操作、二重送信の防止）を作る（SCR-006、DD-01 M06・M09、BD-09 5章）（se/10-chat）
   - 受け入れ基準: DD-10 TC75 が通る
-- [ ] [Backend] 種類の一覧 M14 に、テストだけの3つ目の種類（一覧への登録、形の確かめ、渡す内容の組み立て、種類ごとの中身のテーブルを作るテスト用のマイグレーション）を足して、M13、M17、M18 と DD-02 3章 P08 を変えずに動くことを確かめる（NFR-004、REQ-019、DD-01 M14、DD-03 2.2）
+- [x] [Backend] 種類の一覧 M14 に、テストだけの3つ目の種類（一覧への登録、形の確かめ、渡す内容の組み立て、種類ごとの中身のテーブルを作るテスト用のマイグレーション）を足して、M13、M17、M18 と DD-02 3章 P08 を変えずに動くことを確かめる（NFR-004、REQ-019、DD-01 M14、DD-03 2.2）（se/10-chat）
   - 受け入れ基準: DD-10 TC110 が通る

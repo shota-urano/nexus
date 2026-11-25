@@ -22,6 +22,15 @@ export function timeoutError(): NexusError {
   return new NexusError("AI_TIMEOUT", "時間の上限を超えたので止めた");
 }
 
+// 止める求め（`stop_requested`）で止めたことを表す合図の理由（DD-02 3章 P06 手順 3、FN-016 手順 3）。
+// 失敗ではないので、DD-06 の分類を持たない。M25 はこれを受けたら、実行（と answer の発言）を中止にする。
+export class RunStopRequested extends Error {
+  constructor() {
+    super("止める求めで止めた");
+    this.name = "RunStopRequested";
+  }
+}
+
 // CLI の文を短くし、鍵の形を伏せる（NFR-019）。
 function shortDetail(texts: readonly string[]): string {
   const joined = redact(texts.join(" / ").replace(/\s+/g, " ").trim());
@@ -57,7 +66,9 @@ export async function readAiCall(
   // AI Runner が止めたときは、AI Runner の側で決めた理由にし、CLI の終了コードを見ない。
   if (exit.kind === "stopped") {
     const reason: unknown = options.signal?.reason;
-    if (reason instanceof NexusError) throw reason;
+    if (reason instanceof NexusError || reason instanceof RunStopRequested) {
+      throw reason;
+    }
     throw new NexusError("AI_INTERRUPTED", "AI Runner が CLI を止めた");
   }
   if (exit.kind === "launch_failed") {

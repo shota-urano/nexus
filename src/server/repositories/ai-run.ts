@@ -181,3 +181,132 @@ export function deleteAiRunsCreatedBefore(
     db.prepare("DELETE FROM ai_run WHERE created_at < ?").run(before).changes,
   );
 }
+
+// 質問の応答の実行を待ちに入れる。作った実行ID を返す。
+export function insertQueuedAnswerRun(
+  db: Database,
+  replyMessageId: number,
+  attempt: number,
+  createdAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO ai_run (purpose, state, reply_message_id, attempt, created_at) VALUES ('answer', 'queued', ?, ?, ?)",
+    )
+    .run(replyMessageId, attempt, createdAt);
+  return Number(result.lastInsertRowid);
+}
+
+// ツールを使った回数（ENT-009）。
+export interface ToolCounts {
+  webSearch: number;
+  webFetch: number;
+  folderRead: number;
+}
+
+// ツールを使った回数を足す（DD-04 4.2）。
+export function addToolCounts(
+  db: Database,
+  aiRunId: number,
+  counts: ToolCounts,
+): void {
+  db.prepare(
+    `UPDATE ai_run SET web_search_count = web_search_count + ?,
+       web_fetch_count = web_fetch_count + ?,
+       folder_read_count = folder_read_count + ?
+     WHERE ai_run_id = ?`,
+  ).run(counts.webSearch, counts.webFetch, counts.folderRead, aiRunId);
+}
+
+// 会話の要約の実行を待ちに入れる。作った実行ID を返す。
+export function insertQueuedSummarizeRun(
+  db: Database,
+  conversationId: number,
+  attempt: number,
+  createdAt: string,
+): number {
+  const result = db
+    .prepare(
+      "INSERT INTO ai_run (purpose, state, summary_conversation_id, attempt, created_at) VALUES ('summarize', 'queued', ?, ?, ?)",
+    )
+    .run(conversationId, attempt, createdAt);
+  return Number(result.lastInsertRowid);
+}
+
+// 同じ会話の summarize の実行が、待ちか処理中にあるか（DD-02 FN-015 会話の要約の手順 1。DD-05 3章）。
+export function hasActiveSummarizeRun(
+  db: Database,
+  conversationId: number,
+): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM ai_run WHERE purpose = 'summarize' AND summary_conversation_id = ? AND state IN ('queued', 'running') LIMIT 1",
+      )
+      .get(conversationId) !== undefined
+  );
+}
+
+// ---- 応答の送り直しと中止（DD-02 FN-016、3章 P06 手順 3）----
+
+// AI の発言の一番新しい実行（`ai_run_id` の一番大きいもの）。無ければ null。
+export function findLatestAnswerRun(
+  db: Database,
+  replyMessageId: number,
+): AiRunRow | null {
+  const row = db
+    .prepare(
+      `SELECT ${COLUMNS} FROM ai_run WHERE reply_message_id = ? ORDER BY ai_run_id DESC LIMIT 1`,
+    )
+    .get(replyMessageId);
+  return row === undefined ? null : toRow(row);
+}
+
+// queued のときだけ cancelled にする。変えた行の数を返す（DD-02 FN-016 手順 3）。
+export function markQueuedRunCancelled(
+  db: Database,
+  aiRunId: number,
+  finishedAt: string,
+): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE ai_run SET state = 'cancelled', finished_at = ? WHERE ai_run_id = ? AND state = 'queued'",
+      )
+      .run(finishedAt, aiRunId).changes,
+  );
+}
+
+// running のときだけ cancelled にする。変えた行の数を返す（DD-02 3章 P06 手順 3。止める求めで止めたとき）。
+export function markRunningRunCancelled(
+  db: Database,
+  aiRunId: number,
+  finishedAt: string,
+): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE ai_run SET state = 'cancelled', finished_at = ? WHERE ai_run_id = ? AND state = 'running'",
+      )
+      .run(finishedAt, aiRunId).changes,
+  );
+}
+
+// running の実行の `stop_requested` を偽から真にだけ変える（DD-05 3章 ENT-009）。変えた行の数を返す。
+export function requestRunStop(db: Database, aiRunId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE ai_run SET stop_requested = 1 WHERE ai_run_id = ? AND state = 'running' AND stop_requested = 0",
+      )
+      .run(aiRunId).changes,
+  );
+}
+
+// 止める求めがあるか（M24 が 1 秒ごとに読む。DD-02 3章 P06 手順 3）。
+export function isRunStopRequested(db: Database, aiRunId: number): boolean {
+  const row = db
+    .prepare("SELECT stop_requested FROM ai_run WHERE ai_run_id = ?")
+    .get(aiRunId);
+  return row !== undefined && Number(row.stop_requested) === 1;
+}
