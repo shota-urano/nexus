@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Clock } from "../shared/clock";
 import { formatDateTime } from "../shared/datetime";
@@ -82,8 +82,11 @@ export function applyMigrations(
 }
 
 // このプロセスが知るマイグレーションの置き場所（リポジトリの根に依らない道）。
-const KNOWN_MIGRATIONS_DIR = fileURLToPath(
-  new URL("./migrations/", import.meta.url),
+// `new URL("./migrations/", import.meta.url)` と書くと、Next.js（Turbopack）が束ねるときに
+// フォルダを1つのファイルとして読み込もうとして失敗するので、このファイルの道から組み立てる。
+const KNOWN_MIGRATIONS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "migrations",
 );
 
 // Web サーバのほかのプロセス（AI Runner、定期ジョブ、管理のコマンド）が起動したときの確かめ（DD-03 5章）。

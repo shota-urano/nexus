@@ -247,11 +247,12 @@ describe("TC94 使えないコードで `openRegistration` を開く（FN-023 �
   });
 });
 
-describe("TC95 同じコードで `openRegistration` を同時に2回（FN-023 同時に操作されたとき、DD-05 3章）", () => {
+// 同時に走らせる確かめは tests/03-auth-and-admin-register-route.test.ts（2つの Worker）で行う。
+describe("TC95 同じコードで `openRegistration` を別々の接続から2回（FN-023 同時に操作されたとき、DD-05 3章）", () => {
   it("端末は1台だけで、片方は MSG-021", async () => {
     run("device", "add", "pixel");
     const code = codeOf(out[0]);
-    // 2台の端末からの求めを、別々の DB の接続で同時に受ける。
+    // 2台の端末からの求めを、別々の DB の接続で受ける（ここでは順に処理される）。
     const first = openFile();
     const second = openFile();
     try {
