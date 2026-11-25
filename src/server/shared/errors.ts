@@ -46,7 +46,8 @@ export interface NexusErrorOptions {
 }
 
 // NEXUS のエラーの型。message は内部の短い理由で、ログと `failure_reason` にだけ使う。
-// message はログにそのまま書く（鍵の形だけ伏せる）ので、本文、質問、応答、AI に渡した内容を入れない（DD-06 5章）。
+// ログの関数は message を書かない（本文が入っていても残らないように。DD-06 5章、DD-10 TC106）。
+// それでも本文、質問、応答、AI に渡した内容は入れない（`failure_reason` に残るため）。
 export class NexusError extends Error {
   readonly code: ErrorCode;
   readonly msg: MessageId | undefined;

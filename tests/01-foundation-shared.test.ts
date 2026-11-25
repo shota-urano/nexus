@@ -107,7 +107,7 @@ describe("TC106 ログに残してはいけない項目（DD-06 5章、NFR-019�
     expect(line.detail).toContain("NexusError(AI_INTERRUPTED)");
   });
 
-  it("例外の文にある質問の本文と照合値は残さない", () => {
+  it("例外の文にある質問の本文と照合値は、NexusError でも残さない", () => {
     const dir = tempDir();
     const clock = createFakeClock("2026-12-01T08:00:00.000+09:00");
     const logger = createLogger({ process: "web", clock, dir });
@@ -134,6 +134,12 @@ describe("TC106 ログに残してはいけない項目（DD-06 5章、NFR-019�
       code: "AUTH_DENIED",
       error: new NexusError("AUTH_DENIED", `照合値 ${hash} が無い`),
     });
+    // NexusError の文に質問の本文を入れてしまっても書かない（DD-10 TC106）。
+    logger.log({
+      level: "error",
+      code: "INTERNAL",
+      error: new NexusError("INTERNAL", question),
+    });
     // 渡した detail にある照合値も伏せる。
     logger.log({ level: "warn", detail: `hash=${hash}` });
 
@@ -147,10 +153,9 @@ describe("TC106 ログに残してはいけない項目（DD-06 5章、NFR-019�
       "Error(SQLITE_ERROR) [SQL logic error]（文は残さない）",
     );
     expect(lines[1].detail).toBe("Error（文は残さない）");
-    expect(lines[2].detail).toBe(
-      `NexusError(AUTH_DENIED): 照合値 ${REDACTED} が無い`,
-    );
-    expect(lines[3].detail).toBe(`hash=${REDACTED}`);
+    expect(lines[2].detail).toBe("NexusError(AUTH_DENIED)（文は残さない）");
+    expect(lines[3].detail).toBe("NexusError(INTERNAL)（文は残さない）");
+    expect(lines[4].detail).toBe(`hash=${REDACTED}`);
   });
 
   it("例外でない値は中身を書かない", () => {
@@ -329,15 +334,27 @@ describe("M23 設定の読み込み（DD-09 2.3）", () => {
     expect((caught as NexusError).code).toBe("STARTUP_MISMATCH");
   });
 
-  it("試験だけの NEXUS_AI_EVENT_LOG_DIR は本番では E17 で止まり、試験では読む（DD-09 2.5）", () => {
-    let caught: unknown;
-    try {
-      loadConfig({ ...production, NEXUS_AI_EVENT_LOG_DIR: "/tmp/evidence" });
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(NexusError);
-    expect((caught as NexusError).code).toBe("STARTUP_MISMATCH");
+  it.each([
+    ["本番", { ...production, NEXUS_AI_EVENT_LOG_DIR: "/tmp/evidence" }],
+    [
+      "開発",
+      { NEXUS_ENV: "development", NEXUS_AI_EVENT_LOG_DIR: "/tmp/evidence" },
+    ],
+  ])(
+    "試験だけの NEXUS_AI_EVENT_LOG_DIR は%sでは E17 で止まる（DD-09 2.3、2.5）",
+    (_, env) => {
+      let caught: unknown;
+      try {
+        loadConfig(env, { cwd: "/repo" });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(NexusError);
+      expect((caught as NexusError).code).toBe("STARTUP_MISMATCH");
+    },
+  );
+
+  it("試験だけの NEXUS_AI_EVENT_LOG_DIR は試験では読む（DD-09 2.5）", () => {
     expect(
       loadConfig({
         NEXUS_ENV: "test",

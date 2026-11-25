@@ -164,10 +164,11 @@ export function createLogger(options: LoggerOptions): Logger {
   };
 }
 
-// 例外の種類と文を取り出す。
+// 例外の種類と、本文を含まない診断の項目を取り出す。
 // 例外の文には、届いた本文、質問、鍵、照合値が入ることがある（JSON の読み取りの失敗、
-// SQLite の検索の構文の失敗、外の部品の例外など）。そのため文を書くのは NexusError だけにする。
-// NexusError の文は NEXUS のコードが書く内部の短い理由で、本文を入れない決まり（errors.ts）。
+// SQLite の検索の構文の失敗、外の部品の例外、本文を入れてしまった NexusError など）。
+// 文が安全かはログの関数では見分けられないので、どの例外でも文は書かない（DD-06 5章、DD-10 TC106）。
+// NexusError は種類と内部のエラーコードだけを書く。
 // それ以外の例外は、種類、SQLite のエラーの名前（errstr）、Node.js のエラーの符号（code）だけを書く。
 // cause や例外が持つほかの値は書かない。
 function describeError(error: unknown): string {
@@ -175,7 +176,7 @@ function describeError(error: unknown): string {
   // 例外でない値は中身を書かない（本文が入っていることがあるため）。
   if (!(error instanceof Error)) return `例外でない値（${typeof error}）`;
   if (error instanceof NexusError)
-    return `${error.name}(${error.code}): ${error.message}`;
+    return `NexusError(${error.code})（文は残さない）`;
   const { errstr, code } = error as { errstr?: unknown; code?: unknown };
   const parts = [safeName(error.name)];
   if (typeof code === "string" && SYMBOL.test(code)) parts.push(`(${code})`);
