@@ -457,6 +457,80 @@ describe("答えの欄（SCR-005-I01）", () => {
   });
 });
 
+describe("完了したことのある教材（BD-02 FN-009 代替の流れ、SCR-005-A01・A11）", () => {
+  function completed(): EnglishSetDetail {
+    const set = e1();
+    set.lastAnswer = {
+      contentId: 7,
+      grades: [
+        { no: 1, grade: "o", answer: "b" },
+        { no: 2, grade: "x", answer: "walks" },
+        { no: 3, grade: "d" },
+      ],
+      completedAt: "2026-11-30T21:15:00.000+09:00",
+    };
+    return set;
+  }
+
+  it("教材の段に前の答えと採点と「やり直す」を出す", () => {
+    render(<EnglishStudy set={completed()} />);
+    const last = screen.getByRole("region", { name: "前の答えと採点" });
+    const items = within(last).getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "問題 1: ○（あなたの答え: b）",
+      "問題 2: ×（あなたの答え: walks）",
+      "問題 3: △",
+    ]);
+    expect(screen.getByRole("button", { name: "やり直す" })).toBeTruthy();
+  });
+
+  it("完了したことが無ければ、前の答えと採点も「やり直す」も出さない", () => {
+    render(<EnglishStudy set={e1()} />);
+    expect(screen.queryByRole("region", { name: "前の答えと採点" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "やり直す" })).toBeNull();
+  });
+
+  it("「やり直す」で、前の答えを初めの値にして問題の段の1問目から始め直す", () => {
+    render(<EnglishStudy set={completed()} />);
+    // 一度問題の段で答えを変えて教材へ戻ってから、やり直す。
+    fireEvent.click(screen.getByRole("button", { name: "問題へ" }));
+    fireEvent.click(screen.getByRole("button", { name: "次の問題" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "問題 2 の答え" }), {
+      target: { value: "walk" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "教材へ戻る" }));
+    fireEvent.click(screen.getByRole("button", { name: "やり直す" }));
+
+    expect(screen.getByRole("region", { name: "問題の段" })).toBeTruthy();
+    expect(screen.getByText("問題 1 / 3")).toBeTruthy();
+    expect(
+      (screen.getByRole("radio", { name: "b" }) as HTMLInputElement).checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "次の問題" }));
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: "問題 2 の答え",
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("walks");
+  });
+
+  it("採点の段では、答えの形の無い問題に前の採点を残し、答えの形のある問題は自動で付け直す", () => {
+    render(<EnglishStudy set={completed()} />);
+    fireEvent.click(screen.getByRole("button", { name: "やり直す" }));
+    fireEvent.click(screen.getByRole("button", { name: "採点へ" }));
+    const pressed = (no: number) =>
+      within(screen.getByRole("group", { name: `問題 ${no} の採点` }))
+        .getAllByRole("button")
+        .filter((button) => button.getAttribute("aria-pressed") === "true")
+        .map((button) => button.textContent);
+    expect(pressed(1)).toEqual(["○"]);
+    expect(pressed(2)).toEqual(["×"]);
+    expect(pressed(3)).toEqual(["△"]);
+  });
+});
+
 describe("SCR-005-A01 画面を開いたとき", () => {
   it("教材を読んで教材の段を出し、出した後に markOpened を1回呼ぶ", async () => {
     fetchMock.mockImplementation(

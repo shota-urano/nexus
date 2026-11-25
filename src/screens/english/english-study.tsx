@@ -22,6 +22,9 @@ import { autoGrade } from "./grading";
 //   「問題へ戻る」（A10）。
 // サーバは呼ばない（FN-010、FN-011 は画面の中だけで動く）。
 // 答えの初めの値は、前に完了していればその答え、無ければ空（SCR-005-I01）。
+// 完了したことのある教材は、教材の段に前の答えと採点を出し、「やり直す」（A11）で前の答えを
+// 初めの値にして問題の段の1問目から始め直す（BD-02 FN-009 代替の流れ、SCR-005-A01・A11、
+// DD-02 FN-009 手順 6）。サーバは呼ばない。
 
 type Stage = "material" | "questions" | "grading";
 
@@ -39,6 +42,18 @@ function initialAnswers(set: EnglishSetDetail): Record<number, string> {
   return answers;
 }
 
+function initialGrades(
+  set: EnglishSetDetail,
+): Record<number, GradeMark | null> {
+  const grades: Record<number, GradeMark | null> = {};
+  for (const grade of set.lastAnswer?.grades ?? []) {
+    grades[grade.no] = grade.grade;
+  }
+  return grades;
+}
+
+const GRADE_LABELS: Record<GradeMark, string> = { o: "○", d: "△", x: "×" };
+
 const buttonClass = "min-h-11 rounded border px-4";
 
 export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
@@ -47,7 +62,9 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
   const [answers, setAnswers] = useState<Record<number, string>>(() =>
     initialAnswers(set),
   );
-  const [grades, setGrades] = useState<Record<number, GradeMark | null>>({});
+  const [grades, setGrades] = useState<Record<number, GradeMark | null>>(() =>
+    initialGrades(set),
+  );
   const problems = set.problems;
   const answerOf = (no: number) => answers[no] ?? "";
 
@@ -65,6 +82,15 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
     setStage("grading");
   };
 
+  const restart = () => {
+    // やり直す（A11）: 前の答えと採点を初めの値に戻し、問題の段の1問目から始める。
+    setAnswers(initialAnswers(set));
+    setGrades(initialGrades(set));
+    setIndex(0);
+    setStage("questions");
+  };
+
+  const lastAnswer = set.lastAnswer;
   const problem = problems[index];
 
   return (
@@ -85,6 +111,21 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
       {stage === "material" && (
         <section aria-label="教材の段">
           <EnglishMaterial lessonMd={set.lessonMd} reading={set.reading} />
+          {lastAnswer !== null && (
+            <section aria-label="前の答えと採点" className="mt-6">
+              <h3 className="font-bold">前の答えと採点</h3>
+              <ol>
+                {lastAnswer.grades.map((item) => (
+                  <li key={item.no} className="border-b py-2 text-sm">
+                    問題 {item.no}: {GRADE_LABELS[item.grade]}
+                    {item.answer !== undefined && item.answer !== ""
+                      ? `（あなたの答え: ${item.answer}）`
+                      : ""}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
           <div className="mt-6 flex gap-2">
             <button
               type="button"
@@ -93,6 +134,11 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
             >
               問題へ
             </button>
+            {lastAnswer !== null && (
+              <button type="button" className={buttonClass} onClick={restart}>
+                やり直す
+              </button>
+            )}
           </div>
         </section>
       )}
