@@ -97,13 +97,19 @@ export async function runJobProcess(
       knownVersion: options.knownVersion,
     });
   } catch (error) {
-    logger.log({
-      level: error instanceof NexusError ? error.level : "error",
-      code: error instanceof NexusError ? error.code : "INTERNAL",
-      target: job.target,
-      detail: `${job.target} を起動できない`,
-      error,
-    });
+    // `schema_migration` の番号が違う（E17）ときは、プロセスが動き出さない（MSG は無い。DD-06 E17）。
+    if (error instanceof NexusError && error.code === "STARTUP_MISMATCH") {
+      logger.log({
+        level: error.level,
+        code: error.code,
+        target: job.target,
+        detail: `${job.target} を起動できない`,
+        error,
+      });
+    } else {
+      // DB を開けない（E08 の SQLITE_CANTOPEN など）か予期しない失敗（E16）。MSG-039 と終了コード 2（DD-06 2章）。
+      logFailure(logger, job, error);
+    }
     return EXIT_ERROR;
   }
 

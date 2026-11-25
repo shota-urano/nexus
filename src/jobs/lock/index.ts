@@ -54,8 +54,8 @@ export function createJobLock(deps: JobLockDeps): JobLock {
           insertJobLock(db, jobName, pid, startedAt);
           return { acquired: true };
         }
-        // 自分と同じ番号の印は、前に同じ番号で動いたプロセスが残したもの（自分はまだ取っていない）。
-        if (holderPid !== pid && isAlive(holderPid)) {
+        // 印の番号のプロセスが生きていれば、自分と同じ番号でも何もしない（DD-05 4章に例外は無い）。
+        if (isAlive(holderPid)) {
           return { acquired: false, holderPid };
         }
         // 前の起動が異常で終わって残った印とみなし、同じトランザクションの中で置き換える。

@@ -8,8 +8,9 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -36,6 +37,8 @@ const TODAY = "2026-12-01";
 const MAIN = join(import.meta.dirname, "../src/jobs/main.ts");
 const NEWS_WORKER = new URL("./12-batch-news-worker.ts", import.meta.url);
 const LOCK_WORKER = new URL("./12-batch-lock-worker.ts", import.meta.url);
+const JOB_CHILD = join(import.meta.dirname, "12-batch-job-child.ts");
+const SRC = join(import.meta.dirname, "../src");
 
 let dir: string;
 let dataDir: string;
@@ -161,6 +164,67 @@ async function chflags(flag: "uchg" | "nouchg", path: string): Promise<void> {
   if (code !== 0) throw new Error(`chflags ${flag} が ${code} で終わった`);
 }
 
+// 子のプロセスを動かして、標準出力の行と終わり方を返す。
+function spawnNode(args: string[], cwd: string) {
+  const child = spawnLauncher({
+    command: process.execPath,
+    args,
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...env() },
+    cwd,
+  });
+  child.writeInput("");
+  // 最初の1行だけを読む（呼んだときだけ読む）。
+  const firstLine = async (): Promise<string> => {
+    for await (const line of child.lines) return line;
+    throw new Error(`子のプロセスが何も出さずに終わった: ${child.stderr()}`);
+  };
+  return { child, firstLine };
+}
+
+async function waitFor(check: () => boolean, label: string): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error(`${label} を待ちきれない`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+// src の TypeScript を型だけ取り除いて JavaScript（`.js`）にし、`<root>/dist` に同じ形で置く。
+// マイグレーションの `.sql` も同じ場所に写す。画面の `.tsx` と試験は含めない。
+// 本番の起動のコマンド `node dist/jobs/main.js` を確かめるため（DD-09 2.6）。
+function buildDist(root: string): void {
+  mkdirSync(root, { recursive: true });
+  writeFileSync(join(root, "package.json"), '{ "type": "module" }\n');
+  const walk = (from: string): void => {
+    for (const entry of readdirSync(from, { withFileTypes: true })) {
+      const path = join(from, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (entry.name.endsWith(".sql")) {
+        const out = join(root, "dist", relative(SRC, path));
+        mkdirSync(dirname(out), { recursive: true });
+        writeFileSync(out, readFileSync(path));
+        continue;
+      }
+      if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts"))
+        continue;
+      if (entry.name.endsWith(".d.ts")) continue;
+      const out = join(root, "dist", relative(SRC, path)).replace(
+        /\.ts$/,
+        ".js",
+      );
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(
+        out,
+        stripTypeScriptTypes(readFileSync(path, "utf8"), { mode: "strip" }),
+      );
+    }
+  };
+  walk(SRC);
+}
+
 describe("TC85 BAT-001 の正常", () => {
   it("今日の写しを権限 0600 で作り、2026-11-24 以前の写しを消して7日分を残し、MSG-038 をログに出して終了コード 0", async () => {
     placeOldBackups(20, 30);
@@ -205,6 +269,19 @@ describe("TC85 BAT-001 の正常", () => {
     expect(lines.every((line) => line.target === "BAT-001")).toBe(true);
     // 終わった後に印が無い。
     expect(lockRows()).toEqual([]);
+  });
+});
+
+describe("TC85 前の回の作りかけの写し（DD-02 FN-021 手順 3）", () => {
+  it("前の日や今日の .partial が残っていると、先に消してから写しを作り、.partial が残らない", async () => {
+    writeFileSync(join(backupDir, "nexus-2026-11-30.db.partial"), "half");
+    writeFileSync(join(backupDir, "nexus-2026-12-01.db.partial"), "half");
+
+    const code = await runBackupJob();
+
+    expect(code).toBe(0);
+    expect(partialNames()).toEqual([]);
+    expect(backupNames()).toEqual(["nexus-2026-12-01.db"]);
   });
 });
 
@@ -348,6 +425,65 @@ describe("TC88 バッチの多重起動（DD-05 4章）", () => {
       0o600,
     );
     expect(lockRows()).toEqual([]);
+  });
+
+  it("印の番号が自分と同じでも、そのプロセスが生きていれば取らない", () => {
+    const lock = createJobLock({ db, clock });
+
+    expect(lock.acquire("backup", process.pid)).toEqual({ acquired: true });
+    expect(lock.acquire("backup", process.pid)).toEqual({
+      acquired: false,
+      holderPid: process.pid,
+    });
+    expect(lockRows()).toEqual([{ job_name: "backup", pid: process.pid }]);
+  });
+
+  it("仕様の起動のコマンド（node dist/jobs/main.js backup）で動かすと、写しを作って終了コード 0 で終わる", async () => {
+    const root = join(dir, "app");
+    buildDist(root);
+    insertLock(deadPid());
+
+    const { child } = spawnNode(["dist/jobs/main.js", "backup"], root);
+    const { code } = await child.ended;
+
+    expect(code, child.stderr()).toBe(0);
+    const today = formatDate(new Date());
+    expect(backupNames()).toEqual([`nexus-${today}.db`]);
+    expect(statSync(join(backupDir, `nexus-${today}.db`)).mode & 0o777).toBe(
+      0o600,
+    );
+    expect(
+      logLines(today).filter((line) => line.msg === "MSG-038"),
+    ).toHaveLength(1);
+    expect(lockRows()).toEqual([]);
+  });
+
+  it("DB を開けない（SQLITE_CANTOPEN）と、MSG-039 と DB_UNAVAILABLE をログに出して終了コード 2", async () => {
+    const broken = join(dir, "broken");
+    // DB のファイルの場所にフォルダがあると、SQLite は開けない。
+    mkdirSync(databasePath(broken), { recursive: true });
+    const logDir = join(broken, "logs");
+
+    const code = await runBackupJob({
+      env: env({ NEXUS_DATA_DIR: broken, NEXUS_LOG_DIR: logDir }),
+    });
+
+    expect(code).toBe(2);
+    expect(backupNames()).toEqual([]);
+    const lines = readFileSync(join(logDir, `job-${TODAY}.log`), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const failed = lines.filter((line) => line.msg === "MSG-039");
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      level: "error",
+      code: "DB_UNAVAILABLE",
+      target: "BAT-001",
+    });
+    expect(String(failed[0]?.detail)).toContain(
+      formatMessage("MSG-039", { 理由: "DB が使えない" }),
+    );
   });
 
   it("バッチの名前が無いか違うと、使い方を出して何もせずに終了コード 2", async () => {
@@ -514,6 +650,57 @@ describe("TC118 2つのプロセスの同時の起動（DD-05 4章。RV16-03）"
       lines.filter((line) =>
         String(line.detail).includes(
           `プロセス ${first} で動いているので、何もせずに終わる`,
+        ),
+      ),
+    ).toHaveLength(1);
+    expect(lockRows()).toEqual([]);
+  });
+});
+
+describe("TC118 2つのプロセスで同時に backup を動かす（DD-05 4章。RV16-03）", () => {
+  it("写しを作るのは片方だけで、もう片方は何もせずに終了コード 0。片方が終わった後にその番号で消しても、写している方の行は残る", async () => {
+    insertLock(deadPid());
+    const holdDir = join(dir, "hold");
+    mkdirSync(holdDir);
+
+    // 2つのプロセスを同時に起動する。印を取った方は、写し始めたところで親の合図を待つ。
+    const started = [0, 1].map(() => spawnNode([JOB_CHILD, NOW, holdDir], dir));
+    const pids = await Promise.all(
+      started.map(async ({ firstLine }) => Number(await firstLine())),
+    );
+    const ends = started.map(({ child }, index) =>
+      child.ended.then((end) => ({ index, code: end.code })),
+    );
+
+    // 先に終わるのは、何もせずに終わる方。
+    const skipped = await Promise.race(ends);
+    expect(skipped.code, started[skipped.index]?.child.stderr()).toBe(0);
+    const loser = pids[skipped.index] as number;
+    const winner = pids[1 - skipped.index] as number;
+    await waitFor(
+      () => existsSync(join(holdDir, `copying-${winner}`)),
+      "写し始め",
+    );
+    expect(existsSync(join(holdDir, `copying-${loser}`))).toBe(false);
+    expect(lockRows()).toEqual([{ job_name: "backup", pid: winner }]);
+
+    // 何もせずに終わった方の番号で消す処理を呼ぶ。写している方の行は残る。
+    expect(createJobLock({ db, clock }).release("backup", loser)).toBe(false);
+    expect(lockRows()).toEqual([{ job_name: "backup", pid: winner }]);
+
+    writeFileSync(join(holdDir, "go"), "");
+    const copied = (await Promise.all(ends))[1 - skipped.index];
+    expect(copied?.code, started[1 - skipped.index]?.child.stderr()).toBe(0);
+
+    expect(backupNames()).toEqual(["nexus-2026-12-01.db"]);
+    expect(partialNames()).toEqual([]);
+    const lines = logLines();
+    const done = lines.filter((line) => line.msg === "MSG-038");
+    expect(done).toHaveLength(1);
+    expect(
+      lines.filter((line) =>
+        String(line.detail).includes(
+          `プロセス ${winner} で動いているので、何もせずに終わる`,
         ),
       ),
     ).toHaveLength(1);
