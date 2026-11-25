@@ -39,3 +39,18 @@ export function updateContentOnReplace(
     "UPDATE content SET title = ?, received_at = ?, delivery_id = ? WHERE content_id = ?",
   ).run(input.title, input.receivedAt, input.deliveryId, contentId);
 }
+
+// 受け取った日時が境より前の受け取りの記録を指す内容の、受け取りの記録ID を空にする。
+// 空にした行の数を返す（DD-02 FN-022 手順 3.2。BAT-002。DD-03 2.3）。
+export function clearDeliveryIdsReceivedBefore(
+  db: Database,
+  before: string,
+): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE content SET delivery_id = NULL WHERE delivery_id IN (SELECT delivery_id FROM delivery WHERE received_at < ?)",
+      )
+      .run(before).changes,
+  );
+}

@@ -171,7 +171,7 @@ export function createLogger(options: LoggerOptions): Logger {
 // NexusError は種類と内部のエラーコードだけを書く。
 // それ以外の例外は、種類、SQLite のエラーの名前（errstr）、Node.js のエラーの符号（code）だけを書く。
 // cause や例外が持つほかの値は書かない。
-function describeError(error: unknown): string {
+export function describeError(error: unknown): string {
   if (error === undefined) return "";
   // 例外でない値は中身を書かない（本文が入っていることがあるため）。
   if (!(error instanceof Error)) return `例外でない値（${typeof error}）`;
