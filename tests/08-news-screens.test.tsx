@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ArticleDetail, Galaxy, GalaxyNode } from "../src/contracts/news";
+import { NewsGalaxyRoute } from "../src/app/(screens)/news/galaxy-route";
 import { NewsGalaxyScreen } from "../src/screens/news/galaxy-screen";
 import { NEWS_MESSAGES } from "../src/screens/news/messages";
 import { MESSAGES } from "../src/server/shared/messages";
@@ -487,9 +489,73 @@ describe("M03 記事の案内（SCR-003）", () => {
     const sheet = await openA1();
     expect(sheet.textContent).toContain("AI ・ 12月1日（火） 07:00");
   });
+
+  it("保存が成功した後に、先に呼んだ markOpened の古い応答が届いても、保存の印は戻らない", async () => {
+    let resolveOpened: (response: Response) => void = () => {};
+    stubFetch(
+      newsApi({
+        "POST /api/app/contents/1/opened": () =>
+          new Promise<Response>((r) => {
+            resolveOpened = r;
+          }) as unknown as Response,
+        "PUT /api/app/contents/1/saved": () =>
+          jsonResponse(
+            stateOf(A1_DETAIL, {
+              isSaved: true,
+              savedAt: "2026-12-01T08:00:00.000+09:00",
+            }),
+          ),
+      }),
+    );
+    render(<NewsGalaxyScreen />);
+    const sheet = await openA1();
+    await waitFor(() =>
+      expect(calls.map((call) => call.url)).toContain(
+        "/api/app/contents/1/opened",
+      ),
+    );
+    fireEvent.click(within(sheet).getByRole("button", { name: "保存" }));
+    await within(sheet).findByRole("button", { name: "保存を外す" });
+
+    // 保存より前の状態（isSaved false）を持つ、開いたときの応答が後から届く。
+    await act(async () => {
+      resolveOpened(jsonResponse(stateOf(A1_DETAIL, {})));
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(
+      within(sheet).getByRole("button", { name: "保存を外す" }),
+    ).toBeTruthy();
+    expect(within(sheet).queryByRole("button", { name: "保存" })).toBeNull();
+  });
+
+  it("「AI に質問」を押すと、この記事の内容ID を渡す（SCR-003-A05）", async () => {
+    stubFetch(newsApi());
+    const onAskAi = vi.fn();
+    render(<NewsGalaxyScreen onAskAi={onAskAi} />);
+    const sheet = await openA1();
+    fireEvent.click(within(sheet).getByRole("button", { name: "AI に質問" }));
+    expect(onAskAi).toHaveBeenCalledWith(1);
+  });
 });
 
 describe("M03 News Galaxy（SCR-002）", () => {
+  it("上の帯の「AI に質問」は中心の記事を選ぶまで出さず、選ぶと中心の記事の内容ID を渡す（SCR-002-A05、CR-003）", async () => {
+    stubFetch(newsApi());
+    const onAskAi = vi.fn();
+    render(<NewsGalaxyRoute onAskAi={onAskAi} />);
+    await screen.findByText("今日の記事 A1");
+    const header = screen.getByRole("banner");
+    expect(
+      within(header).queryByRole("button", { name: "AI に質問" }),
+    ).toBeNull();
+
+    await openA1();
+    fireEvent.click(
+      await within(header).findByRole("button", { name: "AI に質問" }),
+    );
+    expect(onAskAi).toHaveBeenCalledWith(1);
+  });
+
   it("日付を選ぶと、その日を読み直す。選択肢は availableDates の新しい順", async () => {
     stubFetch((call) =>
       call.url === "/api/app/news/galaxy"
