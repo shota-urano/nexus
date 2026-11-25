@@ -44,3 +44,14 @@ export function openDatabase(path: string): Database {
     throw toDbError(error);
   }
 }
+
+// `fn` のあいだだけ、ロックを待つ時間を `ms` にし、終わったら 5,000 ミリ秒に戻す。
+// 接続はプロセスに1つで、`node:sqlite` は同期で動くので、ほかの処理がこの間に同じ接続を使うことはない。
+export function withBusyTimeout<T>(db: Database, ms: number, fn: () => T): T {
+  db.exec(`PRAGMA busy_timeout = ${ms}`);
+  try {
+    return fn();
+  } finally {
+    db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+  }
+}
