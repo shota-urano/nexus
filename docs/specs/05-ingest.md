@@ -50,9 +50,9 @@ DD-06 E01、E02、E03、E05、E08、E16。
 
 ## 9. 実装単位
 
-- [ ] [Backend] 配信元の鍵の入口 P02 と、ニュースの受け取り（M13 の共通の受け取り、M14 の種類の一覧、M15 の形の確かめ、P08 の検索の索引、記事の関係の判定の待ち）の `postNewsBatch` を作る（FN-001、IF-001、DD-02 FN-001・3章 P02・P08、DD-05 2章）
+- [x] [Backend] 配信元の鍵の入口 P02 と、ニュースの受け取り（M13 の共通の受け取り、M14 の種類の一覧、M15 の形の確かめ、P08 の検索の索引、記事の関係の判定の待ち）の `postNewsBatch` を作る（FN-001、IF-001、DD-02 FN-001・3章 P02・P08、DD-05 2章）（se/05-ingest）
   - 受け入れ基準: DD-10 TC01、DD-10 TC02、DD-10 TC03、DD-10 TC04、DD-10 TC05、DD-10 TC06、DD-10 TC07、DD-10 TC08、DD-10 TC09、DD-10 TC99、DD-10 TC120 が通る
-- [ ] [Backend] 英語のセットの受け取り（M16 の形の確かめと置き換え）の `postEnglishSet` を作る（FN-007、IF-002、DD-01 M13、DD-01 M16、DD-02 FN-007）
+- [x] [Backend] 英語のセットの受け取り（M16 の形の確かめと置き換え）の `postEnglishSet` を作る（FN-007、IF-002、DD-01 M13、DD-01 M16、DD-02 FN-007）（se/05-ingest）
   - 受け入れ基準: DD-10 TC30、DD-10 TC31、DD-10 TC32、DD-10 TC33、DD-10 TC34、DD-10 TC119、DD-10 TC121 が通る
-- [ ] [Backend] sharpen が読む `getEnglishSetForSender` と `getEnglishResult` を作る（FN-013、IF-003、DD-01 M16、DD-02 FN-013）
+- [x] [Backend] sharpen が読む `getEnglishSetForSender` と `getEnglishResult` を作る（FN-013、IF-003、DD-01 M16、DD-02 FN-013）（se/05-ingest）
   - 受け入れ基準: DD-10 TC35、DD-10 TC36、DD-10 TC37 が通る
