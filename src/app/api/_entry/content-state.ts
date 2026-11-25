@@ -6,7 +6,7 @@ import {
   type DeviceRequestInfo,
   deviceApi,
 } from "./device-api";
-import { type MessageRef, errorResponse, toErrorResponse } from "./errors";
+import { type MessageRef, errorResponse } from "./errors";
 
 // 内容の状態を変える端末の API（DD-01 M11。DD-02 FN-004 手順 4、FN-005、FN-006、DD-04）。
 //   `markOpened` POST `/api/app/contents/{contentId}/opened`
@@ -116,6 +116,9 @@ export function markOpened(
 }
 
 // `setRead` と `setSaved` の共通の形。
+// 500 の MSG-003 は、鍵を確かめる途中の失敗（P01 の DB が使えないなど）にも使う（DD-04 3.4）。
+// 「操作」は本文の値で決まるので、本文を P01 より先に読む。本文の形が違うときは操作が決まらない
+// ので、P01 の途中の 500 は入口の決まり（MSG-019）のまま。
 function setFlag(
   context: ContentStateApiContext,
   spec: {
@@ -128,34 +131,30 @@ function setFlag(
 ): (request: Request, routeContext: ContentRouteContext) => Promise<Response> {
   const { target } = spec;
   const { logger } = context.deviceApi;
-  return deviceApi<ContentRouteContext>(
-    context.deviceApi,
-    async (request, info: DeviceRequestInfo, routeContext) => {
-      const { requestId } = info;
-      const contentId = await readContentId(routeContext);
-      const value = await readBooleanBody(request, spec.bodyName);
-      if (contentId === null || value === null) {
-        logInvalid(logger, target, requestId);
-        return errorResponse(400, "bad_request", "MSG-019");
-      }
-      try {
+  return async (request, routeContext) => {
+    const value = await readBooleanBody(request.clone(), spec.bodyName);
+    const messages: Partial<Record<500, MessageRef>> | undefined =
+      value === null
+        ? undefined
+        : {
+            500: { id: "MSG-003", values: { 操作: spec.operation(value) } },
+          };
+    return deviceApi<ContentRouteContext>(
+      context.deviceApi,
+      async (_request, info: DeviceRequestInfo, route) => {
+        const { requestId } = info;
+        const contentId = await readContentId(route);
+        if (contentId === null || value === null) {
+          logInvalid(logger, target, requestId);
+          return errorResponse(400, "bad_request", "MSG-019");
+        }
+        // 失敗は入口（deviceApi）が messages の MSG-003 で 500 にする。
         const outcome = spec.change(contentId, value);
         return stateResponse(logger, outcome, target, requestId);
-      } catch (error) {
-        const message: MessageRef = {
-          id: "MSG-003",
-          values: { 操作: spec.operation(value) },
-        };
-        return toErrorResponse(error, {
-          logger,
-          requestId,
-          target,
-          messages: { 500: message },
-        });
-      }
-    },
-    { target },
-  );
+      },
+      { target, messages },
+    )(request, routeContext);
+  };
 }
 
 export function setRead(

@@ -17,6 +17,7 @@ import {
   openDatabase,
 } from "../src/server/db/connection";
 import { createFakeClock, type FakeClock } from "../src/server/shared/clock";
+import { NexusError } from "../src/server/shared/errors";
 import { createLogger } from "../src/server/shared/logger";
 import { formatMessage } from "../src/server/shared/messages";
 import { createSecret, hashSecret } from "../src/server/shared/secret";
@@ -336,4 +337,81 @@ describe("TC126 別の接続が書き込みの権利を持つあいだに setRea
       if (other.isOpen) other.close();
     }
   }, 15_000);
+});
+
+describe("P01 で鍵を確かめる途中に DB が使えないとき（DD-04 3.4、DD-06 E08）", () => {
+  function failingContext(): ContentStateApiContext {
+    return {
+      ...context,
+      deviceApi: {
+        ...context.deviceApi,
+        deviceKeys: {
+          verify() {
+            throw new NexusError("DB_UNAVAILABLE", "database is locked");
+          },
+        },
+      },
+    };
+  }
+
+  it("setRead は 500 と MSG-003（操作は押した操作）を返し、データは変わらない", async () => {
+    const failing = failingContext();
+    for (const [isRead, operation] of [
+      [true, "既読に"],
+      [false, "未読に戻す"],
+    ] as const) {
+      const response = await setRead(failing)(
+        request(A1, "read", { isRead }),
+        route(A1),
+      );
+      expect(response.status).toBe(500);
+      expect(response.headers.get("set-cookie")).toBeNull();
+      expect(await response.json()).toEqual({
+        error: {
+          code: "internal",
+          messageId: "MSG-003",
+          message: formatMessage("MSG-003", { 操作: operation }),
+        },
+      });
+    }
+    expect(
+      logLines().find(
+        (line) =>
+          line.code === "DB_UNAVAILABLE" &&
+          line.target === "FN-005" &&
+          line.msg === "MSG-003",
+      ),
+    ).toBeDefined();
+    expect(stateRow(A1)).toBeUndefined();
+  });
+
+  it("setSaved は 500 と MSG-003（操作は押した操作）を返し、データは変わらない", async () => {
+    const failing = failingContext();
+    for (const [isSaved, operation] of [
+      [true, "保存"],
+      [false, "保存を外す"],
+    ] as const) {
+      const response = await setSaved(failing)(
+        request(A1, "saved", { isSaved }),
+        route(A1),
+      );
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: {
+          code: "internal",
+          messageId: "MSG-003",
+          message: formatMessage("MSG-003", { 操作: operation }),
+        },
+      });
+    }
+    expect(
+      logLines().find(
+        (line) =>
+          line.code === "DB_UNAVAILABLE" &&
+          line.target === "FN-006" &&
+          line.msg === "MSG-003",
+      ),
+    ).toBeDefined();
+    expect(stateRow(A1)).toBeUndefined();
+  });
 });
