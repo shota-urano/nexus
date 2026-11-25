@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { onDeviceUnauthorized } from "../../../client/device-api";
+import { MotionSettings } from "../../../ui/motion";
 import { FullNotice } from "./full-notice";
 import type { FullNoticeId } from "./full-notice-messages";
 
@@ -18,6 +19,7 @@ import type { FullNoticeId } from "./full-notice-messages";
 // - 端末の API が 401 を返したら（DD-04 3.4。MSG-020）、通信層 M09（src/client）から
 //   知らせを受けて MSG-020 を出す。M01 は端末の API を直接呼ばない（DD-01 1.1）。
 // 知らせを出している間は、画面の中身を出さない。
+// 動きを減らす設定（NFR-008）は、M07 の MotionSettings で全ての画面に当てる。
 
 const ShowFullNoticeContext = createContext<(id: FullNoticeId) => void>(
   () => {},
@@ -43,7 +45,9 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
   return (
     <ShowFullNoticeContext.Provider value={setNotice}>
-      {notice === null ? children : <FullNotice messageId={notice} />}
+      <MotionSettings>
+        {notice === null ? children : <FullNotice messageId={notice} />}
+      </MotionSettings>
     </ShowFullNoticeContext.Provider>
   );
 }
