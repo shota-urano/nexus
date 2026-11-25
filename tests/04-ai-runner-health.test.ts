@@ -204,6 +204,15 @@ describe("Web サーバと AI Runner の起動", () => {
     }
   });
 
+  it("Web サーバの部品は DB の接続を1つだけ使う（DD-01 2.1 M21）", () => {
+    const web = createWebContext(testEnv(dataDir), clock);
+    expect(web.devices.list()).toEqual([]);
+    expect(web.aiJobs.queue.counts().queuedCount).toBe(0);
+    // 待ち行列の接続を閉じると、端末の部品も使えなくなる（同じ接続を使っている）。
+    web.aiJobs.close();
+    expect(() => web.devices.list()).toThrow();
+  });
+
   it("設定が読めない AI Runner は E17 で終わり、標準エラーに出す", () => {
     const lines: string[] = [];
     const result = bootAiRunner({

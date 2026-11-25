@@ -1,5 +1,5 @@
 import { type OpenedAiJobs, openAiJobs } from "../../../server/ai-jobs";
-import { type Devices, openDevices } from "../../../server/auth/devices";
+import { createDevices, type Devices } from "../../../server/auth/devices";
 import { type Clock, systemClock } from "../../../server/shared/clock";
 import { loadConfig } from "../../../server/shared/config";
 import { NexusError } from "../../../server/shared/errors";
@@ -27,7 +27,8 @@ export function webContext(): WebContext {
   return context;
 }
 
-// 部品を作る。マイグレーションを当ててから（DD-03 5章）、端末の部品が番号を確かめて開く。
+// 部品を作る。DB を1つだけ開き（DD-01 2.1 M21 の接続はプロセスごとに1つ）、マイグレーションを当ててから
+// （DD-03 5章）、端末の部品も同じ接続を使う。
 // 失敗したら、ログに出せるときはログに出し（DD-06 E17 は致命的）、開いた DB を閉じて投げる。
 export function createWebContext(
   env: Env,
@@ -38,7 +39,7 @@ export function createWebContext(
   let aiJobs: OpenedAiJobs | null = null;
   try {
     aiJobs = openAiJobs({ dataDir: config.dataDir, clock, startup: "migrate" });
-    const devices = openDevices({ dataDir: config.dataDir, clock });
+    const devices = createDevices({ db: aiJobs.db, clock });
     return { logger, devices, aiJobs };
   } catch (error) {
     aiJobs?.close();

@@ -69,6 +69,7 @@ export function createAiQueue(db: Database, clock: Clock): AiQueue {
 // - `migrate`: Web サーバ。まだ当てていないマイグレーションを全て当ててから返す。
 // - `check`: AI Runner。`schema_migration` の最後の番号が知る番号と違えば E17（STARTUP_MISMATCH）を投げる。
 // 失敗したら DB を閉じて投げる。使い終わったら close で DB を閉じる。
+// 接続はプロセスごとに1つ（DD-01 2.1 M21）なので、ほかの部品は返した `db` を使う。
 export interface OpenAiJobsDeps {
   dataDir: string;
   clock: Clock;
@@ -78,6 +79,7 @@ export interface OpenAiJobsDeps {
 }
 
 export interface OpenedAiJobs {
+  db: Database;
   queue: AiQueue;
   close(): void;
 }
@@ -95,6 +97,7 @@ export function openAiJobs(deps: OpenAiJobsDeps): OpenedAiJobs {
     throw toDbError(error);
   }
   return {
+    db,
     queue: createAiQueue(db, deps.clock),
     close: () => db.close(),
   };
