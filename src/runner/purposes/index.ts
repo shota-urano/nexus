@@ -1,9 +1,17 @@
-import { failRun, requeueRelate, type PickedRun } from "../../server/ai-jobs";
+import {
+  failRun,
+  requeueAnswer,
+  requeueRelate,
+  type PickedRun,
+} from "../../server/ai-jobs";
 import type { Database } from "../../server/db/connection";
 import { inWriteTransaction } from "../../server/db/transaction";
 import type { Clock } from "../../server/shared/clock";
 import { type ErrorCode, NexusError } from "../../server/shared/errors";
-import { markReplyFailed } from "../../server/repositories/conversation";
+import {
+  markReplyFailed,
+  resetWritingReplyBody,
+} from "../../server/repositories/conversation";
 import type { Logger } from "../../server/shared/logger";
 import { formatMessage } from "../../server/shared/messages";
 import { type AiProvider, createAiProvider } from "../ai-provider";
@@ -69,9 +77,11 @@ export function createPurposes(deps: PurposesDeps): Purposes {
   // 失敗の扱い（DD-02 3章 P06 手順 5）。1つのトランザクションで次を行う（DD-05 3章）。
   // - `state` を running のときだけ failed にし、`failure_reason` に失敗の分類と短い理由を入れる。
   // - relate で `attempt` が 1 で、分類が E09、E10、E11 なら、同じ受け取りの記録で `attempt` 2 を待ちに入れる。
+  // - answer で `attempt` が 1 で、分類が E09、E10、E11 なら、AI の発言の本文を空に戻して writing のままにし、
+  //   同じ AI の発言で `attempt` 2 を待ちに入れる（発言が writing でなければ送り直さない）。
   // - それ以外の relate は、ログに MSG-037 を出す（記事は残したまま。RD-06 UC-001）。
   // - それ以外の answer は、AI の発言を failed にする（writing のときだけ）。
-  // answer の送り直しは 10-chat の次の実装単位で作る。分類の無い例外は E16（INTERNAL）。
+  // E12、E13、E16 は送り直さない（DD-06 4章）。分類の無い例外は E16（INTERNAL）。
   function fail(run: PickedRun, error: unknown): void {
     const nexus =
       error instanceof NexusError
@@ -91,6 +101,14 @@ export function createPurposes(deps: PurposesDeps): Purposes {
         return "retried" as const;
       }
       if (run.purpose === "answer" && run.replyMessageId !== null) {
+        if (
+          run.attempt === 1 &&
+          RETRYABLE_CODES.includes(nexus.code) &&
+          resetWritingReplyBody(db, run.replyMessageId) === 1
+        ) {
+          requeueAnswer(db, run.replyMessageId, run.attempt + 1, now);
+          return "retried" as const;
+        }
         markReplyFailed(db, run.replyMessageId);
       }
       return "failed" as const;

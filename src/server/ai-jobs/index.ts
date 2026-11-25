@@ -144,6 +144,17 @@ export function requeueRelate(
   return insertQueuedRelateRun(db, deliveryId, attempt, formatDateTime(at));
 }
 
+// 質問の応答を自動で送り直す（同じ AI の発言で `attempt` 2 を待ちに入れる。DD-02 3章 P06 手順 5）。
+// 失敗にするのと同じトランザクションの中で呼ぶ（DD-05 3章）。作った実行ID を返す。
+export function requeueAnswer(
+  db: Database,
+  replyMessageId: number,
+  attempt: number,
+  at: Date,
+): number {
+  return insertQueuedAnswerRun(db, replyMessageId, attempt, formatDateTime(at));
+}
+
 // 実行を完了にする（running のときだけ。DD-02 3章 P06 手順 4）。
 // 目的ごとの結果を残すのと同じトランザクションの中で呼ぶ。完了にできたかを返す。
 export function completeRun(db: Database, aiRunId: number, at: Date): boolean {

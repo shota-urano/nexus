@@ -362,3 +362,15 @@ export function markReplyFailed(db: Database, messageId: number): number {
       .run(messageId).changes,
   );
 }
+
+// 自動の送り直しのために本文を空に戻す（`reply_state` が writing の行だけ。writing のままにする。
+// DD-02 3章 P06 手順 5）。変えた行の数を返す。
+export function resetWritingReplyBody(db: Database, messageId: number): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE message SET body_md = '' WHERE message_id = ? AND reply_state = 'writing'",
+      )
+      .run(messageId).changes,
+  );
+}
