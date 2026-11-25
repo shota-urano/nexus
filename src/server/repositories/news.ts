@@ -139,3 +139,88 @@ export function updateArticleRow(
     contentId,
   );
 }
+
+// 図と案内（FN-003、FN-004）で読む、ニュースの記事と内容の状態（ENT-001、ENT-002、ENT-006）。
+// 内容の状態の行が無い記事は、開いた日時が空で、未読で、保存していないとして扱う（DD-02 2章 状態の実装）。
+export interface NewsViewRow {
+  contentId: number;
+  title: string;
+  theme: string;
+  guideMd: string;
+  sourceUrl: string;
+  imageUrl: string | null;
+  targetDate: string;
+  receivedAt: string;
+  openedAt: string | null;
+  isRead: boolean;
+  isSaved: boolean;
+  savedAt: string | null;
+}
+
+const NEWS_VIEW_SELECT = `SELECT c.content_id, c.title, c.target_date, c.received_at,
+         a.theme, a.guide_md, a.source_url, a.image_url,
+         s.opened_at, COALESCE(s.is_read, 0) AS is_read,
+         COALESCE(s.is_saved, 0) AS is_saved, s.saved_at
+    FROM content AS c
+    JOIN article AS a ON a.content_id = c.content_id
+    LEFT JOIN content_state AS s ON s.content_id = c.content_id`;
+
+function toNewsViewRow(row: Record<string, unknown>): NewsViewRow {
+  return {
+    contentId: Number(row.content_id),
+    title: String(row.title),
+    theme: String(row.theme),
+    guideMd: String(row.guide_md),
+    sourceUrl: String(row.source_url),
+    imageUrl: (row.image_url as string | null) ?? null,
+    targetDate: String(row.target_date),
+    receivedAt: String(row.received_at),
+    openedAt: (row.opened_at as string | null) ?? null,
+    isRead: Number(row.is_read) === 1,
+    isSaved: Number(row.is_saved) === 1,
+    savedAt: (row.saved_at as string | null) ?? null,
+  };
+}
+
+// 対象日のニュースの記事を、内容ID の順に読む（`content_kind_date_ix`）。
+export function listNewsViewRowsByDate(
+  db: Database,
+  targetDate: string,
+): NewsViewRow[] {
+  return db
+    .prepare(
+      `${NEWS_VIEW_SELECT}
+       WHERE c.kind = 'news' AND c.target_date = ?
+       ORDER BY c.content_id`,
+    )
+    .all(targetDate)
+    .map(toNewsViewRow);
+}
+
+// 内容ID のニュースの記事を、内容ID の順に読む。ニュースでない内容と無い内容ID は含めない。
+export function listNewsViewRowsByIds(
+  db: Database,
+  contentIds: readonly number[],
+): NewsViewRow[] {
+  if (contentIds.length === 0) return [];
+  return db
+    .prepare(
+      `${NEWS_VIEW_SELECT}
+       WHERE c.kind = 'news' AND c.content_id IN (SELECT value FROM json_each(?))
+       ORDER BY c.content_id`,
+    )
+    .all(JSON.stringify(contentIds))
+    .map(toNewsViewRow);
+}
+
+// ニュースの記事のある対象日の重ならない値を、新しい順に `limit` 件まで読む。
+export function listNewsTargetDates(db: Database, limit: number): string[] {
+  return db
+    .prepare(
+      `SELECT DISTINCT target_date FROM content
+       WHERE kind = 'news' AND target_date IS NOT NULL
+       ORDER BY target_date DESC LIMIT ?`,
+    )
+    .all(limit)
+    .map((row) => String(row.target_date));
+}
