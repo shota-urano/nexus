@@ -272,12 +272,15 @@ describe("TC31 同じ日付で読む教材の無いセットを送ると置き�
     ).run(contentId, "2026-12-01T07:30:00.000+09:00");
 
     clock.set("2026-12-01T09:00:00.000+09:00");
-    const { read: _read, ...withoutRead } = englishSet({
-      theme: "過去形の使い方",
-      lessonMd: "# 過去形",
-      problems: problems(2),
-      closingMd: null,
-    });
+    const withoutRead: Record<string, unknown> = {
+      ...englishSet({
+        theme: "過去形の使い方",
+        lessonMd: "# 過去形",
+        problems: problems(2),
+        closingMd: null,
+      }),
+    };
+    delete withoutRead.read;
     const { status, json } = await send(withoutRead);
 
     expect(status).toBe(200);
@@ -532,7 +535,11 @@ describe("TC34 鍵が通らない（FN-007 異常系、DD-02 3章 P02、DD-06 E0
 
 describe("TC119 問題の kind の無いセット（DD-02 FN-007 手順 4.3、BD-06 IF-002 3.2）", () => {
   it("TC119 200。problems_json の問題は kind が quiz。raw_payload_json の問題には kind が無い", async () => {
-    const list = problems(3).map(({ kind: _kind, ...rest }) => rest);
+    const list = problems(3).map((problem) => {
+      const rest: Record<string, unknown> = { ...problem };
+      delete rest.kind;
+      return rest;
+    });
     const { status } = await send(englishSet({ problems: list }));
 
     expect(status).toBe(200);
