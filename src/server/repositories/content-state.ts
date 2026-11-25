@@ -111,3 +111,100 @@ export function setContentSaved(
     .get(value, isSaved ? at : null, contentId);
   return row === undefined ? null : toRow(row);
 }
+
+// 一覧の1行（`content` に `content_state` を外部結合した行）。
+export interface ContentListRow {
+  contentId: number;
+  kind: string;
+  title: string;
+  targetDate: string;
+  receivedAt: string;
+  openedAt: string | null;
+  isRead: boolean;
+  isSaved: boolean;
+  savedAt: string | null;
+}
+
+const LIST_COLUMNS = `c.content_id AS content_id,
+              c.kind AS kind,
+              c.title AS title,
+              c.target_date AS target_date,
+              c.received_at AS received_at,
+              s.opened_at AS opened_at,
+              COALESCE(s.is_read, 0) AS is_read,
+              COALESCE(s.is_saved, 0) AS is_saved,
+              s.saved_at AS saved_at`;
+
+function toListRow(row: Record<string, unknown>): ContentListRow {
+  return {
+    contentId: Number(row.content_id),
+    kind: row.kind as string,
+    title: row.title as string,
+    targetDate: row.target_date as string,
+    receivedAt: row.received_at as string,
+    openedAt: (row.opened_at as string | null) ?? null,
+    isRead: Number(row.is_read) === 1,
+    isSaved: Number(row.is_saved) === 1,
+    savedAt: (row.saved_at as string | null) ?? null,
+  };
+}
+
+// 前のページの最後の行（並べる値と ID）。
+export interface ListAfter {
+  value: string;
+  id: number;
+}
+
+// 新着と未読の一覧（DD-02 FN-017 手順 2）。`content_state` が無いか、`opened_at` が空か、
+// `is_read` が 0 の行を、届いた日時と ID の大きい順に `count` 件まで読む（3章 P03 手順 2）。
+export function listInboxRows(
+  db: Database,
+  after: ListAfter | null,
+  count: number,
+): ContentListRow[] {
+  const afterCondition =
+    after === null
+      ? ""
+      : "AND (c.received_at < ? OR (c.received_at = ? AND c.content_id < ?))";
+  const params =
+    after === null ? [count] : [after.value, after.value, after.id, count];
+  return db
+    .prepare(
+      `SELECT ${LIST_COLUMNS}
+         FROM content AS c
+         LEFT JOIN content_state AS s ON s.content_id = c.content_id
+        WHERE (s.content_id IS NULL OR s.opened_at IS NULL OR s.is_read = 0)
+          ${afterCondition}
+        ORDER BY c.received_at DESC, c.content_id DESC
+        LIMIT ?`,
+    )
+    .all(...params)
+    .map(toListRow);
+}
+
+// 保存した内容の一覧（BD-02 FN-019）。`is_saved` が 1 の行を、保存した日時と ID の大きい順に
+// `count` 件まで読む（3章 P03 手順 2）。
+export function listSavedRows(
+  db: Database,
+  after: ListAfter | null,
+  count: number,
+): ContentListRow[] {
+  const afterCondition =
+    after === null
+      ? ""
+      : "AND (s.saved_at < ? OR (s.saved_at = ? AND s.content_id < ?))";
+  const params =
+    after === null ? [count] : [after.value, after.value, after.id, count];
+  return db
+    .prepare(
+      `SELECT ${LIST_COLUMNS}
+         FROM content_state AS s
+         JOIN content AS c ON c.content_id = s.content_id
+        WHERE s.is_saved = 1
+          ${afterCondition}
+        ORDER BY s.saved_at DESC, s.content_id DESC
+        LIMIT ?`,
+    )
+    .all(...params)
+    .map(toListRow);
+}
