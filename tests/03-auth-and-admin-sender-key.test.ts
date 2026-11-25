@@ -1,7 +1,15 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Worker } from "node:worker_threads";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runAdminCommand } from "../src/cli/admin";
 import { createSenderKeys } from "../src/server/auth/sender-key";
-import { type Database, openDatabase } from "../src/server/db/connection";
+import {
+  type Database,
+  databasePath,
+  openDatabase,
+} from "../src/server/db/connection";
 import {
   MIGRATIONS_DIR,
   applyMigrations,
@@ -156,5 +164,110 @@ describe("配信元の鍵の照合（M12。DD-02 3章 P02 手順 1・2）", () =
     expect(keys.verify(null, "IF-001")).toBeNull();
     expect(keys.verify("", "IF-001")).toBeNull();
     expect(keys.verify("not-a-key", "IF-001")).toBeNull();
+  });
+});
+
+// 管理のコマンドを、プロセスの入口（src/cli/main.ts）から一時のフォルダと一時の DB で動かす（DD-10 1章）。
+// 子のプロセスは M26 のほかで起動しない決まり（DD-01 1.3）なので、入口のファイルを Worker で動かし、
+// 入口が決めた終了コードと、標準出力と標準エラーを受け取る。
+describe("管理のコマンドのプロセスの入口（src/cli/main.ts）", () => {
+  const MAIN = new URL("../src/cli/main.ts", import.meta.url);
+  let dataDir: string;
+
+  const runMain = (
+    argv: string[],
+    env: Record<string, string> = {
+      NEXUS_ENV: "test",
+      NEXUS_DATA_DIR: dataDir,
+      TZ: "Asia/Tokyo",
+    },
+  ) =>
+    new Promise<{ status: number; stdout: string[]; stderr: string[] }>(
+      (resolve, reject) => {
+        const worker = new Worker(MAIN, {
+          argv,
+          env,
+          stdout: true,
+          stderr: true,
+        });
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        worker.stdout.on("data", (chunk) => stdout.push(String(chunk)));
+        worker.stderr.on("data", (chunk) => stderr.push(String(chunk)));
+        worker.on("error", reject);
+        worker.on("exit", (status) => {
+          const lines = (chunks: string[]) =>
+            chunks
+              .join("")
+              .split("\n")
+              .filter((line) => line !== "");
+          resolve({ status, stdout: lines(stdout), stderr: lines(stderr) });
+        });
+      },
+    );
+
+  const migrate = () => {
+    const file = openDatabase(databasePath(dataDir));
+    applyMigrations(file, readMigrations(MIGRATIONS_DIR), clock);
+    file.close();
+  };
+
+  const fileRows = () => {
+    const file = openDatabase(databasePath(dataDir));
+    try {
+      return file.prepare("SELECT sender, key_hash FROM sender_key").all();
+    } finally {
+      file.close();
+    }
+  };
+
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), "nexus-m30-"));
+  });
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("TC100 `sender-key issue cerebellum` は MSG-044 を出し、終了コード 1 で終わる", async () => {
+    migrate();
+    const result = await runMain(["sender-key", "issue", "cerebellum"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toEqual([
+      formatMessage("MSG-044", {
+        配信元: "cerebellum",
+        配信元の一覧: "brain-harness、sharpen",
+      }),
+    ]);
+    expect(result.stdout).toEqual([]);
+    expect(fileRows()).toEqual([]);
+  });
+
+  it("`sender-key issue brain-harness` は鍵を1回だけ出し、DB に照合値を残し、終了コード 0", async () => {
+    migrate();
+    const result = await runMain(["sender-key", "issue", "brain-harness"]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toEqual([]);
+    expect(result.stdout).toHaveLength(1);
+    expect(fileRows()).toEqual([
+      { sender: "brain-harness", key_hash: hashSecret(result.stdout[0]) },
+    ]);
+  });
+
+  it("DB の schema_migration の番号が違えば何もせずに失敗で終わる（DD-03 5章、DD-06 E17）", async () => {
+    const result = await runMain(["sender-key", "issue", "brain-harness"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toEqual([]);
+    expect(result.stderr).toHaveLength(1);
+  });
+
+  it("設定が読めなければ何もせずに失敗で終わる（DD-06 E17）", async () => {
+    const result = await runMain(["sender-key", "issue", "brain-harness"], {});
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toEqual([]);
+    expect(result.stderr).toHaveLength(1);
   });
 });

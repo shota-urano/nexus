@@ -1,5 +1,6 @@
-import type { Database } from "../db/connection";
+import { type Database, databasePath, openDatabase } from "../db/connection";
 import { toDbError } from "../db/errors";
+import { assertMigrationsApplied } from "../db/migrations";
 import {
   deleteSenderKey,
   findSenderByKeyHash,
@@ -107,5 +108,25 @@ export function createSenderKeys(deps: {
       const allowed: readonly string[] = SENDER_INTERFACES[sender];
       return allowed.includes(usedInterface) ? sender : null;
     },
+  };
+}
+
+// 管理のコマンドのプロセス（M30）が使う形。データの置き場所の DB を開き、
+// マイグレーションの番号を確かめてから（DD-03 5章。違えば E17）、配信元の鍵の部品を返す。
+// 使い終わったら close で DB を閉じる。
+export function openSenderKeys(deps: {
+  dataDir: string;
+  clock: Clock;
+}): SenderKeys & { close(): void } {
+  const db = openDatabase(databasePath(deps.dataDir));
+  try {
+    assertMigrationsApplied(db);
+  } catch (error) {
+    db.close();
+    throw toDbError(error);
+  }
+  return {
+    ...createSenderKeys({ db, clock: deps.clock }),
+    close: () => db.close(),
   };
 }
