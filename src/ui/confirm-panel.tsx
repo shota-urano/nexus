@@ -41,6 +41,8 @@ export function ConfirmPanel({
     () => false,
   );
 
+  // サーバで描いた面を端末で引き継ぐときは、初回の effect では面がまだ無い。
+  // onClient が true になって面が出た後に、もう一度ここを通して後ろを止める。
   useEffect(() => {
     const host = overlayRef.current;
     if (!open || !host) return;
@@ -74,7 +76,7 @@ export function ConfirmPanel({
         document.removeEventListener(type, blockOutside, true);
       }
     };
-  }, [open]);
+  }, [open, onClient]);
 
   if (!onClient) return null;
 

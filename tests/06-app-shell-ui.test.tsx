@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act } from "react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BottomNotices } from "../src/ui/bottom-notices";
 import { BottomSheet } from "../src/ui/bottom-sheet";
@@ -346,6 +349,50 @@ describe("確認の面（BD-09 2章）", () => {
     expect(document.activeElement).toBe(background);
     fireEvent.click(background);
     expect(onBackground).toHaveBeenCalledTimes(1);
+  });
+
+  it("サーバで開いた状態で描いて端末で引き継いでも、後ろを操作できない", async () => {
+    const onBackground = vi.fn();
+    const app = (
+      <>
+        <button type="button" onClick={onBackground}>
+          後ろのボタン
+        </button>
+        <ConfirmPanel
+          open
+          message="置き換えますか。"
+          confirmLabel="置き換える"
+          cancelLabel="やめる"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      </>
+    );
+    const actGlobal = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previousActEnvironment = actGlobal.IS_REACT_ACT_ENVIRONMENT;
+    actGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(app);
+    document.body.appendChild(container);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, app);
+      });
+      const dialog = screen.getByRole("alertdialog");
+      expect(dialog.closest("[inert]")).toBeNull();
+      const background = screen.getByText("後ろのボタン");
+      expect(background.closest("[inert]")).not.toBeNull();
+      expect(document.activeElement?.textContent).toBe("やめる");
+      fireEvent.click(background);
+      expect(onBackground).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => {
+        root?.unmount();
+      });
+      container.remove();
+      actGlobal.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    }
   });
 
   it("閉じているときは出ない", () => {
