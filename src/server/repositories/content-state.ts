@@ -208,3 +208,55 @@ export function listSavedRows(
     .all(...params)
     .map(toListRow);
 }
+
+// 検索の条件（DD-02 FN-018 手順 3、DD-03 3章）。
+export interface SearchCondition {
+  // 3文字以上の言葉を FTS5 の一致の式にしたもの。無ければ null。
+  match: string | null;
+  // 2文字以下の言葉を `LIKE` の形にしたもの（`%` と `_` と `\` は `\` で逃がしてある）。
+  likes: string[];
+}
+
+// 検索（DD-02 FN-018 手順 3〜4）。`search_index` の `body` が全ての条件に当たる内容を、
+// 届いた日時と ID の大きい順に `count` 件まで読む（3章 P03 手順 2）。会話は探さない（RD-03 R19）。
+export function searchContentRows(
+  db: Database,
+  condition: SearchCondition,
+  after: ListAfter | null,
+  count: number,
+): ContentListRow[] {
+  const indexConditions: string[] = [];
+  const indexParams: string[] = [];
+  if (condition.match !== null) {
+    indexConditions.push("search_index MATCH ?");
+    indexParams.push(condition.match);
+  }
+  for (const like of condition.likes) {
+    indexConditions.push("body LIKE ? ESCAPE '\\'");
+    indexParams.push(like);
+  }
+  if (indexConditions.length === 0) {
+    throw new Error("検索の条件が無い");
+  }
+  const afterCondition =
+    after === null
+      ? ""
+      : "AND (c.received_at < ? OR (c.received_at = ? AND c.content_id < ?))";
+  const afterParams =
+    after === null ? [] : [after.value, after.value, after.id];
+  return db
+    .prepare(
+      `SELECT ${LIST_COLUMNS}
+         FROM content AS c
+         LEFT JOIN content_state AS s ON s.content_id = c.content_id
+        WHERE c.content_id IN (
+                SELECT content_id FROM search_index
+                 WHERE ${indexConditions.join(" AND ")}
+              )
+          ${afterCondition}
+        ORDER BY c.received_at DESC, c.content_id DESC
+        LIMIT ?`,
+    )
+    .all(...indexParams, ...afterParams, count)
+    .map(toListRow);
+}
