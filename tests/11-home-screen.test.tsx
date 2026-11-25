@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -8,7 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { homeSchema, type Home } from "../src/contracts/home";
-import { HomeScreen } from "../src/screens/home/home-screen";
+import { HomeScreen, LEAVE_STEP_MS } from "../src/screens/home/home-screen";
 import {
   cardOffset,
   selectedAt,
@@ -40,6 +41,16 @@ const HOME: Home = {
   notices: ["MSG-015", "MSG-016", "MSG-017"],
 };
 
+// 機能の画面へ移った道（A03）。止められずに押された道（a 要素）を、押された順に記録する。
+// React の受け口（画面の根）の後で受けるため、document で聞く。
+let navigations: string[] = [];
+function recordNavigation(event: MouseEvent) {
+  const anchor = (event.target as Element).closest("a");
+  if (anchor !== null && !event.defaultPrevented) {
+    navigations.push(anchor.getAttribute("href") ?? "");
+  }
+}
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function stubHome(respond: () => Response | Promise<Response>) {
@@ -56,11 +67,15 @@ function card(key: string): HTMLElement {
 
 beforeEach(() => {
   stubHome(() => Response.json(HOME));
+  navigations = [];
+  document.addEventListener("click", recordNavigation);
 });
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  document.removeEventListener("click", recordNavigation);
 });
 
 describe("ホームの値を出す（SCR-001-A01）", () => {
@@ -269,6 +284,126 @@ describe("HUD とカード（SCR-001-A02、A03、A05。BD-13 P01）", () => {
       expect(await screen.findByText("AI チャット")).toBeTruthy();
       cleanup();
     }
+  });
+});
+
+describe("機能の画面へ移る動き（SCR-001-A03。RD-07 3章）", () => {
+  function advance(ms: number) {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  }
+
+  it("前のカードを押すと、セグメントの光 → カードの移動 → 広がる、の順に動かしてから移る", async () => {
+    render(<HomeScreen now={NOW} />);
+    await screen.findByRole("link", { name: "文型" });
+    vi.useFakeTimers();
+    const segment = screen.getByRole("button", { name: "News Galaxy" });
+    const link = screen.getByRole("link", { name: /^News Galaxy/ });
+
+    // 道のとおりにすぐには移らない（動きの後で移る）。
+    expect(fireEvent.click(link)).toBe(false);
+
+    // 1. セグメントの光。カードはまだ動かず、広がってもいない。
+    expect(segment.dataset.flashing).toBe("true");
+    expect(card("news").dataset.leaving).toBeUndefined();
+    expect(screen.queryByTestId("home-leave-expand")).toBeNull();
+    expect(navigations).toEqual([]);
+
+    // 2. カードの移動。
+    advance(LEAVE_STEP_MS.glow);
+    expect(card("news").dataset.leaving).toBe("true");
+    expect(screen.queryByTestId("home-leave-expand")).toBeNull();
+    expect(navigations).toEqual([]);
+
+    // 3. 広がる。
+    advance(LEAVE_STEP_MS.move);
+    expect(screen.getByTestId("home-leave-expand")).toBeTruthy();
+    expect(navigations).toEqual([]);
+
+    // 4. 移る。
+    advance(LEAVE_STEP_MS.expand - 1);
+    expect(navigations).toEqual([]);
+    advance(1);
+    expect(navigations).toEqual(["/news"]);
+  });
+
+  it("移る動きの間は、もう一度押しても受けない", async () => {
+    render(<HomeScreen now={NOW} />);
+    await screen.findByRole("link", { name: "文型" });
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
+    const link = screen.getByRole("link", { name: /^Inbox/ });
+
+    fireEvent.click(link);
+    advance(LEAVE_STEP_MS.glow);
+    // 同じカードをもう一度押しても、道のとおりに移らず、動きもやり直さない。
+    expect(fireEvent.click(link)).toBe(false);
+    expect(card("inbox").dataset.leaving).toBe("true");
+    // ほかのセグメント、奥のカード、学習の続き、AI の印も受けない。
+    fireEvent.click(screen.getByRole("button", { name: "Library" }));
+    fireEvent.click(within(card("english")).getByRole("button"));
+    expect(fireEvent.click(screen.getByRole("link", { name: "文型" }))).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI チャットを開く" }));
+    expect(card("inbox").dataset.front).toBe("true");
+    expect(screen.queryByText("AI チャット")).toBeNull();
+
+    advance(LEAVE_STEP_MS.move + LEAVE_STEP_MS.expand);
+    expect(navigations).toEqual(["/inbox"]);
+    advance(1000);
+    expect(navigations).toHaveLength(1);
+  });
+
+  it("学習の続きを押すと、English を光らせて同じ順に動かし、その教材へ移る", async () => {
+    render(<HomeScreen now={NOW} />);
+    const learning = await screen.findByRole("link", { name: "文型" });
+    vi.useFakeTimers();
+
+    expect(fireEvent.click(learning)).toBe(false);
+    const english = screen.getByRole("button", { name: "English" });
+    expect(english.ariaPressed).toBe("true");
+    expect(english.dataset.flashing).toBe("true");
+    expect(card("english").dataset.front).toBe("true");
+
+    advance(LEAVE_STEP_MS.glow);
+    expect(card("english").dataset.leaving).toBe("true");
+    advance(LEAVE_STEP_MS.move);
+    expect(screen.getByTestId("home-leave-expand")).toBeTruthy();
+    advance(LEAVE_STEP_MS.expand);
+    expect(navigations).toEqual(["/english/7"]);
+  });
+});
+
+describe("画像と飾り（BD-03 SCR-001 3.2）", () => {
+  it("中心の球、右上の惑星、ロゴは Codex が作った画像を出す", async () => {
+    const { container } = render(<HomeScreen now={NOW} />);
+    expect(screen.getByTestId("hud-core").getAttribute("href")).toBe(
+      "/img/home/core_orb_001.png",
+    );
+    const planet = screen.getByTestId("home-planet");
+    expect(planet.getAttribute("src")).toBe("/img/home/planet_001.png");
+    // 惑星は飾りで、機能を持たない。
+    expect(planet.closest("a, button, [role=button]")).toBeNull();
+    expect(
+      container.querySelector('img[src="/img/home/logo.png"]'),
+    ).toBeTruthy();
+    await screen.findByRole("link", { name: "文型" });
+  });
+
+  it("写真の無い記事には代わりの絵を出す", async () => {
+    render(<HomeScreen now={NOW} />);
+    const pickup = await screen.findByRole("region", {
+      name: "今日のピックアップ",
+    });
+    const links = await within(pickup).findAllByRole("link");
+    expect(links[0].querySelector("img")?.getAttribute("src")).toBe(
+      "https://example.com/a.png",
+    );
+    expect(
+      within(links[1]).getByTestId("pick-fallback").getAttribute("src"),
+    ).toBe("/img/home/news_fallback_001.png");
   });
 });
 

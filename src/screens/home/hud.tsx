@@ -15,7 +15,9 @@ import { STEP_DEGREES, normalizeDegrees } from "./hud-angle";
 // - 6つのセグメントを円形に並べ、右の真ん中（0度）に来たセグメントを選んだ機能として光らせる。
 // - 指で回すと回り（`onDrag`）、離すと `onRelease` で一番近い機能に合わせる。
 //   セグメントを押すと `onPick` で、その機能が右の真ん中に来るまで回す。
-// - 中心の AI の印を押すと `onCenter`（対象の無い AI チャット。A05）。
+// - 中心の AI の印を押すと `onCenter`（対象の無い AI チャット。A05）。中心の球は Codex（gpt-image）が
+//   作った画像（BD-03 SCR-001 3.2。`public/img/home/core_orb_001.png`、プロンプトも同じ場所）。
+// - 機能の画面へ移るとき（A03）は、`flashing` のセグメントを強く光らせる（移る動きの1つ目）。
 // - 動きを減らす設定（NFR-008、BD-09 5章）のときは、回転の動きを使わず、回した後の角度で描く。
 // 回転の角度と選んだ機能は、カードと合わせるため画面（home-screen）が持つ。
 
@@ -28,9 +30,17 @@ const DRAG_START_DEGREES = 4;
 const INNER_RADIUS = 58;
 const OUTER_RADIUS = 122;
 const LABEL_RADIUS = 90;
+// 中心の印の半径と、球の画像の大きさ（画像の外側の黒い部分を円で切る）。
+const CORE_RADIUS = 54;
+const CORE_IMAGE_SIZE = 168;
+
+// 座標を小数3桁に丸める。サーバとブラウザで三角関数の最後の桁が違い、描いた後の照合が合わなくなるため。
+function round(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 function point(radius: number, radians: number): string {
-  return `${radius * Math.cos(radians)} ${radius * Math.sin(radians)}`;
+  return `${round(radius * Math.cos(radians))} ${round(radius * Math.sin(radians))}`;
 }
 
 function sectorPath(index: number): string {
@@ -95,11 +105,14 @@ export function Hud({
   onDrag,
   onRelease,
   onCenter,
+  flashing = null,
 }: {
   features: readonly Feature[];
   selected: number;
   turn: number;
   reduceMotion: boolean;
+  /** 移る動きで光らせるセグメント（A03）。移っていなければ null */
+  flashing?: number | null;
   onPick: (index: number) => void;
   onDrag: (turn: number) => void;
   onRelease: () => void;
@@ -202,6 +215,9 @@ export function Hud({
           <stop offset="40%" stopColor="#6b4520" />
           <stop offset="100%" stopColor="#c27a35" />
         </radialGradient>
+        <clipPath id="hud-core-clip">
+          <circle r={CORE_RADIUS} />
+        </clipPath>
       </defs>
       <circle
         r="131"
@@ -219,9 +235,10 @@ export function Hud({
       >
         {features.map((feature, index) => {
           const on = index === selected;
+          const flash = index === flashing;
           const radians = (index * STEP_DEGREES * Math.PI) / 180;
-          const lx = LABEL_RADIUS * Math.cos(radians);
-          const ly = LABEL_RADIUS * Math.sin(radians);
+          const lx = round(LABEL_RADIUS * Math.cos(radians));
+          const ly = round(LABEL_RADIUS * Math.sin(radians));
           return (
             <g
               key={feature.key}
@@ -229,6 +246,7 @@ export function Hud({
               tabIndex={0}
               aria-label={feature.name}
               aria-pressed={on}
+              data-flashing={flash || undefined}
               className="cursor-pointer outline-none"
               onClick={() => press(() => onPick(index))}
               onKeyDown={(event) => handleKey(event, () => onPick(index))}
@@ -237,9 +255,16 @@ export function Hud({
                 d={sectorPath(index)}
                 fill={on ? "url(#hud-segment-on)" : "url(#hud-segment)"}
                 stroke={on ? "#ffd08a" : "rgba(183,193,211,0.22)"}
-                strokeWidth={1.2}
+                strokeWidth={flash ? 2.4 : 1.2}
                 style={
-                  on ? { filter: "drop-shadow(0 0 6px #ffb04099)" } : undefined
+                  flash
+                    ? {
+                        filter:
+                          "drop-shadow(0 0 14px #ffb040) brightness(1.35)",
+                      }
+                    : on
+                      ? { filter: "drop-shadow(0 0 6px #ffb04099)" }
+                      : undefined
                 }
               />
               {/* 名前は HUD の回転と逆に回し、いつも正立させる */}
@@ -251,7 +276,7 @@ export function Hud({
                 instant={instant}
               >
                 <g transform={`translate(${lx - 11} ${ly - 24}) scale(0.7)`}>
-                  <FeatureIcon feature={feature} />
+                  <FeatureIcon feature={feature} size={32} />
                 </g>
                 <text
                   x={lx}
@@ -278,18 +303,20 @@ export function Hud({
         onClick={() => press(onCenter)}
         onKeyDown={(event) => handleKey(event, onCenter)}
       >
-        <circle r="54" fill="#07090e" stroke="rgba(255,190,110,0.35)" />
         <circle
-          r="22"
-          fill="none"
-          stroke="#ffc077"
-          strokeWidth="1.5"
-          style={{ filter: "drop-shadow(0 0 8px #ffb040)" }}
+          r={CORE_RADIUS}
+          fill="#07090e"
+          stroke="rgba(255,190,110,0.35)"
         />
-        <path
-          d="M0 -14 L4 -4 L14 0 L4 4 L0 14 L-4 4 L-14 0 L-4 -4 Z"
-          fill="#ffd08a"
-          style={{ filter: "drop-shadow(0 0 6px #ffb040)" }}
+        <image
+          data-testid="hud-core"
+          href="/img/home/core_orb_001.png"
+          x={-CORE_IMAGE_SIZE / 2}
+          y={-CORE_IMAGE_SIZE / 2}
+          width={CORE_IMAGE_SIZE}
+          height={CORE_IMAGE_SIZE}
+          clipPath="url(#hud-core-clip)"
+          aria-hidden="true"
         />
       </g>
     </svg>

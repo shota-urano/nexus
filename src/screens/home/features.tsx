@@ -106,16 +106,21 @@ export const FEATURES: readonly Feature[] = [
 ];
 
 // 線のアイコン（飾り。読み上げない）。
+// HUD の SVG の中に置くときは `size` で大きさを決める（決めないと HUD いっぱいに広がる）。
 export function FeatureIcon({
   feature,
   className,
+  size,
 }: {
   feature: Feature;
   className?: string;
+  size?: number;
 }) {
   return (
     <svg
       viewBox="0 0 32 32"
+      width={size}
+      height={size}
       aria-hidden="true"
       focusable="false"
       className={className}

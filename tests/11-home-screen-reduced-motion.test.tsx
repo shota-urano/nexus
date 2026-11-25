@@ -102,4 +102,16 @@ describe("TC114 動きを減らす設定で HUD のセグメントを押す", ()
     );
     expect(screen.getByTestId("card-chat").dataset.front).toBe("true");
   });
+
+  it("前のカードを押すと、移る動きをせずに、道のとおりすぐ移る（SCR-001-A03）", () => {
+    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    const english = screen.getByRole("link", { name: /^English/ });
+    // 道（Link）のとおりに移る（押した動きを止めない）。光、カードの移動、広がる動きを出さない。
+    expect(fireEvent.click(english)).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "English" }).dataset.flashing,
+    ).toBeUndefined();
+    expect(screen.getByTestId("card-english").dataset.leaving).toBeUndefined();
+    expect(screen.queryByTestId("home-leave-expand")).toBeNull();
+  });
 });

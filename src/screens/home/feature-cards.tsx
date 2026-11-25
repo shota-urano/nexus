@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { Home } from "../../contracts/home";
 import { type Feature, FeatureIcon, type FeatureKey } from "./features";
 import { cardOffset } from "./hud-angle";
@@ -11,6 +11,8 @@ import { HOME_MESSAGES } from "./messages";
 // 機能のカード（BD-03 SCR-001-O03、O09、A02、A03）。
 // - 選んだ機能のカードを前に出し、ほかを上下に奥へ薄く置く（A02）。
 // - 前のカードを押すと、その機能の画面へ移る（A03。遷移表）。AI Chat は下から出る面で開く。
+//   移る動き（セグメントの光 → カードの移動 → 広がって移る）は画面（home-screen）が進め、
+//   ここでは `leaving` が "move" か "expand" のとき、前のカードを前へ引き出す。
 //   奥のカードを押すと、その機能を選ぶ（HUD が回る）。
 // - 知らせ（MSG-015〜MSG-017）は、該当する機能のカードの中に出す（BD-09 2章「ホームのカード」）。
 // - 幅 480 ピクセル以下では、前のカードは「アイコン、見出し、件数」を縦に並べ、隣のカードを
@@ -28,6 +30,14 @@ interface Slot {
   scale: number;
   opacity: number;
 }
+
+// 移る動きの段階（A03。home-screen の LeaveStep と同じ）。
+export type LeaveStep = "glow" | "move" | "expand";
+
+// 移る動きで前のカードを引き出す置き方（並びの真ん中から HUD の側へ寄せ、正面に向ける）。
+const LEAVING_SLOT = { x: -36, y: -70, tilt: 0, scale: 1.08, opacity: 1 };
+// 移る動きでカードを動かす長さ（秒）。
+const LEAVE_MOVE_SECONDS = 0.28;
 
 // 並びの位置（cardOffset）ごとの置き方。
 const SLOTS: Record<number, Slot> = {
@@ -152,6 +162,8 @@ export function FeatureCards({
   reduceMotion,
   onPick,
   onOpenChat,
+  onOpen,
+  leaving = null,
 }: {
   features: readonly Feature[];
   selected: number;
@@ -161,6 +173,10 @@ export function FeatureCards({
   reduceMotion: boolean;
   onPick: (index: number) => void;
   onOpenChat: () => void;
+  /** 前のカードの道を押したとき（A03）。移る動きを使うなら `event.preventDefault()` する */
+  onOpen: (index: number, event: MouseEvent) => void;
+  /** 移る動きの段階。移っていなければ null */
+  leaving?: LeaveStep | null;
 }) {
   const slots = narrow ? SLOTS_NARROW : SLOTS;
   return (
@@ -207,11 +223,16 @@ export function FeatureCards({
           );
         } else {
           card = (
-            <Link href={feature.href} className={`${className} min-h-11`}>
+            <Link
+              href={feature.href}
+              className={`${className} min-h-11`}
+              onClick={(event) => onOpen(index, event)}
+            >
               {body}
             </Link>
           );
         }
+        const pulled = front && (leaving === "move" || leaving === "expand");
 
         if (reduceMotion) {
           return (
@@ -235,16 +256,32 @@ export function FeatureCards({
             key={feature.key}
             data-testid={`card-${feature.key}`}
             data-front={front}
+            data-leaving={pulled || undefined}
             className="absolute right-0 left-0"
             initial={false}
-            animate={{
-              y: slot.y,
-              rotateZ: slot.tilt,
-              rotateY: -8,
-              scale: slot.scale,
-              opacity: slot.opacity,
+            animate={
+              pulled
+                ? {
+                    x: LEAVING_SLOT.x,
+                    y: LEAVING_SLOT.y,
+                    rotateZ: LEAVING_SLOT.tilt,
+                    rotateY: 0,
+                    scale: LEAVING_SLOT.scale,
+                    opacity: LEAVING_SLOT.opacity,
+                  }
+                : {
+                    x: 0,
+                    y: slot.y,
+                    rotateZ: slot.tilt,
+                    rotateY: -8,
+                    scale: slot.scale,
+                    opacity: slot.opacity,
+                  }
+            }
+            transition={{
+              duration: pulled ? LEAVE_MOVE_SECONDS : MOVE_SECONDS,
+              ease: [0.19, 1, 0.22, 1],
             }}
-            transition={{ duration: MOVE_SECONDS, ease: [0.19, 1, 0.22, 1] }}
             style={style}
           >
             {card}

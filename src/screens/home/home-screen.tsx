@@ -1,13 +1,14 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { fetchHome } from "../../client/home";
 import type { Home } from "../../contracts/home";
 import { formatListDate } from "../../ui/list-date";
 import { useReduceMotion } from "../../ui/motion";
 import { ChatSheet } from "../chat/chat-sheet";
-import { FeatureCards } from "./feature-cards";
+import { FeatureCards, type LeaveStep } from "./feature-cards";
 import { FEATURES } from "./features";
 import { Hud } from "./hud";
 import { selectedAt, snapTurn, turnToSelect } from "./hud-angle";
@@ -18,16 +19,36 @@ import { HOME_MESSAGES } from "./messages";
 //   読み込み中は数の場所に待つ印、読めなければ数の場所に MSG-019 を出す（3.5）。
 // - A02 HUD を指で回すかセグメントを押して機能を選ぶ。選ぶ操作と移る操作は分ける（BD-13 P01）。
 // - A03 前のカードを押すと機能の画面へ移る。学習の続きを押すと、完了していない教材を開く。
+//   移るときは、セグメントの光 → カードの移動 → 広がって移る、の順に動かしてから移る（RD-07 3章）。
+//   移る動きの間は、もう一度押しても受けない（ほかの操作も受けない）。
+//   動きを減らす設定のときは動かさず、押してすぐに移る。
 // - A04 今日のピックアップの記事を押すと、記事の案内（SCR-003）を全画面で開く。
 // - A05 中心の AI の印か「AI に質問」を押すと、対象の無い AI チャット（SCR-006）を開く。
 // - 0件のものは0か空にする（RD-03 R21）。
 // - 401（MSG-020）のときは何も出さない。全面の知らせは M01 の枠が出す。
 // - 動きを減らす設定（NFR-008）のときは、HUD の回転とカードの移動を動かさずに切り替える。
+// - 画像（右上の惑星の飾り、ロゴ、記事の写真が無いときの代わりの絵）は BD-03 SCR-001 3.2 のとおり
+//   Codex（gpt-image）が作ったもの（`public/img/home/`。プロンプトも同じ場所）。惑星は機能を持たない。
 
 type Phase = "loading" | "ready" | "failed" | "unauthorized";
 
 // 前のカードを縦に並べる幅（BD-03 SCR-001 3.2）。
 const NARROW_MAX_WIDTH = 480;
+
+// 移る動きの各段階の長さ（ミリ秒）。光 → カードの移動 → 広がる、の順に進み、終わったら移る。
+export const LEAVE_STEP_MS: Readonly<Record<LeaveStep, number>> = {
+  glow: 180,
+  move: 280,
+  expand: 320,
+};
+
+// 学習の続き（A03）で移るときに光らせる機能。
+const ENGLISH_INDEX = FEATURES.findIndex(
+  (feature) => feature.key === "english",
+);
+
+// 記事の写真が無いときの代わりの絵。
+const PICK_FALLBACK_IMAGE = "/img/home/news_fallback_001.png";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -75,7 +96,15 @@ function Count({ value }: { value: number }) {
 }
 
 // O04〜O07 の数の並び。
-function StatusRow({ phase, home }: { phase: Phase; home: Home | null }) {
+function StatusRow({
+  phase,
+  home,
+  onOpenLearning,
+}: {
+  phase: Phase;
+  home: Home | null;
+  onOpenLearning: (event: MouseEvent) => void;
+}) {
   const frame =
     "rounded-[19px] border border-[#d0c1b12f] bg-[linear-gradient(140deg,rgba(44,43,45,.8),rgba(16,22,30,.9))] px-1 py-3.5";
   if (phase === "failed") {
@@ -119,6 +148,7 @@ function StatusRow({ phase, home }: { phase: Phase; home: Home | null }) {
         ) : (
           <Link
             href={`/english/${learning.contentId}`}
+            onClick={onOpenLearning}
             className="mt-1 inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-bold underline-offset-2 hover:underline"
           >
             {learning.learningTheme}
@@ -150,12 +180,13 @@ function Pickup({ home }: { home: Home | null }) {
               className="flex min-h-11 items-center gap-3 rounded-2xl border border-[#81899533] bg-[linear-gradient(125deg,#252831,#141b27)] p-2"
             >
               {pick.imageUrl === null ? (
-                <span
-                  aria-hidden="true"
-                  className="flex h-[72px] w-24 shrink-0 items-center justify-center rounded-xl bg-[#0b0f17]"
-                >
-                  <span className="size-3 rounded-full bg-[#ffb040] shadow-[0_0_10px_#ffb040]" />
-                </span>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={PICK_FALLBACK_IMAGE}
+                  alt=""
+                  data-testid="pick-fallback"
+                  className="h-[72px] w-24 shrink-0 rounded-xl border border-white/10 bg-[#0b0f17] object-cover"
+                />
               ) : (
                 // 画像は記事のサイトにあり、Next.js の画像の最適化を通さない（RD-12 T12）。
                 // eslint-disable-next-line @next/next/no-img-element
@@ -192,6 +223,20 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
   const [selected, setSelected] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [today] = useState(() => todayInJapan(now ?? new Date()));
+  // 移る動き（A03）。移っている間は、押しても受けない。
+  const [leaving, setLeaving] = useState<{
+    index: number;
+    step: LeaveStep;
+  } | null>(null);
+  const leavingRef = useRef(false);
+  // 動きの後で道（Link）を押し直すときは、その押しを通す。
+  const passRef = useRef(false);
+  const leaveTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    const timers = leaveTimersRef.current;
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -214,11 +259,13 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
   }, []);
 
   function pick(index: number) {
+    if (leavingRef.current) return;
     setTurn((current) => turnToSelect(current, index));
     setSelected(index);
   }
 
   function drag(next: number) {
+    if (leavingRef.current) return;
     setTurn(next);
     setSelected(selectedAt(next, FEATURES.length));
   }
@@ -227,15 +274,70 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
     setTurn((current) => snapTurn(current));
   }
 
-  const openChat = () => setChatOpen(true);
+  function openChat() {
+    if (leavingRef.current) return;
+    setChatOpen(true);
+  }
+
+  // A03 選んだ機能の画面へ移る。光 → カードの移動 → 広がる、の順に動かしてから移る。
+  // 動きを減らす設定のときは、道（Link）のとおりにすぐ移る。
+  // 動きの後は、押した道（Link）をもう一度押して、道のとおりに移る。
+  function leave(index: number, event: MouseEvent) {
+    if (passRef.current) {
+      passRef.current = false;
+      return;
+    }
+    if (leavingRef.current) {
+      event.preventDefault();
+      return;
+    }
+    if (reduceMotion) return;
+    event.preventDefault();
+    const anchor = event.currentTarget as HTMLElement;
+    leavingRef.current = true;
+    if (index !== selected) {
+      setTurn((current) => turnToSelect(current, index));
+      setSelected(index);
+    }
+    setLeaving({ index, step: "glow" });
+    const moveAt = LEAVE_STEP_MS.glow;
+    const expandAt = moveAt + LEAVE_STEP_MS.move;
+    const goAt = expandAt + LEAVE_STEP_MS.expand;
+    leaveTimersRef.current.push(
+      setTimeout(() => setLeaving({ index, step: "move" }), moveAt),
+      setTimeout(() => setLeaving({ index, step: "expand" }), expandAt),
+      setTimeout(() => {
+        passRef.current = true;
+        anchor.click();
+      }, goAt),
+    );
+  }
 
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-[#080b11] text-[#f1ece4]">
-      <div className="relative mx-auto max-w-[1180px] px-3.5 pt-6 pb-10">
+    <div
+      className="relative min-h-dvh overflow-x-hidden bg-[#080b11] text-[#f1ece4]"
+      data-leave-step={leaving?.step}
+      aria-busy={leaving !== null || undefined}
+    >
+      {/* 右上の惑星の飾り（機能は持たない） */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/img/home/planet_001.png"
+        alt=""
+        aria-hidden="true"
+        data-testid="home-planet"
+        className="pointer-events-none absolute -top-10 -right-[min(22vw,140px)] z-0 w-[min(95vw,520px)] opacity-80 select-none [mask-image:radial-gradient(circle_at_75%_25%,#000_45%,transparent_75%)]"
+      />
+      <div
+        className={`relative z-[1] mx-auto max-w-[1180px] px-3.5 pt-6 pb-10 ${leaving !== null ? "pointer-events-none" : ""}`}
+      >
         <header className="flex h-16 items-center gap-3">
-          <span
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/img/home/logo.png"
+            alt=""
             aria-hidden="true"
-            className="size-10 rounded-full border border-[#ffc07780] bg-[radial-gradient(circle,#ffb04055,transparent_70%)] shadow-[0_0_14px_#ef9e4c66]"
+            className="size-10 shrink-0 object-contain drop-shadow-[0_0_10px_#ef9e4c66]"
           />
           <div>
             <h1 className="text-[22px] font-bold tracking-[7px]">NEXUS</h1>
@@ -259,6 +361,7 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
               onDrag={drag}
               onRelease={release}
               onCenter={openChat}
+              flashing={leaving === null ? null : leaving.index}
             />
           </div>
           <div className="pointer-events-none absolute inset-0 z-[4]">
@@ -270,6 +373,8 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
               reduceMotion={reduceMotion}
               onPick={pick}
               onOpenChat={openChat}
+              onOpen={leave}
+              leaving={leaving?.step ?? null}
             />
           </div>
           <p className="absolute bottom-2.5 left-[18px] text-[10px] tracking-[1.2px] text-[#aab0c1]">
@@ -277,7 +382,11 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
           </p>
         </section>
 
-        <StatusRow phase={phase} home={home} />
+        <StatusRow
+          phase={phase}
+          home={home}
+          onOpenLearning={(event) => leave(ENGLISH_INDEX, event)}
+        />
 
         <button
           type="button"
@@ -292,6 +401,21 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
 
         <Pickup home={home} />
       </div>
+      {leaving?.step === "expand" && (
+        // 広がって移る（A03 の動きの3つ目）。選んだカードのあたりから画面いっぱいに広げる。
+        <motion.div
+          data-testid="home-leave-expand"
+          aria-hidden="true"
+          className="pointer-events-auto fixed inset-0 z-50 bg-[radial-gradient(circle_at_72%_42%,#513926,#1f2431_55%,#080b11)]"
+          style={{ transformOrigin: "72% 42%" }}
+          initial={{ opacity: 0.4, scale: 0.2, borderRadius: 18 }}
+          animate={{ opacity: 1, scale: 1, borderRadius: 0 }}
+          transition={{
+            duration: LEAVE_STEP_MS.expand / 1000,
+            ease: [0.65, 0, 0.35, 1],
+          }}
+        />
+      )}
       <ChatSheet
         open={chatOpen}
         onClose={() => setChatOpen(false)}
