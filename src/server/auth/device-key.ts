@@ -1,4 +1,4 @@
-import type { Database } from "../db/connection";
+import { type Database, withBusyTimeout } from "../db/connection";
 import { toDbError } from "../db/errors";
 import {
   findDeviceByKeyHash,
@@ -57,11 +57,16 @@ export function createDeviceKeyVerifier(deps: {
         deviceId: device.deviceId,
         deviceName: device.deviceName,
       };
+      // 最後に使った日時の更新だけは、書き込みの権利を待たない（busy_timeout 0）。
+      // 取れなければ「変えられなくても続ける」の扱いに入れ、本来の操作の側で DD-05 1章の 5 秒を待つ
+      // （待ちが2回重なって約 10 秒にならないように。DD-10 TC126）。
       try {
-        updateDeviceLastUsedAt(
-          db,
-          device.deviceId,
-          formatDateTime(clock.now()),
+        withBusyTimeout(db, 0, () =>
+          updateDeviceLastUsedAt(
+            db,
+            device.deviceId,
+            formatDateTime(clock.now()),
+          ),
         );
       } catch (error) {
         return { ok: true, device: verified, lastUsedError: toDbError(error) };

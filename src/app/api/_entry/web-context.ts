@@ -1,9 +1,11 @@
 import { type OpenedAiJobs, openAiJobs } from "../../../server/ai-jobs";
+import { createDeviceKeyVerifier } from "../../../server/auth/device-key";
 import { createDevices, type Devices } from "../../../server/auth/devices";
 import {
   createSenderKeys,
   type SenderKeys,
 } from "../../../server/auth/sender-key";
+import { createContents, type Contents } from "../../../server/contents";
 import { createIngest, type Ingest } from "../../../server/ingest";
 import {
   createEnglishForSender,
@@ -13,6 +15,7 @@ import { type Clock, systemClock } from "../../../server/shared/clock";
 import { loadConfig } from "../../../server/shared/config";
 import { NexusError } from "../../../server/shared/errors";
 import { createLogger, type Logger } from "../../../server/shared/logger";
+import { createDeviceApiContext, type DeviceApiContext } from "./device-api";
 
 // Web サーバのプロセスが使う部品（DD-01 M11）。設定を環境変数から読み（DD-09 2.3）、
 // NEXUS_DATA_DIR の DB を開く。
@@ -30,6 +33,9 @@ export interface WebContext {
   senderKeys: SenderKeys;
   ingest: Ingest;
   englishForSender: EnglishForSender;
+  // 端末の API の入口（DD-02 3章 P01）が使うもの。
+  deviceApi: DeviceApiContext;
+  contents: Contents;
   clock: Clock;
 }
 
@@ -42,6 +48,7 @@ export function webContext(): WebContext {
 
 // 部品を作る。DB を1つだけ開き（DD-01 2.1 M21 の接続はプロセスごとに1つ）、マイグレーションを当ててから
 // （DD-03 5章）、端末の部品、配信元の鍵の部品、受け取りの部品、sharpen に返す読み取りも同じ接続を使う。
+// 端末の API の入口と内容の状態も同じ接続を使う。
 // 失敗したら、ログに出せるときはログに出し（DD-06 E17 は致命的）、開いた DB を閉じて投げる。
 export function createWebContext(
   env: Env,
@@ -57,6 +64,13 @@ export function createWebContext(
     const senderKeys = createSenderKeys({ db, clock });
     const ingest = createIngest({ db, clock, logger });
     const englishForSender = createEnglishForSender({ db });
+    const deviceApi = createDeviceApiContext({
+      clock,
+      logger,
+      origin: config.origin,
+      deviceKeys: createDeviceKeyVerifier({ db, clock }),
+    });
+    const contents = createContents({ db, clock });
     return {
       logger,
       devices,
@@ -64,6 +78,8 @@ export function createWebContext(
       senderKeys,
       ingest,
       englishForSender,
+      deviceApi,
+      contents,
       clock,
     };
   } catch (error) {
