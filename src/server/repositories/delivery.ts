@@ -44,3 +44,18 @@ export function insertRejectedDelivery(
     );
   return Number(result.lastInsertRowid);
 }
+
+// 受け取った日時が境より前で、残った AI の実行の判定する受け取りから指されていない記録を消す。
+// 消した行の数を返す（DD-02 FN-022 手順 3.3。BAT-002。DD-03 2.3）。
+export function deleteUnreferencedDeliveriesReceivedBefore(
+  db: Database,
+  before: string,
+): number {
+  return Number(
+    db
+      .prepare(
+        "DELETE FROM delivery WHERE received_at < ? AND NOT EXISTS (SELECT 1 FROM ai_run WHERE ai_run.relate_delivery_id = delivery.delivery_id)",
+      )
+      .run(before).changes,
+  );
+}

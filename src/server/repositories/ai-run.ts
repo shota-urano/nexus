@@ -171,6 +171,17 @@ export function countQueue(db: Database): QueueCounts {
   };
 }
 
+// 作った日時が境より前の実行を消す。消した行の数を返す（DD-02 FN-022 手順 3.1。BAT-002）。
+// 日時は全て日本時間の同じ形の文字なので、文字の大小で比べる（DD-03 1章）。
+export function deleteAiRunsCreatedBefore(
+  db: Database,
+  before: string,
+): number {
+  return Number(
+    db.prepare("DELETE FROM ai_run WHERE created_at < ?").run(before).changes,
+  );
+}
+
 // 質問の応答の実行を待ちに入れる。作った実行ID を返す。
 export function insertQueuedAnswerRun(
   db: Database,
