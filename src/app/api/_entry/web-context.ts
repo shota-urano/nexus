@@ -7,6 +7,7 @@ import {
 } from "../../../server/auth/sender-key";
 import { createContents, type Contents } from "../../../server/contents";
 import { createIngest, type Ingest } from "../../../server/ingest";
+import { createNewsView, type NewsView } from "../../../server/kinds/news/view";
 import {
   createEnglishForSender,
   type EnglishForSender,
@@ -36,6 +37,8 @@ export interface WebContext {
   // 端末の API の入口（DD-02 3章 P01）が使うもの。
   deviceApi: DeviceApiContext;
   contents: Contents;
+  // 記事の図と案内（M15。FN-003、FN-004）。
+  news: NewsView;
   clock: Clock;
 }
 
@@ -71,6 +74,7 @@ export function createWebContext(
       deviceKeys: createDeviceKeyVerifier({ db, clock }),
     });
     const contents = createContents({ db, clock });
+    const news = createNewsView({ db });
     return {
       logger,
       devices,
@@ -80,6 +84,7 @@ export function createWebContext(
       englishForSender,
       deviceApi,
       contents,
+      news,
       clock,
     };
   } catch (error) {
