@@ -68,9 +68,15 @@ function head(text: string, limit: number): string {
   return result;
 }
 
-// 1件の記事の文字数（見出し、テーマ、案内の先頭）。
+// 1件の記事の文字数（内容ID、見出し、テーマ、案内の先頭。DD-02 FN-002 手順 3 で並べる4項目）。
+// 内容ID は10進の文字列の文字数で数える。
 export function relateArticleChars(article: RelateArticle): number {
-  return chars(article.title) + chars(article.theme) + chars(article.guide);
+  return (
+    chars(String(article.contentId)) +
+    chars(article.title) +
+    chars(article.theme) +
+    chars(article.guide)
+  );
 }
 
 // 判定に渡す記事を選ぶ（DD-02 FN-002 手順 1〜3）。

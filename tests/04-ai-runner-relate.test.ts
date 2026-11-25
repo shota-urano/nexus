@@ -254,8 +254,8 @@ describe("TC13 同じ2つの記事の置き換えと、返らなかった関係�
 });
 
 describe("TC18 渡す記事の選び方の境界（DD-02 FN-002 手順 3。Q-086 の答え）", () => {
-  // 1件の文字数: 見出し 5 文字 + テーマ 2 文字 + 案内の先頭 600 文字 = 607 文字。
-  // 今日の1件と、照らす記事を7日分で 47 件ずつ（329 件）にすると、合計 330 × 607 = 200,310 文字。
+  // 1件の文字数: 内容ID（10進の文字数）+ 見出し 5 文字 + テーマ 2 文字 + 案内の先頭 600 文字。
+  // 今日の1件と、照らす記事を7日分で 47 件ずつ（329 件）にすると、合計は 330 × 607 と内容IDの文字数で 200,000 文字を超える。
   const PER_DAY = 47;
   const DAYS = [
     "2026-11-24",
@@ -320,7 +320,9 @@ describe("TC18 渡す記事の選び方の境界（DD-02 FN-002 手順 3。Q-086
       for (const article of all) {
         expect(article.guide).toHaveLength(RELATE_GUIDE_CHARS);
         expect(article.guide).toBe(guide.slice(0, 600));
-        expect(relateArticleChars(article)).toBe(607);
+        expect(relateArticleChars(article)).toBe(
+          607 + String(article.contentId).length,
+        );
       }
       expect(selection.current).toHaveLength(1);
       expect(selection.droppedDates).toEqual(["2026-11-24"]);
@@ -340,6 +342,83 @@ describe("TC18 渡す記事の選び方の境界（DD-02 FN-002 手順 3。Q-086
         target: "FN-002",
         deliveryId,
       });
+      expect(String(lines[0].detail)).toContain("2026-11-24");
+    } finally {
+      fresh.close();
+    }
+  });
+
+  it("TC18 内容IDも数える: 見出し・テーマ・案内だけなら上限以下でも、内容IDを含む4項目で超えれば一番古い日を外す", () => {
+    // 今日の1件と照らす記事 328 件（見出し 5 文字、テーマ 2 文字、案内 600 文字）。
+    // 3項目の合計は 329 × 607 = 199,703 文字で上限以下、内容ID（1〜329）を足すと 200,582 文字で上限を超える。
+    const fresh = openDatabase(":memory:");
+    migrate(fresh);
+    try {
+      const body = "う".repeat(600);
+      const counts = [46, 47, 47, 47, 47, 47, 47];
+      const ids: number[] = [];
+      let seq = 0;
+      const title = () => `U${String((seq += 1)).padStart(4, "0")}`;
+      DAYS.forEach((day, index) => {
+        const deliveryId = insertDelivery(
+          fresh,
+          day,
+          `${day}T07:00:00.000+09:00`,
+          counts[index],
+        );
+        for (let i = 0; i < counts[index]; i += 1) {
+          ids.push(
+            insertArticle(fresh, {
+              title: title(),
+              theme: "AI",
+              guideMd: body,
+              targetDate: day,
+              receivedAt: `${day}T07:00:00.000+09:00`,
+              deliveryId,
+            }),
+          );
+        }
+      });
+      const deliveryId = insertDelivery(
+        fresh,
+        "2026-12-01",
+        "2026-12-01T07:00:00.000+09:00",
+        1,
+      );
+      ids.push(
+        insertArticle(fresh, {
+          title: title(),
+          theme: "AI",
+          guideMd: body,
+          targetDate: "2026-12-01",
+          receivedAt: "2026-12-01T07:00:00.000+09:00",
+          deliveryId,
+        }),
+      );
+      // 実装の集計関数を使わずに、渡す4項目の文字数を数える。
+      const fourFields = (id: number) => String(id).length + 5 + 2 + 600;
+      expect(ids).toHaveLength(329);
+      expect(ids.length * 607).toBeLessThanOrEqual(RELATE_TOTAL_CHARS);
+      expect(ids.reduce((sum, id) => sum + fourFields(id), 0)).toBeGreaterThan(
+        RELATE_TOTAL_CHARS,
+      );
+
+      const selection = selectRelateArticles(fresh, deliveryId, logger());
+      expect(selection.droppedDates).toEqual(["2026-11-24"]);
+      const passed = [...selection.current, ...selection.others];
+      expect(passed).toHaveLength(329 - 46);
+      const total = passed.reduce(
+        (sum, a) =>
+          sum +
+          String(a.contentId).length +
+          [...a.title].length +
+          [...a.theme].length +
+          [...a.guide].length,
+        0,
+      );
+      expect(total).toBeLessThanOrEqual(RELATE_TOTAL_CHARS);
+      const lines = logLines();
+      expect(lines).toHaveLength(1);
       expect(String(lines[0].detail)).toContain("2026-11-24");
     } finally {
       fresh.close();
