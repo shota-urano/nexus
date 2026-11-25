@@ -7,10 +7,12 @@ import {
 import { inWriteTransaction } from "../db/transaction";
 import {
   type AiRunPurpose,
+  type AiRunRow,
   type QueueCounts,
   claimNextQueuedRun,
   countQueue,
   insertQueuedRelateRun,
+  listRunningRuns,
   markRunDone,
   markRunFailed,
 } from "../repositories/ai-run";
@@ -36,8 +38,22 @@ export interface PickedRun {
 export interface AiQueue {
   // 次を拾う（DD-02 3章 P06 手順 2）。拾えなければ null。
   pickNext(): PickedRun | null;
+  // 処理中のまま残った実行を全て読む（AI Runner の起動のとき。DD-02 3章 P06 手順 1）。
+  listRunning(): PickedRun[];
   // 待ちの数、処理中の数、一番古い待ちの日時（状態を返す API。DD-01 M20、DD-04 `getHealth`）。
   counts(): QueueCounts;
+}
+
+function toPicked(row: AiRunRow): PickedRun {
+  return {
+    aiRunId: row.aiRunId,
+    purpose: row.purpose,
+    attempt: row.attempt,
+    createdAt: row.createdAt,
+    relateDeliveryId: row.relateDeliveryId,
+    replyMessageId: row.replyMessageId,
+    summaryConversationId: row.summaryConversationId,
+  };
 }
 
 export function createAiQueue(db: Database, clock: Clock): AiQueue {
@@ -48,16 +64,10 @@ export function createAiQueue(db: Database, clock: Clock): AiQueue {
       const row = inWriteTransaction(db, () =>
         claimNextQueuedRun(db, formatDateTime(clock.now())),
       );
-      if (row === null) return null;
-      return {
-        aiRunId: row.aiRunId,
-        purpose: row.purpose,
-        attempt: row.attempt,
-        createdAt: row.createdAt,
-        relateDeliveryId: row.relateDeliveryId,
-        replyMessageId: row.replyMessageId,
-        summaryConversationId: row.summaryConversationId,
-      };
+      return row === null ? null : toPicked(row);
+    },
+    listRunning() {
+      return listRunningRuns(db).map(toPicked);
     },
     counts() {
       return countQueue(db);

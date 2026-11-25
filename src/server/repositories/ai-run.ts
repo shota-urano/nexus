@@ -126,6 +126,16 @@ export function markRunFailed(
   );
 }
 
+// `state` が running の行を全て、`ai_run_id` の順に読む（AI Runner の起動のとき。DD-02 3章 P06 手順 1）。
+export function listRunningRuns(db: Database): AiRunRow[] {
+  return db
+    .prepare(
+      `SELECT ${COLUMNS} FROM ai_run WHERE state = 'running' ORDER BY ai_run_id`,
+    )
+    .all()
+    .map(toRow);
+}
+
 export function findAiRun(db: Database, aiRunId: number): AiRunRow | null {
   const row = db
     .prepare(`SELECT ${COLUMNS} FROM ai_run WHERE ai_run_id = ?`)

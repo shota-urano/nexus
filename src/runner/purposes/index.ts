@@ -5,7 +5,8 @@ import type { Clock } from "../../server/shared/clock";
 import { type ErrorCode, NexusError } from "../../server/shared/errors";
 import type { Logger } from "../../server/shared/logger";
 import { formatMessage } from "../../server/shared/messages";
-import type { AiProvider } from "../ai-provider";
+import { type AiProvider, createAiProvider } from "../ai-provider";
+import type { Config } from "../../server/shared/config";
 import type { ExecuteContext } from "./context";
 import { runRelate } from "./relate";
 
@@ -23,6 +24,8 @@ export interface PurposesDeps {
 export interface Purposes {
   // 実行する（実行 → 完了か失敗）。失敗は実行の記録に残して返る。
   execute(run: PickedRun, context?: ExecuteContext): Promise<void>;
+  // 失敗の扱い（DD-02 3章 P06 手順 5）を当てる。AI Runner の起動のときの手順 1 でも使う。
+  fail(run: PickedRun, error: unknown): void;
 }
 
 // 1回だけ自動で送り直す失敗の分類（DD-06 E09、E10、E11。DD-06 4章）。
@@ -32,6 +35,14 @@ export const RETRYABLE_CODES: readonly ErrorCode[] = [
   "AI_BAD_OUTPUT",
   "AI_INTERRUPTED",
 ];
+
+// 設定（DD-09 2.3）から AI の呼び方（M26）を決めて作る。AI Runner の入口（M24）はこちらを使う。
+export function createPurposesFromConfig(
+  config: Config,
+  deps: Omit<PurposesDeps, "provider">,
+): Purposes {
+  return createPurposes({ ...deps, provider: createAiProvider(config) });
+}
 
 export function createPurposes(deps: PurposesDeps): Purposes {
   const { db, clock, logger } = deps;
@@ -47,6 +58,7 @@ export function createPurposes(deps: PurposesDeps): Purposes {
         fail(run, error);
       }
     },
+    fail,
   };
 
   // 失敗の扱い（DD-02 3章 P06 手順 5）。1つのトランザクションで次を行う（DD-05 3章）。

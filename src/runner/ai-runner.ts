@@ -1,4 +1,5 @@
 import type { AiQueue, PickedRun } from "../server/ai-jobs";
+import { NexusError } from "../server/shared/errors";
 import type { Logger } from "../server/shared/logger";
 import type { ExecuteContext } from "./purposes/context";
 import { timeoutError } from "./purposes/outcome";
@@ -101,4 +102,18 @@ export function createAiRunner(options: AiRunnerOptions): AiRunner {
     },
     running: () => inFlight.size,
   };
+}
+
+// 起動したときの処理（DD-02 3章 P06 手順 1。NFR-005）。
+// 処理中のまま残った実行を全て、失敗（E11、理由「途中で止まった」）にし、手順 5 の失敗の扱いを当てる。
+// 拾い始める前に呼ぶ。失敗にした実行の数を返す。
+export function failInterruptedRuns(deps: {
+  queue: AiQueue;
+  fail(run: PickedRun, error: unknown): void;
+}): number {
+  const runs = deps.queue.listRunning();
+  for (const run of runs) {
+    deps.fail(run, new NexusError("AI_INTERRUPTED", "途中で止まった"));
+  }
+  return runs.length;
 }
