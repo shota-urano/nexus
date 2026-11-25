@@ -1,2 +1,16 @@
 reports/
 .DS_Store
+
+# 依存と生成物
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# 開発のデータ（DD-09 2.2）
+.data/
+
+# 設定の値（DD-09 5章。コピーしない）
+.env*

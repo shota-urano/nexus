@@ -1,0 +1,11 @@
+# 上流工程の書類、本人の資料、試作、引き継ぎ書は整形しない
+docs/
+prototype/
+NEXUS_implementation_handoff/
+handoff.md
+README.md
+.se/
+reports/
+.data/
+.next/
+package-lock.json
