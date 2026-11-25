@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   createConversation,
+  DEFAULT_STREAM_RETRY_MS,
   fetchConversation,
   fetchConversations,
   postQuestion,
@@ -75,6 +76,22 @@ export function ChatSheet({
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+// 間を空ける。止めたら AbortError で終わる。
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+  });
 }
 
 function countChars(text: string): number {
@@ -182,28 +199,31 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
         setPhase("ready");
         return;
       }
+      // 選択肢の書き出しを取るため、会話ごとに発言を読む。
+      const readSnippets = (page: readonly Conversation[]) =>
+        page.map((conversation) =>
+          fetchConversation(conversation.conversationId, signal).then(
+            (result) => {
+              if (result.status === "ok") {
+                const snippet = snippetOf(result.value.messages);
+                setOptions((previous) =>
+                  previous.map((option) =>
+                    option.conversation.conversationId ===
+                    conversation.conversationId
+                      ? { ...option, snippet }
+                      : option,
+                  ),
+                );
+              }
+              return result;
+            },
+          ),
+        );
       setOptions(
         items.map((conversation) => ({ conversation, snippet: null })),
       );
-      // 選択肢の書き出しを取るため、会話ごとに発言を読む。一番新しい会話の発言はそのまま出す。
-      const details = items.map((conversation) =>
-        fetchConversation(conversation.conversationId, signal).then(
-          (result) => {
-            if (result.status === "ok") {
-              const snippet = snippetOf(result.value.messages);
-              setOptions((previous) =>
-                previous.map((option) =>
-                  option.conversation.conversationId ===
-                  conversation.conversationId
-                    ? { ...option, snippet }
-                    : option,
-                ),
-              );
-            }
-            return result;
-          },
-        ),
-      );
+      // 一番新しい会話の発言はそのまま出す。
+      const details = readSnippets(items);
       const newest = await details[0];
       if (newest.status !== "ok") {
         setPhase(newest.status);
@@ -211,6 +231,33 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
       }
       setCurrent(newest.value);
       setPhase("ready");
+      // 続きのページの会話も選べるよう、最後のページまで読む（DD-04 ページング）。
+      let cursor = list.value.nextCursor;
+      while (cursor !== null) {
+        const next = await fetchConversations(
+          target?.contentId ?? null,
+          signal,
+          cursor,
+        );
+        if (next.status !== "ok") {
+          if (next.status === "failed") setError(CHAT_MESSAGES["MSG-019"]);
+          break;
+        }
+        const added = next.value.items;
+        setOptions((previous) => {
+          const known = new Set(
+            previous.map((option) => option.conversation.conversationId),
+          );
+          return [
+            ...previous,
+            ...added
+              .filter((conversation) => !known.has(conversation.conversationId))
+              .map((conversation) => ({ conversation, snippet: null })),
+          ];
+        });
+        details.push(...readSnippets(added));
+        cursor = next.value.nextCursor;
+      }
       await Promise.all(details);
     };
     run().catch((caught: unknown) => {
@@ -219,6 +266,39 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
     });
     return () => controller.abort();
   }, [targetKey]);
+
+  // 続きを受けられないときに、作成中の応答が終わるまで `getConversation` で読み直す（DD-04 3.5）。
+  const pollConversation = useCallback(
+    async (id: number, messageId: number, signal: AbortSignal) => {
+      // 読み直しで出した MSG-019 だけを、読めたときに消す。
+      let shownError = false;
+      try {
+        while (!signal.aborted) {
+          const result = await fetchConversation(id, signal);
+          if (signal.aborted) return;
+          if (result.status === "unauthorized") return;
+          if (result.status === "ok") {
+            if (shownError) setError(null);
+            shownError = false;
+            setCurrent(result.value);
+            const stillWriting = result.value.messages.some(
+              (message) =>
+                message.messageId === messageId &&
+                message.replyState === "writing",
+            );
+            if (!stillWriting) return;
+          } else {
+            setError(CHAT_MESSAGES["MSG-019"]);
+            shownError = true;
+          }
+          await wait(DEFAULT_STREAM_RETRY_MS, signal);
+        }
+      } catch {
+        // 止めた（AbortSignal）ときは何もしない。
+      }
+    },
+    [],
+  );
 
   // 作成中の応答の続きを受ける。
   const conversationId = current?.conversation.conversationId ?? null;
@@ -244,23 +324,16 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
             notice: event.notice,
           })),
         onFailed: () => {
-          // つなげないときは `getConversation` で読む（DD-04 3.5）。
-          fetchConversation(conversationId, signal).then(
-            (result) => {
-              if (signal.aborted) return;
-              if (result.status === "ok") setCurrent(result.value);
-              else if (result.status === "failed")
-                setError(CHAT_MESSAGES["MSG-019"]);
-            },
-            () => undefined,
-          );
+          // つなげないときは `getConversation` で読む（DD-04 3.5）。応答がまだ作成中なら、
+          // 完了、失敗、中止になるまで、間を空けて読み直す。
+          void pollConversation(conversationId, writingId, signal);
         },
         onUnauthorized: () => undefined,
       },
       signal,
     ).catch(() => undefined);
     return () => controller.abort();
-  }, [conversationId, writingId, updateMessage]);
+  }, [conversationId, writingId, updateMessage, pollConversation]);
 
   // A02: 前の会話を選ぶ。
   async function selectConversation(id: number) {

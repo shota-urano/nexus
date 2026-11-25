@@ -470,6 +470,78 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
     expect(calls("GET /api/app/conversations/2")).toHaveLength(1);
   });
 
+  it("O02 前の会話は nextCursor をたどって最後のページまで読み、31件目からも選べる", async () => {
+    const firstPage = Array.from({ length: 30 }, (_, i) =>
+      conversation({ conversationId: i + 1 }),
+    );
+    const routes: Record<string, Route> = {
+      [LIST_KEY]: () => jsonResponse({ items: firstPage, nextCursor: "page2" }),
+      [`${LIST_KEY}&cursor=page2`]: () =>
+        jsonResponse({
+          items: [conversation({ conversationId: 31 })],
+          nextCursor: null,
+        }),
+    };
+    for (let id = 1; id <= 31; id += 1) {
+      routes[`GET /api/app/conversations/${id}`] = () =>
+        jsonResponse({
+          conversation: conversation({ conversationId: id }),
+          messages: [
+            message({
+              messageId: id * 100,
+              conversationId: id,
+              bodyMd: `質問${id}`,
+            }),
+          ],
+        });
+    }
+    stubFetch(routes);
+    openSheet();
+    const select = (await screen.findByRole("combobox", {
+      name: "前の会話",
+    })) as HTMLSelectElement;
+    await waitFor(() => expect(select.options).toHaveLength(31));
+    await waitFor(() =>
+      expect(select.options[30].textContent).toContain("質問31"),
+    );
+    expect(calls(`${LIST_KEY}&cursor=page2`)).toHaveLength(1);
+    fireEvent.change(select, { target: { value: "31" } });
+    await waitFor(() => expect(select.value).toBe("31"));
+    expect(
+      screen.getByText("質問31", { selector: "*:not(option)" }),
+    ).toBeTruthy();
+  });
+
+  it("続きにつなげない（500）とき、getConversation がまだ作成中を返しても、完了するまで読み直す", async () => {
+    let reads = 0;
+    stubFetch({
+      [LIST_KEY]: () =>
+        jsonResponse({ items: [conversation()], nextCursor: null }),
+      [DETAIL_KEY]: () => {
+        reads += 1;
+        const reply =
+          reads <= 2
+            ? aiMessage({ bodyMd: "途中", replyState: "writing" })
+            : aiMessage({ bodyMd: "完了した本文", replyState: "done" });
+        return jsonResponse({
+          conversation: conversation(),
+          messages: [message(), reply],
+        });
+      },
+      "GET /api/app/messages/11/stream": () => jsonResponse({}, 500),
+    });
+    openSheet();
+    await screen.findByText("途中");
+    typeQuestion("次の質問");
+    expect(sendButton().disabled).toBe(true);
+    expect(
+      await screen.findByText("完了した本文", undefined, { timeout: 5_000 }),
+    ).toBeTruthy();
+    expect(sendButton().disabled).toBe(false);
+    expect(reads).toBe(3);
+    expect(calls("GET /api/app/messages/11/stream")).toHaveLength(1);
+  }, 10_000);
+
   it("A02 前の会話を選ぶと、その会話の発言と対象を出す", async () => {
     const phraseConversation = conversation({
       conversationId: 2,

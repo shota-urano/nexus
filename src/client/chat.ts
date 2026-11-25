@@ -79,15 +79,21 @@ function postInit(body: unknown, signal?: AbortSignal): RequestInit {
 }
 
 // `listConversations`（FN-014）。対象の内容の会話を、最後に話した日時の新しい順に読む。
-// `targetContentId` が null なら対象の無い会話。
+// `targetContentId` が null なら対象の無い会話。続きは前のページの `nextCursor` を `cursor` に付けて読む
+// （DD-04 ページング）。
 export function fetchConversations(
   targetContentId: number | null,
   signal?: AbortSignal,
+  cursor?: string | null,
 ): Promise<ApiResult<ConversationPage>> {
+  const params = new URLSearchParams();
+  if (targetContentId !== null) {
+    params.set("targetContentId", String(targetContentId));
+  }
+  if (cursor) params.set("cursor", cursor);
+  const query = params.toString();
   const path =
-    targetContentId === null
-      ? "/api/app/conversations"
-      : `/api/app/conversations?targetContentId=${targetContentId}`;
+    query === "" ? "/api/app/conversations" : `/api/app/conversations?${query}`;
   return requestJson(path, { signal }, conversationPageSchema, 200);
 }
 
