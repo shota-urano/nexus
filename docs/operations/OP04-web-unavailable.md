@@ -29,11 +29,12 @@
 
    読み込まれていないと出たときは、OP01 の手順 7 で読み込ませる。
 
-3. ログを見る（OP10）。起動の失敗は `launchd-web.log` に、起動の後のエラーは `web-YYYY-MM-DD.log` に出る。E17（設定が足りない、マイグレーションの番号が違う、SQLite の機能が無い）と E08（DB を開けない）を探す。
+3. ログを見る（OP10）。起動の失敗は `launchd-web.log` に、起動の後のエラーは `web-YYYY-MM-DD.log` に出る。E17 の `STARTUP_MISMATCH`（設定が足りない、マイグレーションの番号が違う、SQLite の機能が無い）と E08 の `DB_UNAVAILABLE`（DB を開けない）を探す。ログには分類の番号でなくコードが出る（OP10）。
 
    ```sh
    tail -n 50 ~/Library/Logs/nexus/launchd-web.log
    tail -n 50 ~/Library/Logs/nexus/web-$(date +%F).log
+   grep -h 'STARTUP_MISMATCH\|DB_UNAVAILABLE' ~/Library/Logs/nexus/launchd-web.log ~/Library/Logs/nexus/web-$(date +%F).log
    ```
 
    原因を直した後に、起動し直す。

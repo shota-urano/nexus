@@ -47,13 +47,27 @@ AI の実行の記録、CLI が動くか、ログインが有効か、使える�
 
    `ANTHROPIC_` で始まる変数が無いことを確かめる（DD-09 2.5）。あれば AI Runner を止め（`launchctl bootout gui/$(id -u)/jp.uslab.nexus.runner`）、開発の担当（AI）に改修を頼む。
 
-5. AI が許していない操作をした跡があるときは、AI Runner を止める（BD-10 5章）。証拠として、ログ（OP10）と AI の実行の記録を消さずに残す。
+5. AI が許していない操作をした跡があるときは、AI Runner を止める（`launchctl bootout gui/$(id -u)/jp.uslab.nexus.runner`。BD-10 5章）。証拠として、ログ（OP10）と AI の実行の記録を消さずに残す。
 
 6. 原因を直した後、AI Runner を起動し直す。直らなければ、開発の担当（AI）に改修を頼む（BD-11 5章）。
 
+   まず、AI Runner が launchd に登録されているかを見る。
+
    ```sh
-   launchctl kickstart -k gui/$(id -u)/jp.uslab.nexus.runner
+   launchctl print gui/$(id -u)/jp.uslab.nexus.runner > /dev/null && echo 登録あり || echo 登録なし
    ```
+
+   - `登録あり` なら、起動し直す。
+
+     ```sh
+     launchctl kickstart -k gui/$(id -u)/jp.uslab.nexus.runner
+     ```
+
+   - `登録なし` なら（手順 4 や 5 で `launchctl bootout` で止めたときは、登録も外れている）、登録し直す。登録すると起動する。
+
+     ```sh
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/jp.uslab.nexus.runner.plist
+     ```
 
 ## 確かめ方
 

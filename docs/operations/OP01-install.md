@@ -92,7 +92,7 @@ DD-09 4章の構築後の確認を、上から順に行う。
 | Tailscale の中から開ける | 端末で `https://nexus.<tailnet>.ts.net/` を開く | ホーム（未登録なら MSG-020） |
 | Tailscale の外から開けない | Tailscale を切った端末で開く | つながらない |
 | 127.0.0.1 だけで待ち受ける | `lsof -nP -iTCP:48400 -sTCP:LISTEN` | `127.0.0.1:48400` だけ |
-| SQLite の機能 | Web サーバのログ（OP10） | 起動のときに E17 が出ていない |
+| SQLite の機能 | Web サーバのログ（OP10） | 起動のときに E17 の `STARTUP_MISMATCH`が出ていない |
 | CLI の起動 | 端末から質問を1つ送る | 応答が出る。`ai_run` が `done` で、`failure_reason` が空（OP06） |
 | CLI に API キーを渡していない | OP06 の手順 4 | `ANTHROPIC_` で始まる変数が無い |
 | 定期ジョブ | OP08 の手順で、バックアップを手で1回取る | 別のディスクに今日の写しがあり、権限が `0600`。ログに MSG-038 |

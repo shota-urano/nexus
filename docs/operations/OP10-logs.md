@@ -28,14 +28,25 @@ NEXUS のログの置き場所、ファイルの分け方、探し方と、30日
 ### 探し方
 
 1. 起きた日時から、プロセスとその日のファイルを決める。画面のエラーは `web-`、AI の失敗は `runner-`、バックアップと古い記録の削除は `job-`。
-2. ファイルを開き、その時刻の行と、エラーの番号（E08、E17 など）と、MSG の番号を探す。
+2. ファイルを開き、その時刻の行と、エラーのコードと、MSG の番号を探す。エラーは分類の番号（E08 など）ではなく、内部のエラーコードで出る（DD-06 2章）。その日のファイルでは JSON の1行に `"code":"DB_UNAVAILABLE"` のように出る。`launchd-*.log` では `NEXUS の AI Runner を起動できない: STARTUP_MISMATCH: …` のように文の中に出る。探すときは下の表のコードをそのまま検索語に使う。
 
    ```sh
    less ~/Library/Logs/nexus/web-<YYYY-MM-DD>.log
+   grep -h 'DB_UNAVAILABLE\|STARTUP_MISMATCH' ~/Library/Logs/nexus/*.log | tail -n 20
    grep -h 'MSG-03[89]\|MSG-04[01]' ~/Library/Logs/nexus/job-*.log | tail -n 20
    ```
 
 3. 起動しないときは、`launchd-*.log` を見る。
+
+### よく探すエラーコード
+
+| 分類 | ログに出るコード | 意味 | 次の手順 |
+|---|---|---|---|
+| E08 | `DB_UNAVAILABLE` | DB を開けない | OP04、OP07 |
+| E12 | `AI_UNAVAILABLE` | AI を使えない | OP06 |
+| E14 | `BACKUP_TARGET_UNAVAILABLE` | バックアップ先を使えない | OP08、OP11 |
+| E16 | `INTERNAL` | 内部のエラー | 開発の担当（AI）に改修を頼む |
+| E17 | `STARTUP_MISMATCH` | 起動の前提が合わない（設定が足りない、マイグレーションの番号が違う、SQLite の機能が無い） | OP04、OP02 |
 
 ### よく見る MSG
 

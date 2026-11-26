@@ -36,9 +36,21 @@
 ## 確かめ方
 
 - 定期ジョブのログに、今日の MSG-040 が出ている。
-- 1年を過ぎた AI の実行と受け取りの記録が0件である。
+- 1年を過ぎた AI の実行と、AI の実行から参照されていない受け取りの記録が0件である。手順 2 で動かした直後に確かめる。
 
   ```sh
-  sqlite3 -readonly "$HOME/Library/Application Support/nexus/nexus.db" \
-    "SELECT COUNT(*) FROM ai_run WHERE created_at < datetime('now', '-1 year'); SELECT COUNT(*) FROM delivery WHERE received_at < datetime('now', '-1 year');"
+  sqlite3 -readonly "$HOME/Library/Application Support/nexus/nexus.db" <<'SQL'
+  WITH n(t) AS (SELECT strftime('%Y-%m-%dT%H:%M:%f+09:00', 'now', '+9 hours')),
+       c(b) AS (SELECT printf('%04d', substr(t, 1, 4) - 1)
+                       || CASE WHEN substr(t, 5, 6) = '-02-29' THEN '-02-28' || substr(t, 11) ELSE substr(t, 5) END
+                FROM n)
+  SELECT b,
+         (SELECT COUNT(*) FROM ai_run WHERE created_at < b),
+         (SELECT COUNT(*) FROM delivery
+           WHERE received_at < b
+             AND NOT EXISTS (SELECT 1 FROM ai_run WHERE ai_run.relate_delivery_id = delivery.delivery_id))
+  FROM c;
+  SQL
   ```
+
+  出力の1つ目は境目の日時である。古い記録の削除と同じく、日本時間の今から1年前を、DB と同じ `YYYY-MM-DDTHH:MM:SS.sss+09:00` の形で作る（DD-03 1章。2月29日は前の年の2月28日にする）。2つ目（AI の実行）と3つ目（受け取りの記録）が `0` なら消し終えている。DB の日時は `T` と時差を付けた形なので、SQLite の `datetime()`（空白で区切り、時差を付けない）と比べてはいけない。

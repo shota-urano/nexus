@@ -70,4 +70,10 @@ main にマージした変更を本番に入れ、動かなければ前の版に
 - `curl http://127.0.0.1:48400/api/health` が 200 を返す。
 - 端末でホームが開き、新しい版の画面が出る。
 - 端末から質問を1つ送り、応答が出る。
-- Web サーバと AI Runner のログ（OP10）に、起動のときの E17 が出ていない。
+- Web サーバと AI Runner のログ（OP10）に、起動のときの E17 の `STARTUP_MISMATCH`が出ていない。
+
+  ```sh
+  grep -h 'STARTUP_MISMATCH' ~/Library/Logs/nexus/launchd-web.log ~/Library/Logs/nexus/launchd-runner.log ~/Library/Logs/nexus/web-$(date +%F).log ~/Library/Logs/nexus/runner-$(date +%F).log
+  ```
+
+  何も出なければよい。
