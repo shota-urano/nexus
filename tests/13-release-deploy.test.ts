@@ -64,22 +64,40 @@ const EXPECTED_DENY = [
 ];
 
 // 子のプロセスを起動するのは M26 の起動の口だけなので（DD-01 1.3）、それを使う。
+// 起動の口は、子が標準入力を読まずに先に終わると「標準入力に書けない」を標準エラーの末尾に足す（DD-06 1章）。
+// そのため out は標準出力の行だけにし、標準エラーは stderr として別に返す。
+// inputDelayMs を渡すと、標準出力を読み始めてから、その時間を待って標準入力を閉じる
+// （子が先に終わった場合を作るため）。
 async function run(
   command: string,
   args: string[],
-  options: { env?: Record<string, string>; cwd?: string } = {},
-): Promise<{ code: number | null; out: string; launchError: string | null }> {
+  options: {
+    env?: Record<string, string>;
+    cwd?: string;
+    inputDelayMs?: number;
+  } = {},
+): Promise<{
+  code: number | null;
+  out: string;
+  stderr: string;
+  launchError: string | null;
+}> {
   const child = spawnLauncher({
     command,
     args,
     env: options.env ?? { PATH: "/usr/bin:/bin" },
     cwd: options.cwd ?? ROOT,
   });
-  child.writeInput("");
   const lines: string[] = [];
-  for await (const line of child.lines) lines.push(line);
+  const reading = (async () => {
+    for await (const line of child.lines) lines.push(line);
+  })();
+  if (options.inputDelayMs !== undefined)
+    await new Promise((resolve) => setTimeout(resolve, options.inputDelayMs));
+  child.writeInput("");
+  await reading;
   const { code, launchError } = await child.ended;
-  return { code, out: [...lines, child.stderr()].join("\n"), launchError };
+  return { code, out: lines.join("\n"), stderr: child.stderr(), launchError };
 }
 
 const sorted = (values: unknown): unknown =>
@@ -111,10 +129,55 @@ describe("deploy の雛形がある", () => {
         "-",
         path,
       ]);
-      expect(result.code, result.out).toBe(0);
+      expect(result.code, result.stderr).toBe(0);
       expect(result.out.trim()).toBe(label);
     },
   );
+
+  // 13-release の実装単位（DD-01 M26、DD-06 1章）: 子のプロセスが標準入力を読まずに終わっても、
+  // Label の確かめは plutil の標準出力だけを比べるので通る。
+  it.each(LABELS)(
+    "%s.plist の Label の確かめが、子のプロセスが標準入力を読まずに終わっても通る",
+    async (label) => {
+      const path = join(DEPLOY, `${label}.plist`);
+      // 子は標準入力を読まずに閉じ、plutil の結果を出して終わる。起動の口が標準入力に書くのは
+      // 子が標準入力を閉じた後なので、起動の口は「標準入力に書けない」を標準エラーの末尾に足す。
+      const result = await run(
+        "/bin/sh",
+        [
+          "-c",
+          'exec 0<&-; /usr/bin/plutil -extract Label raw -o - "$1"; s=$?; sleep 0.3; exit $s',
+          "sh",
+          path,
+        ],
+        { inputDelayMs: 100 },
+      );
+      expect(result.launchError).toBeNull();
+      expect(result.code, result.stderr).toBe(0);
+      // 子が先に終わった場合を作れていること（起動の口が標準エラーの末尾に足す）。
+      expect(result.stderr).toContain("標準入力に書けない");
+      // 比べる値は標準出力だけで、標準エラーを含まない。
+      expect(result.out).not.toContain("標準入力に書けない");
+      expect(result.out.trim()).toBe(label);
+    },
+  );
+
+  it("Label の確かめが比べる値は plutil の標準出力だけで、標準エラーを含まない", async () => {
+    const label = LABELS[0];
+    const path = join(DEPLOY, `${label}.plist`);
+    // plutil の標準出力に加えて、標準エラーにも書く子のプロセス。
+    const result = await run("/bin/sh", [
+      "-c",
+      '/usr/bin/plutil -extract Label raw -o - "$1"; echo "stderr-only-marker" >&2',
+      "sh",
+      path,
+    ]);
+    expect(result.launchError).toBeNull();
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toContain("stderr-only-marker");
+    expect(result.out).not.toContain("stderr-only-marker");
+    expect(result.out.trim()).toBe(label);
+  });
 
   it("CLI の設定の雛形 claude-settings.json がある", () => {
     expect(existsSync(CLAUDE_SETTINGS)).toBe(true);

@@ -1,6 +1,6 @@
 # OP01 NEXUS を入れて、自動で動き出すようにする
 
-launchd、Tailscale Service、別のディスクの置き場所を用意し、Mac mini の再起動の後に人の手を借りずに NEXUS が動き出すようにする（BD-11 7章、DD-09 4章、NFR-005、NFR-027）。
+launchd、Tailscale Service、別のディスクの置き場所を用意し、本人のログインで NEXUS が動き出すようにする。Mac mini は FileVault をオンにするので、再起動の後は本人がログインする（BD-11 7章、DD-09 2.6・4章、NFR-005、NFR-027、CR-016）。
 
 ## きっかけ
 
@@ -78,7 +78,17 @@ launchd、Tailscale Service、別のディスクの置き場所を用意し、Ma
 
 8. Tailscale の管理画面で Tailscale Service `svc:nexus` を用意し、Mac mini で `127.0.0.1:48400` へ渡す設定をする（evaloom と同じ形。DD-09 4章 手順 6、ADR-009）。
 
-9. macOS の設定で、本人のユーザが自動でログインすることを確かめる。LaunchAgent は本人のユーザのセッションで動くので、自動でログインしないと再起動の後に動き出さない（DD-09 2.6）。
+9. macOS の設定で FileVault がオンであることを確かめる。FileVault をオンにするので、Mac mini は自動でログインしない。LaunchAgent は本人のユーザのセッションで動くので、再起動の後は本人がログインすると NEXUS が動き出す（DD-09 2.6、CR-016）。
+
+   ```sh
+   fdesetup status
+   ```
+
+   計画した再起動（macOS の更新など）は、次のコマンドで行う。次の起動の1回だけ、FileVault の解除とログインを飛ばす（DD-09 2.6）。
+
+   ```sh
+   sudo fdesetup authrestart
+   ```
 
 10. 端末を登録し、配信元の鍵を用意する（OP03）。
 
@@ -96,7 +106,7 @@ DD-09 4章の構築後の確認を、上から順に行う。
 | CLI の起動 | 端末から質問を1つ送る | 応答が出る。`ai_run` が `done` で、`failure_reason` が空（OP06） |
 | CLI に API キーを渡していない | OP06 の手順 4 | `ANTHROPIC_` で始まる変数が無い |
 | 定期ジョブ | OP08 の手順で、バックアップを手で1回取る | 別のディスクに今日の写しがあり、権限が `0600`。ログに MSG-038 |
-| 再起動からの戻り | Mac mini を再起動する | 5 分以内に `/api/health` が 200 |
+| 再起動からの戻り | Mac mini を再起動し、本人がログインする | ログインから 5 分以内に `/api/health` が 200 |
 | ログ | `ls ~/Library/Logs/nexus/` | プロセスごとの今日のファイルがある |
 
 どれかが期待どおりでなければ、OP04 で確かめる。値を変えたとき（ポートが使われていた、など）は、先に `deploy/` の雛形を直し、同じ変更の中で DD-09 2章の表を直す（DD-09 4章）。
