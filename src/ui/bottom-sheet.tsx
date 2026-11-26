@@ -15,6 +15,30 @@ import { type ReactNode, useState } from "react";
 //   引き上げと引き下げは、取っ手のボタンでもできる（指で引けないときの代わり）。
 // - 動きを減らす設定のときは、M07 の MotionSettings が動きを止める（NFR-008）。
 // - 押す場所は 44 ピクセル四方以上にする（RD-11 NFR-008）。
+// - tone="hud" は、BD-13 の試作の面（暗い土台、アンバーの枠と光）の色にする。色は Tailwind の設定の値を使う。
+
+type SheetTone = "plain" | "hud";
+
+const TONE_CLASSES: Record<
+  SheetTone,
+  { surface: string; handle: string; header: string; closeButton: string }
+> = {
+  plain: {
+    surface: "bg-white text-black shadow-2xl",
+    handle: "bg-gray-300",
+    header: "px-2",
+    closeButton: "px-2",
+  },
+  hud: {
+    surface:
+      "border-t border-hud-line bg-hud-panel text-hud-text shadow-2xl shadow-hud-amber/10 backdrop-blur-md",
+    handle: "bg-hud-muted",
+    // 試作の .topbar（上下 10px、左右 12px、下の線、暗い背景）に合わせる。
+    header: "border-b border-hud-line bg-hud-bar px-3 py-2.5",
+    // 試作の button（アンバーの枠、角の丸み 10px、左右 12px）に合わせる。
+    closeButton: "rounded-hud border border-hud-line px-3",
+  },
+};
 
 // 指で引いたときに、広げるか戻すかを決める距離（ピクセル）。
 const DRAG_THRESHOLD = 80;
@@ -24,17 +48,20 @@ export function BottomSheet({
   title,
   onClose,
   children,
+  tone = "plain",
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** 面の色の組（省くと plain） */
+  tone?: SheetTone;
 }) {
   // 面の中身は開いている間だけ置く。閉じたら、次に開くときは広げる前の高さから出す。
   return (
     <AnimatePresence>
       {open && (
-        <SheetPanel key="sheet" title={title} onClose={onClose}>
+        <SheetPanel key="sheet" title={title} onClose={onClose} tone={tone}>
           {children}
         </SheetPanel>
       )}
@@ -46,11 +73,14 @@ function SheetPanel({
   title,
   onClose,
   children,
+  tone,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  tone: SheetTone;
 }) {
+  const colors = TONE_CLASSES[tone];
   const [expanded, setExpanded] = useState(false);
   const dragControls = useDragControls();
 
@@ -78,13 +108,13 @@ function SheetPanel({
       dragConstraints={{ top: 0, bottom: 0 }}
       dragElastic={0.2}
       onDragEnd={handleDragEnd}
-      className={`fixed inset-x-0 bottom-0 z-30 flex flex-col bg-white text-black shadow-2xl ${
+      className={`fixed inset-x-0 bottom-0 z-30 flex flex-col ${colors.surface} ${
         expanded ? "" : "rounded-t-2xl"
       }`}
     >
       <header
         onPointerDown={(event) => dragControls.start(event)}
-        className="flex touch-none items-center gap-2 px-2"
+        className={`flex touch-none items-center gap-2 ${colors.header}`}
       >
         <button
           type="button"
@@ -92,13 +122,13 @@ function SheetPanel({
           aria-label={expanded ? "面を戻す" : "面を広げる"}
           className="inline-flex min-h-11 min-w-11 items-center justify-center"
         >
-          <span className="block h-1.5 w-10 rounded-full bg-gray-300" />
+          <span className={`block h-1.5 w-10 rounded-full ${colors.handle}`} />
         </button>
         <h2 className="flex-1 truncate text-base font-semibold">{title}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center px-2"
+          className={`inline-flex min-h-11 min-w-11 items-center justify-center ${colors.closeButton}`}
         >
           閉じる
         </button>

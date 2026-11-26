@@ -9,6 +9,8 @@ export interface ConversationRow {
   questionTargetJson: string | null;
   // 対象の内容の見出し（`content.title`）。対象が無ければ null。
   targetTitle: string | null;
+  // 最初の本人の発言の本文（話し手が owner の一番古い `message`）。無ければ null（DD-02 FN-014、CR-017）。
+  firstQuestionText: string | null;
   startedAt: string;
   lastSpokenAt: string;
 }
@@ -33,6 +35,10 @@ const CONVERSATION_COLUMNS = `v.conversation_id AS conversation_id,
               v.target_content_id AS target_content_id,
               v.question_target_json AS question_target_json,
               c.title AS target_title,
+              (SELECT m.body_md FROM message AS m
+                WHERE m.conversation_id = v.conversation_id AND m.speaker = 'owner'
+                ORDER BY m.message_id
+                LIMIT 1) AS first_question_text,
               v.started_at AS started_at,
               v.last_spoken_at AS last_spoken_at`;
 
@@ -43,6 +49,7 @@ function toConversationRow(row: Record<string, unknown>): ConversationRow {
       row.target_content_id === null ? null : Number(row.target_content_id),
     questionTargetJson: (row.question_target_json as string | null) ?? null,
     targetTitle: (row.target_title as string | null) ?? null,
+    firstQuestionText: (row.first_question_text as string | null) ?? null,
     startedAt: row.started_at as string,
     lastSpokenAt: row.last_spoken_at as string,
   };

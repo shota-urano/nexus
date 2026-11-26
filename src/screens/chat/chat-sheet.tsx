@@ -35,8 +35,11 @@ import { CHAT_MESSAGES } from "./messages";
 // M02〜M04 から対象（内容ID と選んだ箇所。無ければ null）を受けて、下から出る面で開く。
 // - A01 開いたら、対象の内容の前の会話を読み（`listConversations`）、一番新しい会話の発言を出す。
 //   無ければ今の対象で新しい会話を作る（`createConversation`。対象が無ければ MSG-011）。
-// - O02 前の会話の選択肢には、最初の質問の書き出しと最後に話した日時を出す。書き出しは、会話ごとに
-//   `getConversation` を呼び、最初の本人の発言から取る（本人の答え。API は変えない）。
+// - O02 前の会話の選択肢には、最初の質問の書き出しと最後に話した日時を出す。書き出しは
+//   `listConversations` の `firstQuestionText` から取り、会話ごとに `getConversation` を呼ばない
+//   （CR-017）。面を開いたときに呼ぶのは、`listConversations` と一番新しい会話の `getConversation` だけ。
+// - 見た目（色、余白、枠、光）は BD-13 の試作 `prototype/components/Chat.tsx` に合わせる。
+//   色は Tailwind の設定（src/app/globals.css の @theme）の値を使い、ここには直に書かない。
 // - O01 対象の印は、出している会話の対象から出す（前の会話を選んだら、その会話の対象で続ける。DD-02 FN-014）。
 // - A04 「送る」は、押してから質問を受け付けたと返るまでと、同じ会話の応答が作成中のあいだ押せなくする
 //   （BD-09 5章 誤操作の防止、BD-02 FN-015）。失敗したら質問の文を欄に残す。
@@ -53,7 +56,7 @@ type Phase = "loading" | "ready" | "failed" | "unauthorized";
 
 interface ConversationOption {
   conversation: Conversation;
-  /** 最初の質問の書き出し。読めていないか質問が無ければ null */
+  /** 最初の質問の書き出し。質問が無ければ null */
   snippet: string | null;
 }
 
@@ -68,7 +71,7 @@ export function ChatSheet({
   target: QuestionTarget | null;
 }) {
   return (
-    <BottomSheet open={open} title={SHEET_TITLE} onClose={onClose}>
+    <BottomSheet open={open} title={SHEET_TITLE} onClose={onClose} tone="hud">
       <ChatPanel target={target} />
     </BottomSheet>
   );
@@ -98,11 +101,10 @@ function countChars(text: string): number {
   return [...text].length;
 }
 
-// 最初の本人の発言から書き出しを取る。
-function snippetOf(messages: readonly ChatMessage[]): string | null {
-  const first = messages.find((message) => message.speaker === "owner");
-  if (first === undefined) return null;
-  const line = first.bodyMd.replace(/\s+/g, " ").trim();
+// 最初の質問の本文から書き出しを作る。
+function snippetOf(text: string | null | undefined): string | null {
+  if (text === null || text === undefined) return null;
+  const line = text.replace(/\s+/g, " ").trim();
   const chars = [...line];
   return chars.length > SNIPPET_CHARS
     ? `${chars.slice(0, SNIPPET_CHARS).join("")}…`
@@ -117,6 +119,10 @@ function thisYearInJapan(now: Date): number {
 // 日本時間の日時（`YYYY-MM-DDTHH:MM:SS.sss+09:00`）を「11月23日（月） 05:30」にする（BD-09 5章 表示書式）。
 function formatDateTime(dateTime: string, thisYear: number): string {
   return `${formatListDate(dateTime.slice(0, 10), thisYear)} ${dateTime.slice(11, 16)}`;
+}
+
+function optionOf(conversation: Conversation): ConversationOption {
+  return { conversation, snippet: snippetOf(conversation.firstQuestionText) };
 }
 
 function targetLabelOf(conversation: Conversation): string {
@@ -196,38 +202,16 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
           return;
         }
         const { conversation, notice } = created.value;
-        setOptions([{ conversation, snippet: null }]);
+        setOptions([optionOf(conversation)]);
         setCurrent({ conversation, messages: [] });
         setOpenNotice(notice);
         setPhase("ready");
         return;
       }
-      // 選択肢の書き出しを取るため、会話ごとに発言を読む。
-      const readSnippets = (page: readonly Conversation[]) =>
-        page.map((conversation) =>
-          fetchConversation(conversation.conversationId, signal).then(
-            (result) => {
-              if (result.status === "ok") {
-                const snippet = snippetOf(result.value.messages);
-                setOptions((previous) =>
-                  previous.map((option) =>
-                    option.conversation.conversationId ===
-                    conversation.conversationId
-                      ? { ...option, snippet }
-                      : option,
-                  ),
-                );
-              }
-              return result;
-            },
-          ),
-        );
-      setOptions(
-        items.map((conversation) => ({ conversation, snippet: null })),
-      );
-      // 一番新しい会話の発言はそのまま出す。
-      const details = readSnippets(items);
-      const newest = await details[0];
+      // 選択肢の書き出しは firstQuestionText から取る（CR-017）。
+      setOptions(items.map(optionOf));
+      // 一番新しい会話の発言だけを読んで出す。
+      const newest = await fetchConversation(items[0].conversationId, signal);
       if (newest.status !== "ok") {
         setPhase(newest.status);
         return;
@@ -256,13 +240,11 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
             ...previous,
             ...added
               .filter((conversation) => !known.has(conversation.conversationId))
-              .map((conversation) => ({ conversation, snippet: null })),
+              .map(optionOf),
           ];
         });
-        details.push(...readSnippets(added));
         cursor = next.value.nextCursor;
       }
-      await Promise.all(details);
     };
     run().catch((caught: unknown) => {
       if (isAbortError(caught) || signal.aborted) return;
@@ -370,10 +352,7 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
       );
       if (result.status === "ok") {
         const { conversation, notice } = result.value;
-        setOptions((previous) => [
-          { conversation, snippet: null },
-          ...previous,
-        ]);
+        setOptions((previous) => [optionOf(conversation), ...previous]);
         // 作るあいだに別の会話を選んだなら、選んだ会話を出したままにする。
         if (selection === selectionRef.current) {
           setCurrent({ conversation, messages: [] });
@@ -423,7 +402,7 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
                     ...option.conversation,
                     lastSpokenAt: question.sentAt,
                   },
-                  snippet: option.snippet ?? snippetOf([question]),
+                  snippet: option.snippet ?? snippetOf(question.bodyMd),
                 }
               : option,
           ),
@@ -511,14 +490,14 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b">
+      <div className="border-b border-hud-line">
         {conversation !== null && conversation.target !== null && (
           <QuestionTargetBadge
             kind={conversation.target.kind}
             label={targetLabelOf(conversation)}
           />
         )}
-        <div className="flex items-center gap-2 px-4 pb-2">
+        <div className="flex items-center gap-2 px-3 pb-2">
           <select
             aria-label="前の会話"
             value={conversation?.conversationId ?? ""}
@@ -526,7 +505,7 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
             onChange={(event) =>
               void selectConversation(Number(event.target.value))
             }
-            className="min-h-11 min-w-0 flex-1 truncate rounded border px-2 text-sm"
+            className="min-h-11 min-w-0 flex-1 truncate rounded-lg border border-hud-line bg-hud-field px-2 text-sm text-hud-text"
           >
             {options.map((option) => (
               <option
@@ -544,16 +523,16 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
             type="button"
             onClick={() => void startConversation()}
             disabled={creating || phase === "loading"}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded border px-3 text-sm disabled:opacity-50"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-hud border border-hud-line px-3 text-sm disabled:opacity-50"
           >
             新しい会話
           </button>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {phase === "loading" && (
-          <p role="status" className="py-6 text-center text-sm">
+          <p role="status" className="py-6 text-center text-sm text-hud-muted">
             読み込み中
           </p>
         )}
@@ -561,12 +540,12 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
           <EmptyState message={CHAT_MESSAGES["MSG-019"]} />
         )}
         {phase === "ready" && openNotice !== null && (
-          <p role="status" className="py-2 text-sm">
+          <p role="status" className="py-2 text-sm text-hud-muted">
             {CHAT_MESSAGES[openNotice]}
           </p>
         )}
         {phase === "ready" && current !== null && (
-          <ol className="flex flex-col gap-3">
+          <ol className="flex flex-col gap-2">
             {current.messages.map((message) => (
               <MessageItem
                 key={message.messageId}
@@ -581,14 +560,14 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
       </div>
 
       <form
-        className="border-t px-4 py-2"
+        className="border-t border-hud-line p-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           if (canSend) void send();
         }}
       >
         {error !== null && (
-          <p role="alert" className="pb-2 text-sm">
+          <p role="alert" className="pb-2 text-sm text-hud-warn">
             {error}
           </p>
         )}
@@ -598,12 +577,12 @@ function ChatPanel({ target }: { target: QuestionTarget | null }) {
             value={text}
             onChange={changeText}
             rows={2}
-            className="min-h-11 min-w-0 flex-1 resize-none rounded border px-2 py-1 text-sm"
+            className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-hud-line bg-hud-field p-2 text-base text-hud-text"
           />
           <button
             type="submit"
             disabled={!canSend}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded border px-3 text-sm disabled:opacity-50"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-hud border border-hud-line px-3 text-sm disabled:opacity-50"
           >
             送る
           </button>
@@ -629,21 +608,29 @@ function MessageItem({
   return (
     <li
       data-testid={isAi ? "ai-message" : "owner-message"}
-      className={`rounded-lg border px-3 py-2 text-sm ${isAi ? "" : "self-end"}`}
+      className={`max-w-bubble rounded-hud px-2.5 py-2 text-sm ${
+        isAi ? "self-start bg-hud-veil" : "self-end bg-hud-amber/15"
+      }`}
     >
-      <p className="pb-1 text-xs opacity-70">
+      <p className="pb-1 text-xs text-hud-muted">
         {isAi ? "AI" : "本人"}　{formatDateTime(message.sentAt, thisYear)}
       </p>
       <ReceivedText markdown={message.bodyMd} />
       {isAi && message.replyState === "writing" && (
-        <p role="status" aria-busy="true" className="pt-1 text-xs">
+        <p
+          role="status"
+          aria-busy="true"
+          className="pt-1 text-xs text-hud-muted"
+        >
           応答を作成中
         </p>
       )}
       {notice !== null && (
         <p
           role={message.replyState === "failed" ? "alert" : "status"}
-          className="pt-1 text-xs"
+          className={`pt-1 text-xs ${
+            message.replyState === "failed" ? "text-hud-warn" : "text-hud-muted"
+          }`}
         >
           {notice}
         </p>
@@ -692,7 +679,7 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded border px-3 text-sm disabled:opacity-50"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-hud border border-hud-line px-3 text-sm disabled:opacity-50"
     >
       {label}
     </button>

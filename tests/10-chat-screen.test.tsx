@@ -411,14 +411,17 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
     expect(screen.queryByText(CHAT_MESSAGES["MSG-011"])).toBeNull();
   });
 
-  it("O01 対象の印と、O02 前の会話（会話ごとに getConversation で取った最初の質問の書き出しと、最後に話した日時）を出す", async () => {
+  // CR-017: 書き出しは listConversations の firstQuestionText から取り、会話ごとに getConversation を呼ばない。
+  it("O01 対象の印と、O02 前の会話（listConversations の firstQuestionText から取った最初の質問の書き出しと、最後に話した日時）を出す", async () => {
     stubFetch({
       [LIST_KEY]: () =>
         jsonResponse({
           items: [
-            conversation(),
+            conversation({ firstQuestionText: "最初の質問" }),
             conversation({
               conversationId: 2,
+              firstQuestionText:
+                "この語句の\n意味は何ですか。三十文字を超える長い質問の文はここで切って書き出しにします",
               target: {
                 kind: "phrase",
                 contentId: 7,
@@ -443,8 +446,7 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
             message({
               messageId: 30,
               conversationId: 2,
-              bodyMd:
-                "この語句の\n意味は何ですか。三十文字を超える長い質問の文はここで切って書き出しにします",
+              bodyMd: "getConversation から取った別の本文",
             }),
           ],
         }),
@@ -467,18 +469,23 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
       "この語句の 意味は何ですか。三十文字を超える長い質問の文はこ…（2025年12月31日 23:59）",
     );
     expect(calls(DETAIL_KEY)).toHaveLength(1);
-    expect(calls("GET /api/app/conversations/2")).toHaveLength(1);
+    expect(calls("GET /api/app/conversations/2")).toHaveLength(0);
   });
 
   it("O02 前の会話は nextCursor をたどって最後のページまで読み、31件目からも選べる", async () => {
     const firstPage = Array.from({ length: 30 }, (_, i) =>
-      conversation({ conversationId: i + 1 }),
+      conversation({
+        conversationId: i + 1,
+        firstQuestionText: `質問${i + 1}`,
+      }),
     );
     const routes: Record<string, Route> = {
       [LIST_KEY]: () => jsonResponse({ items: firstPage, nextCursor: "page2" }),
       [`${LIST_KEY}&cursor=page2`]: () =>
         jsonResponse({
-          items: [conversation({ conversationId: 31 })],
+          items: [
+            conversation({ conversationId: 31, firstQuestionText: "質問31" }),
+          ],
           nextCursor: null,
         }),
     };
@@ -505,6 +512,10 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
       expect(select.options[30].textContent).toContain("質問31"),
     );
     expect(calls(`${LIST_KEY}&cursor=page2`)).toHaveLength(1);
+    // CR-017: 書き出しのために会話ごとに getConversation を呼ばない（一番新しい会話の1回だけ）。
+    for (let id = 2; id <= 31; id += 1) {
+      expect(calls(`GET /api/app/conversations/${id}`)).toHaveLength(0);
+    }
     fireEvent.change(select, { target: { value: "31" } });
     await waitFor(() => expect(select.value).toBe("31"));
     expect(
@@ -585,7 +596,6 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
 
   it("A02 会話2、会話3と続けて選び、会話2の結果が後から返っても、最後に選んだ会話3を出したままにする", async () => {
     let answerSecond: (response: Response) => void = () => {};
-    let secondCalls = 0;
     const detail2 = () =>
       jsonResponse({
         conversation: conversation({ conversationId: 2 }),
@@ -597,22 +607,25 @@ describe("M06 AI チャットの面（BD-03 SCR-006）", () => {
       [LIST_KEY]: () =>
         jsonResponse({
           items: [
-            conversation(),
-            conversation({ conversationId: 2 }),
-            conversation({ conversationId: 3 }),
+            conversation({ firstQuestionText: "最初の質問" }),
+            conversation({
+              conversationId: 2,
+              firstQuestionText: "会話2の質問",
+            }),
+            conversation({
+              conversationId: 3,
+              firstQuestionText: "会話3の質問",
+            }),
           ],
           nextCursor: null,
         }),
       [DETAIL_KEY]: () =>
         jsonResponse({ conversation: conversation(), messages: [message()] }),
-      // 1回目は書き出しを取る呼び出し。2回目（選んだとき）の応答を遅らせる。
-      "GET /api/app/conversations/2": () => {
-        secondCalls += 1;
-        if (secondCalls === 1) return detail2();
-        return new Promise<Response>((resolve) => {
+      // 書き出しは listConversations の firstQuestionText から取る（CR-017）。選んだときの応答を遅らせる。
+      "GET /api/app/conversations/2": () =>
+        new Promise<Response>((resolve) => {
           answerSecond = resolve;
-        });
-      },
+        }),
       "GET /api/app/conversations/3": () =>
         jsonResponse({
           conversation: conversation({ conversationId: 3 }),

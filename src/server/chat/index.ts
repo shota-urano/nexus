@@ -62,6 +62,7 @@ export interface Conversation {
   conversationId: number;
   target: QuestionTarget | null;
   targetTitle: string | null;
+  firstQuestionText: string | null;
   startedAt: string;
   lastSpokenAt: string;
 }
@@ -141,6 +142,7 @@ function toConversation(row: ConversationRow): Conversation {
         ? null
         : (JSON.parse(row.questionTargetJson) as QuestionTarget),
     targetTitle: row.targetTitle,
+    firstQuestionText: row.firstQuestionText,
     startedAt: row.startedAt,
     lastSpokenAt: row.lastSpokenAt,
   };

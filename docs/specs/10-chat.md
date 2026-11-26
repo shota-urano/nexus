@@ -67,7 +67,7 @@ MSG-011〜MSG-014、MSG-019。DD-06 E01、E05、E06、E09〜E13。
   - 受け入れ基準: DD-10 TC75 が通る
 - [x] [Backend] 種類の一覧 M14 に、テストだけの3つ目の種類（一覧への登録、形の確かめ、渡す内容の組み立て、種類ごとの中身のテーブルを作るテスト用のマイグレーション）を足して、M13、M17、M18 と DD-02 3章 P08 を変えずに動くことを確かめる（NFR-004、REQ-019、DD-01 M14、DD-03 2.2）（se/10-chat）
   - 受け入れ基準: DD-10 TC110 が通る
-- [ ] [Backend] `listConversations` と `createConversation` の応答の会話に `firstQuestionText`（最初の本人の発言の本文。無ければ null）を添える（DD-02 FN-014、DD-04、CR-017）
+- [x] [Backend] `listConversations` と `createConversation` の応答の会話に `firstQuestionText`（最初の本人の発言の本文。無ければ null）を添える（DD-02 FN-014、DD-04、CR-017）（se/10-chat）
   - 受け入れ基準: DD-10 TC102 が通る; 発言のある会話を `listConversations` で読むと `firstQuestionText` が最初の本人の発言の本文で、発言の無い会話では null である
-- [ ] [Frontend] AI チャットの面 M06 で、前の会話の選択肢の書き出しを `listConversations` の `firstQuestionText` から取り、会話ごとに `getConversation` を呼ばない。面の見た目（色、余白、枠、光）を BD-13 の試作 `prototype/components/Chat.tsx` に合わせる（SCR-006、DD-01 M06、DD-01 3章 Tailwind CSS の決まり、CR-017）
+- [x] [Frontend] AI チャットの面 M06 で、前の会話の選択肢の書き出しを `listConversations` の `firstQuestionText` から取り、会話ごとに `getConversation` を呼ばない。面の見た目（色、余白、枠、光）を BD-13 の試作 `prototype/components/Chat.tsx` に合わせる（SCR-006、DD-01 M06、DD-01 3章 Tailwind CSS の決まり、CR-017）（se/10-chat）
   - 受け入れ基準: DD-10 TC75 が通る; 面を開いたときの API の呼び出しが `listConversations` 1回と、一番新しい会話の `getConversation` 1回だけである; 面の色の値が Tailwind の設定のファイルの値を使い、部品の中に直に書いていない

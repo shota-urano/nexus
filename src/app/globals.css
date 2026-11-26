@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+/*
+ * 色などの値（DD-01 3章 Tailwind CSS の決まり）。部品の中には直に書かず、ここの名前で使う。
+ * 値は BD-13 の試作（prototype/app/globals.css、prototype/components/Chat.tsx）に合わせる。
+ * 暗い土台と、アンバーの光。
+ */
+@theme {
+  --color-hud-panel: rgb(22 24 34 / 0.78);
+  /* 試作の上部の帯（.topbar）の背景 */
+  --color-hud-bar: rgb(7 8 13 / 0.92);
+  --color-hud-field: #0e1018;
+  --color-hud-veil: rgb(255 255 255 / 0.06);
+  --color-hud-line: rgb(255 176 64 / 0.35);
+  --color-hud-amber: #ffb040;
+  --color-hud-text: #f1ece4;
+  --color-hud-muted: #a8a196;
+  --color-hud-warn: #ff9a6b;
+
+  /* 試作の押す部品と発言の角の丸み、発言の幅の上限 */
+  --radius-hud: 10px;
+  --container-bubble: 85%;
+}
