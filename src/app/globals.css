@@ -7,6 +7,8 @@
  */
 @theme {
   --color-hud-panel: rgb(22 24 34 / 0.78);
+  /* 試作の上部の帯（.topbar）の背景 */
+  --color-hud-bar: rgb(7 8 13 / 0.92);
   --color-hud-field: #0e1018;
   --color-hud-veil: rgb(255 255 255 / 0.06);
   --color-hud-line: rgb(255 176 64 / 0.35);

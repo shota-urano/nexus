@@ -21,18 +21,22 @@ type SheetTone = "plain" | "hud";
 
 const TONE_CLASSES: Record<
   SheetTone,
-  { surface: string; handle: string; header: string }
+  { surface: string; handle: string; header: string; closeButton: string }
 > = {
   plain: {
     surface: "bg-white text-black shadow-2xl",
     handle: "bg-gray-300",
-    header: "",
+    header: "px-2",
+    closeButton: "px-2",
   },
   hud: {
     surface:
       "border-t border-hud-line bg-hud-panel text-hud-text shadow-2xl shadow-hud-amber/10 backdrop-blur-md",
     handle: "bg-hud-muted",
-    header: "border-b border-hud-line",
+    // 試作の .topbar（上下 10px、左右 12px、下の線、暗い背景）に合わせる。
+    header: "border-b border-hud-line bg-hud-bar px-3 py-2.5",
+    // 試作の button（アンバーの枠、角の丸み 10px、左右 12px）に合わせる。
+    closeButton: "rounded-hud border border-hud-line px-3",
   },
 };
 
@@ -110,7 +114,7 @@ function SheetPanel({
     >
       <header
         onPointerDown={(event) => dragControls.start(event)}
-        className={`flex touch-none items-center gap-2 px-2 ${colors.header}`}
+        className={`flex touch-none items-center gap-2 ${colors.header}`}
       >
         <button
           type="button"
@@ -124,7 +128,7 @@ function SheetPanel({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center px-2"
+          className={`inline-flex min-h-11 min-w-11 items-center justify-center ${colors.closeButton}`}
         >
           閉じる
         </button>
