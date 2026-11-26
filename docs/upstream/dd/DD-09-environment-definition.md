@@ -2,8 +2,8 @@
 id: DD-09
 name: 環境定義書（基盤詳細設計）
 phase: 詳細設計
-version: 1.0
-updated: 2026-11-25
+version: 1.1
+updated: 2026-11-26
 ---
 
 # DD-09 環境定義書（基盤詳細設計）（NEXUS）
@@ -14,6 +14,7 @@ updated: 2026-11-25
 - 0.1: 初めて書いた（2026-11-24）。
 - 0.2: X-05 RV16 の指摘に合わせ、多重起動の印のフォルダを外した（DB の `job_lock` に替えた。RV16-03）。6章の参照に書類の名前を付けた（2026-11-25）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
+- 1.1: X-04 CR-016（2026-11-26 RD-01 SH01 が承認）で、2.6 と構築後の確認の再起動を、FileVault をオンにして本人がログインする形に直した。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 環境一覧
@@ -127,7 +128,7 @@ AC22 の証拠の残し方（RD-15 AC22、CR-005）:
 | `jp.uslab.nexus.backup` | 定期ジョブの入口（`node dist/jobs/main.js backup`） | `StartCalendarInterval` の 3 時 0 分 | 同上（`launchd-job.log`） |
 | `jp.uslab.nexus.purge` | 定期ジョブの入口（`node dist/jobs/main.js purge`） | `StartCalendarInterval` の 1 日 3 時 30 分 | 同上 |
 
-- Mac mini の再起動の後に LaunchAgent が動くには、本人のユーザが自動でログインする必要がある。cerebellum と同じ前提で、OP01 で確かめる（NFR-005、AC26）。
+- LaunchAgent は本人のユーザのセッションで動く。Mac mini は FileVault をオンにするので自動でログインせず、再起動の後は本人がログインすると動き出す。計画した再起動は `sudo fdesetup authrestart` で行い、次の起動の1回だけログインを飛ばす。OP01 で確かめる（NFR-005、AC26、CR-016）。
 - ログ（CR-013）: 各プロセスは M23 のログの関数で `NEXUS_LOG_DIR/<プロセスの名前>-YYYY-MM-DD.log` に書き、日が替わったら新しいファイルに書き、30 日より古いファイルを消す（NFR-025）。launchd の標準出力と標準エラーのファイルには、ログの関数が使えるようになる前の出力（起動の失敗など）だけが出る。このファイルは Web サーバと AI Runner の起動のときに、1 MB を超えていれば空にする。
 
 ## 3. IaC とパラメータシート
@@ -163,7 +164,7 @@ AC22 の証拠の残し方（RD-15 AC22、CR-005）:
 | CLI の起動 | 本番の端末から質問を1つ送る | 応答が出る。`ai_run` が done で、`failure_reason` が空 |
 | CLI に API キーを渡していない | AI Runner のプロセスの環境を確かめる手順（OP06）で、CLI に渡す変数の一覧を見る | `ANTHROPIC_` で始まる変数が無い |
 | 定期ジョブ | `node dist/jobs/main.js backup` を手で動かす | 別のディスクに今日の写しがあり、権限が `0600`。ログに MSG-038 |
-| 再起動からの戻り | Mac mini を再起動する | 5 分以内に `getHealth` が 200（NFR-005。AC26） |
+| 再起動からの戻り | Mac mini を再起動し、本人がログインする | ログインから 5 分以内に `getHealth` が 200（NFR-005。AC26。CR-016） |
 | ログ | `NEXUS_LOG_DIR` | プロセスごとの今日のファイルがある |
 
 - 書類の直し方: 構築してみて値を変えたとき（ポートが使われていた、など）は、先に `deploy/` の雛形を直し、同じ変更の中でこの書類の 2章の表を直す。版を上げ、冒頭に直したわけを書く。

@@ -1,5 +1,5 @@
 ---
-status: confirmed
+status: draft
 範囲: リポジトリの足場、make verify、層の規則、共通層（M23）、DB の接続とマイグレーションの仕組み（M21）
 ---
 
@@ -57,3 +57,5 @@ DD-06 E08（DB が使えない）、E16（予期しない失敗）、E17（起�
   - 受け入れ基準: DD-10 TC106、DD-10 TC111 が通る
 - [x] [Backend] DB の接続 M21（WAL、外部キー、`busy_timeout`、トランザクションの関数、マイグレーションを番号の順に当てる仕組み、起動のときの FTS5 の trigram と `backup` の確かめ）を作る（DD-01 M21、DD-03 5章、DD-05 1章、DD-09 2.1、ADR-020）（se/01-foundation）
   - 受け入れ基準: DD-10 TC109 が通る
+- [ ] [Backend] `npm run build` で、Next.js の画面に加えて、AI Runner（`src/runner/main.ts`）、定期ジョブ（`src/jobs/main.ts`）、管理のコマンド（`src/cli/main.ts`）の TypeScript を `dist/` に JavaScript で書き出し、マイグレーションの `.sql` も写す（DD-09 2.6・4章 手順 2。本番の構築 OP01 で見つけた不具合。2026-11-26）
+  - 受け入れ基準: `npm run build` の後に `dist/runner/main.js`、`dist/jobs/main.js`、`dist/cli/main.js` がある; DD-10 TC85 の起動の試験（`node dist/jobs/main.js backup`）が、試験の中で `dist/` を作らず、`npm run build` と同じ変換の手順で作った `dist/` を使って通る

@@ -1,5 +1,5 @@
 ---
-status: confirmed
+status: draft
 範囲: launchd と CLI の設定の雛形、運用の手順書、契約のテスト、総合テスト、受入テスト、配信元の改修
 ---
 
@@ -53,6 +53,8 @@ Messages API への切り替え（ADR-017 の見直しのとき）。
   - 受け入れ基準: deploy のフォルダに launchd の雛形4つと、CLI の設定の雛形と、環境変数の雛形がある; launchd の雛形4つが plutil の lint を通る; CLI の設定の雛形の許可、拒否、作業の場所の外の読み取りと書き込みを断る設定の値が DD-09 2.5 の表と同じ; 構築のスクリプトを一時のホームで動かすと DD-09 4章の手順 3 のフォルダが権限 0700 でできる
 - [x] [Backend] 運用の手順書 `docs/operations/` の OP01〜OP11 を書く（NFR-027、BD-11 7章）（se/13-release）
   - 受け入れ基準: DD-10 TC128 が通る
+- [ ] [Backend] 運用の手順書 OP01 の手順 9（自動でログイン）と確かめ方の「再起動からの戻り」を、FileVault をオンにして再起動の後は本人がログインする形に直す。計画した再起動は `sudo fdesetup authrestart` で行うことを書く（NFR-005、DD-09 2.6・4章、CR-016）
+  - 受け入れ基準: DD-10 TC128 が通る; OP01 に自動でログインする手順が無く、再起動の後に本人がログインすることと `sudo fdesetup authrestart` が書いてある; 確かめ方の「再起動からの戻り」の期待する結果が、ログインから 5 分以内に `/api/health` が 200 である
 - [x] [Backend] 全ての operation の応答を `docs/api/openapi.yaml` と照らす契約のテストを作る（NFR-015、DD-01 M10、ADR-021）（se/13-release）
   - 受け入れ基準: DD-10 TC102 が通る
 - [x] [Backend] AC22 の証拠の数える処理を作る（NFR-016、NFR-019、DD-09 2.5）（se/13-release）
