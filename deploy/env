@@ -1,0 +1,15 @@
+# NEXUS の本番の環境変数（DD-09 2.3）。管理のコマンドがこのファイルから読む（DD-09 2.1）。
+# 構築のスクリプト（deploy/setup.sh）が __HOME__ を本人のホームの絶対の道に直し、
+# ~/Library/Application Support/nexus/env（権限 0600）に置く。
+# __TAILNET__ と __BACKUP_VOLUME__ は、OP01 で本人が書き込む（DD-09 3章）。
+# 秘密の情報は書かない（DD-09 3章）。NEXUS_AI_EVENT_LOG_DIR は本番では設定しない（DD-09 2.5）。
+NEXUS_ENV=production
+NEXUS_DATA_DIR="__HOME__/Library/Application Support/nexus"
+NEXUS_LOG_DIR="__HOME__/Library/Logs/nexus"
+NEXUS_PORT=48400
+NEXUS_ORIGIN=https://nexus.__TAILNET__.ts.net
+NEXUS_BACKUP_DIR="/Volumes/__BACKUP_VOLUME__/nexus-backup"
+NEXUS_AI_PROVIDER=claude
+NEXUS_CLAUDE_BIN="__HOME__/.local/bin/claude"
+NEXUS_BRAIN_HARNESS_DIR="__HOME__/projects/brain-harness"
+TZ=Asia/Tokyo
