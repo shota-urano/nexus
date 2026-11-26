@@ -54,7 +54,7 @@ export async function countAc22Evidence(
   for (const name of names) {
     const runId = basename(name, ".jsonl");
     const purpose = input.purposeByRunId[runId];
-    const { uses, errors } = parseRun(
+    const { uses, errors, results } = parseRun(
       await readFile(join(input.eventLogDir, name), "utf8"),
     );
     for (const use of uses) {
@@ -69,6 +69,11 @@ export async function countAc22Evidence(
       if (!succeeded) continue;
       if (READ_TOOLS.has(use.name)) {
         const paths = readTargets(use, workdir);
+        if (use.name === "Glob" || use.name === "Grep") {
+          paths.push(
+            ...resultPaths(results.get(use.id), searchBase(use, workdir)),
+          );
+        }
         if (
           paths.some(
             (path) =>
@@ -95,9 +100,11 @@ export async function countAc22Evidence(
 function parseRun(text: string): {
   uses: ToolUse[];
   errors: Map<string, boolean>;
+  results: Map<string, string>;
 } {
   const uses = new Map<string, ToolUse>();
   const errors = new Map<string, boolean>();
+  const results = new Map<string, string>();
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     let event: unknown;
@@ -130,10 +137,56 @@ function parseRun(text: string): {
         typeof block.tool_use_id === "string"
       ) {
         errors.set(block.tool_use_id, block.is_error === true);
+        results.set(block.tool_use_id, resultText(block.content));
       }
     }
   }
-  return { uses: [...uses.values()], errors };
+  return { uses: [...uses.values()], errors, results };
+}
+
+// tool_result の content は文字列か、`{ type: "text", text }` の並び。
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      isRecord(part) && typeof part.text === "string" ? part.text : "",
+    )
+    .join("\n");
+}
+
+// Glob と Grep の検索先。path が無ければ作業の場所。
+function searchBase(use: ToolUse, workdir: string | undefined): string {
+  const path = use.input.path;
+  if (typeof path === "string" && path !== "") {
+    return resolve(workdir ?? "/", expandHome(path));
+  }
+  return workdir ?? "/";
+}
+
+// Glob と Grep の結果に並んだファイルの道を1行ずつ取り出す（本人の答え、案A）。相対の道は検索先を起点にする。
+// 件数の見出しや「見つからない」の行は道でないので除く。Grep の content と count の出力の
+// `道:行番号:中身`、`道-行番号-中身`、`道:件数` は、道の部分だけを取る。
+function resultPaths(text: string | undefined, base: string): string[] {
+  if (text === undefined) return [];
+  const paths: string[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (line === "" || line === "--") continue;
+    if (
+      /^(Found \d+ |No (files|matches) found|\(Results are truncated)/.test(
+        line,
+      )
+    ) {
+      continue;
+    }
+    const path = line
+      .replace(/:\d+:.*$/, "")
+      .replace(/-\d+-.*$/, "")
+      .replace(/:\d+$/, "");
+    paths.push(resolve(base, expandHome(path)));
+  }
+  return paths;
 }
 
 // Read は file_path、Glob と Grep は path（無ければ作業の場所）を指す。Glob の pattern と Grep の glob も
