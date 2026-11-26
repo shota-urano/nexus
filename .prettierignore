@@ -9,3 +9,4 @@ reports/
 .data/
 .next/
 package-lock.json
+dist/
