@@ -334,7 +334,7 @@ export function HomeScreen({ now }: { now?: Date } = {}) {
         <header className="flex h-16 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/img/home/logo.png"
+            src="/img/home/logo_001.png"
             alt=""
             aria-hidden="true"
             className="size-10 shrink-0 object-contain drop-shadow-[0_0_10px_#ef9e4c66]"

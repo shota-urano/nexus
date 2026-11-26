@@ -387,7 +387,7 @@ describe("画像と飾り（BD-03 SCR-001 3.2）", () => {
     // 惑星は飾りで、機能を持たない。
     expect(planet.closest("a, button, [role=button]")).toBeNull();
     expect(
-      container.querySelector('img[src="/img/home/logo.png"]'),
+      container.querySelector('img[src="/img/home/logo_001.png"]'),
     ).toBeTruthy();
     await screen.findByRole("link", { name: "文型" });
   });
