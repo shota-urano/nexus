@@ -53,5 +53,5 @@ MSG-018、MSG-019、MSG-020、MSG-021（BD-09 1.1）。
   - 受け入れ基準: DD-10 TC104、DD-10 TC116 が通る; service worker の保存の対象が `/_next/static/` の中だけである（service worker のファイルの保存の条件を見て一つに決まる）
 - [x] [Frontend] 共通部品 M07（下から出る面、内容の一覧の行、空の状態、下の知らせ、確認の面、質問の対象の印、届いた文の表示、動きを減らす設定）を作る（DD-01 M07、NFR-008、NFR-018、ADR-018）（se/06-app-shell）
   - 受け入れ基準: DD-10 TC105 が通る
-- [ ] [Frontend] `public/img/` の画像に `Cache-Control: public, max-age=31536000, immutable` を付けて返す（DD-09 2.1、CR-017）
+- [x] [Frontend] `public/img/` の画像に `Cache-Control: public, max-age=31536000, immutable` を付けて返す（DD-09 2.1、CR-017）（se/06-app-shell-2）
   - 受け入れ基準: `/img/home/planet_001.png` の応答の `Cache-Control` が `public, max-age=31536000, immutable` である; `public/img/` の画像の名前が全て版の番号（`_001` など）で終わる; service worker の保存の対象が `/_next/static/` の中だけのままである
