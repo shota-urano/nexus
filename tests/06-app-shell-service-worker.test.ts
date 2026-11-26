@@ -116,6 +116,19 @@ describe("service worker の保存の条件（DD-09 2.1）", () => {
     expect(sw.fetchMock).not.toHaveBeenCalled();
   });
 
+  it("`public/img/` の画像は保存の対象にしない（CR-017。保存は Cache-Control に任せる）", async () => {
+    const sw = loadServiceWorker();
+    for (const url of [
+      `${ORIGIN}/img/home/planet_001.png`,
+      `${ORIGIN}/img/home/core_orb_001.png`,
+      `${ORIGIN}/img/home/logo_001.png`,
+    ]) {
+      expect(await sw.dispatchFetch(new Request(url)), url).toBeUndefined();
+    }
+    expect(sw.put).not.toHaveBeenCalled();
+    expect(sw.fetchMock).not.toHaveBeenCalled();
+  });
+
   it("失敗した応答は保存しない", async () => {
     const sw = loadServiceWorker();
     sw.fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
