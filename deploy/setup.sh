@@ -10,8 +10,11 @@
 # launchd に読み込ませるのは手順 5 で、このスクリプトはしない。
 # 別のディスクの nexus-backup（手順 4）と、__TAILNET__、__BACKUP_VOLUME__ の書き込みは、本人が OP01 で行う。
 #
-# Node.js の道は、NEXUS_NODE_BIN があればそれ、無ければ Homebrew の node@<番号> の一番大きい番号、
-# それも無ければ PATH の node を使う（DD-09 2.1）。見つからなければ launchd の設定は置かずに知らせる。
+# Node.js の道は、NEXUS_NODE_BIN があればそれ、無ければ Homebrew の node@<番号> のうち長期サポート版で一番大きい番号、
+# それも無ければ PATH の node を使う（DD-09 2.1）。どれも長期サポート版（process.release.lts がある）であることを確かめる。
+# NEXUS_NODE_BIN が実行できないか長期サポート版でなければ、何もせずに終了コード 1 で止まる。
+# NEXUS_NODE_BIN が無く、長期サポート版が見つからなければ、launchd の設定は置かずに知らせる（フォルダ、env、
+# claude-settings.json は置く）。
 set -eu
 # 親のフォルダ（~/Library/LaunchAgents など）はふだんの権限で作り、置くファイルだけを本人だけが読めるようにする。
 umask 022
@@ -43,12 +46,45 @@ xml_sed_escape() {
   sed_escape "$(printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')"
 }
 
+# Node.js の道を先に決める（NEXUS_NODE_BIN の誤りは、何かを作る前に止める）。
+# 絶対の道で、実行でき、長期サポート版なら 0 を返す。
+is_lts_node() {
+  case "$1" in
+  /*) ;;
+  *) return 1 ;;
+  esac
+  [ -x "$1" ] || return 1
+  [ "$("$1" -p 'process.release.lts ? "lts" : ""' 2>/dev/null || true)" = "lts" ]
+}
+
+node_bin=
+if [ -n "${NEXUS_NODE_BIN:-}" ]; then
+  if ! is_lts_node "$NEXUS_NODE_BIN"; then
+    echo "NEXUS_NODE_BIN が、実行できる Node.js の長期サポート版の絶対の道ではない: $NEXUS_NODE_BIN" >&2
+    exit 1
+  fi
+  node_bin=$NEXUS_NODE_BIN
+else
+  for candidate in $(ls -d /opt/homebrew/opt/node@*/bin/node 2>/dev/null | sort -t@ -k2 -n -r); do
+    if is_lts_node "$candidate"; then
+      node_bin=$candidate
+      break
+    fi
+  done
+  if [ -z "$node_bin" ]; then
+    candidate=$(command -v node || true)
+    if [ -n "$candidate" ] && is_lts_node "$candidate"; then
+      node_bin=$candidate
+    fi
+  fi
+fi
+
 # 1. フォルダ
 for dir in "$DATA_DIR" "$WORK_DIR" "$LOG_DIR"; do
   mkdir -p "$dir"
   chmod 0700 "$dir"
 done
-echo "フォルダを作った（0700）: $DATA_DIR、$WORK_DIR、$LOG_DIR"
+echo "フォルダを作った（0700）: ${DATA_DIR}、${WORK_DIR}、${LOG_DIR}"
 
 # 2. env
 if [ -e "$DATA_DIR/env" ]; then
@@ -68,25 +104,8 @@ mv "$DATA_DIR/claude-settings.json.tmp" "$DATA_DIR/claude-settings.json"
 echo "claude-settings.json を置いた（0600）: $DATA_DIR/claude-settings.json"
 
 # 2. launchd の設定
-node_bin=${NEXUS_NODE_BIN:-}
 if [ -z "$node_bin" ]; then
-  for candidate in $(ls -d /opt/homebrew/opt/node@*/bin/node 2>/dev/null | sort -t@ -k2 -n -r); do
-    if [ -x "$candidate" ]; then
-      node_bin=$candidate
-      break
-    fi
-  done
-fi
-if [ -z "$node_bin" ]; then
-  node_bin=$(command -v node || true)
-fi
-case "$node_bin" in
-/*) ;;
-*) node_bin= ;;
-esac
-
-if [ -z "$node_bin" ] || [ ! -x "$node_bin" ]; then
-  echo "Node.js が見つからないので、launchd の設定は置かなかった。NEXUS_NODE_BIN に Node.js の絶対の道を入れて、もう一度動かす。" >&2
+  echo "Node.js の長期サポート版が見つからないので、launchd の設定は置かなかった。NEXUS_NODE_BIN に Node.js の絶対の道を入れて、もう一度動かす。" >&2
 else
   mkdir -p "$AGENTS_DIR"
   home=$(xml_sed_escape "$HOME")
@@ -99,7 +118,7 @@ else
     chmod 0644 "$target.tmp"
     mv "$target.tmp" "$target"
   done
-  echo "launchd の設定を置いた（Node.js: $node_bin）: $AGENTS_DIR/jp.uslab.nexus.*.plist"
+  echo "launchd の設定を置いた（Node.js: ${node_bin}）: $AGENTS_DIR/jp.uslab.nexus.*.plist"
 fi
 
 echo "残り: __TAILNET__ と __BACKUP_VOLUME__ を env と launchd の設定に書き込み、別のディスクに nexus-backup（0700）を作る（DD-09 4章 手順 4。OP01）。"
