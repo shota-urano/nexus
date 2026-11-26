@@ -8,9 +8,8 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -26,6 +25,7 @@ import {
 import { createFakeClock } from "../src/server/shared/clock";
 import { formatDate } from "../src/server/shared/datetime";
 import { formatMessage } from "../src/server/shared/messages";
+import { REPO, withBuild } from "./fixtures/build";
 import { NOW, insertD1News, insertDelivery, migrate } from "./fixtures/news";
 
 // 12-batch の実装単位1: 定期ジョブの入口 M27（バッチの名前の引数、`job_lock` の行での多重起動の防止、
@@ -38,7 +38,6 @@ const MAIN = join(import.meta.dirname, "../src/jobs/main.ts");
 const NEWS_WORKER = new URL("./12-batch-news-worker.ts", import.meta.url);
 const LOCK_WORKER = new URL("./12-batch-lock-worker.ts", import.meta.url);
 const JOB_CHILD = join(import.meta.dirname, "12-batch-job-child.ts");
-const SRC = join(import.meta.dirname, "../src");
 
 let dir: string;
 let dataDir: string;
@@ -187,42 +186,6 @@ async function waitFor(check: () => boolean, label: string): Promise<void> {
     if (Date.now() > deadline) throw new Error(`${label} を待ちきれない`);
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-}
-
-// src の TypeScript を型だけ取り除いて JavaScript（`.js`）にし、`<root>/dist` に同じ形で置く。
-// マイグレーションの `.sql` も同じ場所に写す。画面の `.tsx` と試験は含めない。
-// 本番の起動のコマンド `node dist/jobs/main.js` を確かめるため（DD-09 2.6）。
-function buildDist(root: string): void {
-  mkdirSync(root, { recursive: true });
-  writeFileSync(join(root, "package.json"), '{ "type": "module" }\n');
-  const walk = (from: string): void => {
-    for (const entry of readdirSync(from, { withFileTypes: true })) {
-      const path = join(from, entry.name);
-      if (entry.isDirectory()) {
-        walk(path);
-        continue;
-      }
-      if (entry.name.endsWith(".sql")) {
-        const out = join(root, "dist", relative(SRC, path));
-        mkdirSync(dirname(out), { recursive: true });
-        writeFileSync(out, readFileSync(path));
-        continue;
-      }
-      if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts"))
-        continue;
-      if (entry.name.endsWith(".d.ts")) continue;
-      const out = join(root, "dist", relative(SRC, path)).replace(
-        /\.ts$/,
-        ".js",
-      );
-      mkdirSync(dirname(out), { recursive: true });
-      writeFileSync(
-        out,
-        stripTypeScriptTypes(readFileSync(path, "utf8"), { mode: "strip" }),
-      );
-    }
-  };
-  walk(SRC);
 }
 
 describe("TC85 BAT-001 の正常", () => {
@@ -438,13 +401,15 @@ describe("TC88 バッチの多重起動（DD-05 4章）", () => {
     expect(lockRows()).toEqual([{ job_name: "backup", pid: process.pid }]);
   });
 
+  // 試験は dist/ を自分で作らず、本番の構築（DD-09 4章 手順 2）と同じ `npm run build` で作った dist/ を使う。
   it("仕様の起動のコマンド（node dist/jobs/main.js backup）で動かすと、写しを作って終了コード 0 で終わる", async () => {
-    const root = join(dir, "app");
-    buildDist(root);
     insertLock(deadPid());
 
-    const { child } = spawnNode(["dist/jobs/main.js", "backup"], root);
-    const { code } = await child.ended;
+    const { child, code } = await withBuild(async () => {
+      const { child } = spawnNode(["dist/jobs/main.js", "backup"], REPO);
+      const { code } = await child.ended;
+      return { child, code };
+    });
 
     expect(code, child.stderr()).toBe(0);
     const today = formatDate(new Date());
@@ -456,7 +421,7 @@ describe("TC88 バッチの多重起動（DD-05 4章）", () => {
       logLines(today).filter((line) => line.msg === "MSG-038"),
     ).toHaveLength(1);
     expect(lockRows()).toEqual([]);
-  });
+  }, 300_000);
 
   it("DB を開けない（SQLITE_CANTOPEN）と、MSG-039 と DB_UNAVAILABLE をログに出して終了コード 2", async () => {
     const broken = join(dir, "broken");
