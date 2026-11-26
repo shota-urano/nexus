@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: ホームの表示（FN-020）の API と画面（SCR-001）、端末の API のオリジンの確かめの通し
 ---
 

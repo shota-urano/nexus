@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: 会話の選択（FN-014）、質問と応答（FN-015）、送り直しと中止（FN-016）の API、AI Runner の質問の応答と会話の要約、画面（SCR-006）
 ---
 

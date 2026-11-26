@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: 画面の道と共通の枠（M01）、PWA、CSP、共通部品（M07）
 ---
 
