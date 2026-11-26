@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 
@@ -172,7 +173,11 @@ function searchBase(use: ToolUse, workdir: string | undefined): string {
 //   - files_with_matches（既定）と Glob: 1行が1つの道。
 //   - count: `道:件数`。
 //   - content: 一致の行は `道:行番号:本文`（-n が偽なら `道:本文`）、前後の行（-A、-B、-C、context）は
-//     `道-行番号-本文`（-n が偽なら `道-本文`）。道の付かない行（1つのファイルだけを検索したとき）は読まない。
+//     `道-行番号-本文`（-n が偽なら `道-本文`）。
+// 1つのファイルだけを検索したとき、content と count の行には道が付かず本文（または件数）だけが並ぶので、
+// 道として読まない（そのファイル自身は readTargets で判定済み）。検索先がファイルかどうかを確かめられない
+// ときに備え、content の行から取った道は検索先の下にあるものだけを残す（フォルダを検索したときの道は、
+// 必ず検索先の下にある）。
 function resultPaths(
   use: ToolUse,
   text: string | undefined,
@@ -193,6 +198,7 @@ function resultPaths(
     lines.push(line);
   }
   const mode = use.name === "Grep" ? use.input.output_mode : undefined;
+  if ((mode === "content" || mode === "count") && isFile(base)) return [];
   let paths: string[];
   if (mode === "content") {
     paths = grepContentPaths(lines, use.input);
@@ -201,13 +207,26 @@ function resultPaths(
   } else {
     paths = lines;
   }
-  return paths.map((path) => resolve(base, expandHome(path)));
+  const resolved = paths.map((path) => resolve(base, expandHome(path)));
+  return mode === "content"
+    ? resolved.filter((path) => isInside(path, base) && path !== base)
+    : resolved;
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 // Grep の content の出力から道を取り出す。一致の行の道は、-n が偽でなければ最初の `:行番号:` の前
 // （見つからなければ最初の `:` の前）、-n が偽なら最初の `:` の前とする。前後の行を出す設定のときは、
 // 前後の行の `-` と本文の中の `:` を区別できないので、一致の行から取った道のうち、その行の頭に
-// `:` か `-` を続けて当たる最も短いものをその行の道とする（前後の行のファイルには必ず一致の行がある）。
+// `:` か `-` を続けて当たる最も長いものをその行の道とする（前後の行のファイルには必ず一致の行がある）。
+// 最も長いものを選ぶので、一致の行はその行から取った完全な道が優先され、短い道の前後の行と取り違えない
+// （例: `/a/notes:hit` と `/a/notes-secret.md:hit` の2行目は `/a/notes-secret.md` とする）。
 function grepContentPaths(
   lines: string[],
   input: Record<string, unknown>,
@@ -228,7 +247,7 @@ function grepContentPaths(
   }
   if (!hasContext) return [...candidates];
   const sepRe = lineNumbers ? /^(?::\d+:|-\d+-)/ : /^[:-]/;
-  const sorted = [...candidates].sort((a, b) => a.length - b.length);
+  const sorted = [...candidates].sort((a, b) => b.length - a.length);
   const paths = new Set<string>();
   for (const line of lines) {
     const path = sorted.find(
