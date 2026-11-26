@@ -2,7 +2,7 @@
 id: DD-04
 name: API 詳細設計書
 phase: 詳細設計
-version: 1.1
+version: 1.2
 updated: 2026-11-26
 ---
 
@@ -15,6 +15,7 @@ updated: 2026-11-26
 - 0.2: X-05 RV16 の指摘で直した（2026-11-25）。`streamReply` に `reset` の出来事と、出来事の番号の形と、失敗の扱いを足した（RV16-01、RV16-10）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: CR-015 で、`openapi.yaml` の `openRegistration`（`/register`）に 500 の応答を足した（2026-11-26 RD-01 SH01）。
+- 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、`openapi.yaml` の `Conversation` に `firstQuestionText` を足した（`listConversations` と `createConversation` の応答）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル

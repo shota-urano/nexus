@@ -995,6 +995,7 @@ components:
         conversationId: { $ref: '#/components/schemas/Id' }
         target: { oneOf: [{ $ref: '#/components/schemas/QuestionTarget' }, { type: 'null' }] }
         targetTitle: { oneOf: [{ type: string }, { type: 'null' }], description: 対象の内容の見出し（質問の対象の印） }
+        firstQuestionText: { oneOf: [{ type: string }, { type: 'null' }], description: 最初の本人の発言の本文（前の会話の選択肢の書き出し。CR-017） }
         startedAt: { $ref: '#/components/schemas/DateTime' }
         lastSpokenAt: { $ref: '#/components/schemas/DateTime' }
     ConversationPage:

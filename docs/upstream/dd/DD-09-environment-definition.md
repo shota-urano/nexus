@@ -2,7 +2,7 @@
 id: DD-09
 name: 環境定義書（基盤詳細設計）
 phase: 詳細設計
-version: 1.1
+version: 1.2
 updated: 2026-11-26
 ---
 
@@ -15,6 +15,7 @@ updated: 2026-11-26
 - 0.2: X-05 RV16 の指摘に合わせ、多重起動の印のフォルダを外した（DB の `job_lock` に替えた。RV16-03）。6章の参照に書類の名前を付けた（2026-11-25）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: X-04 CR-016（2026-11-26 RD-01 SH01 が承認）で、2.6 と構築後の確認の再起動を、FileVault をオンにして本人がログインする形に直した。
+- 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、2.1 の画面（PWA）に、`public/img/` の画像を長く保存させる決まりを足した。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 環境一覧
@@ -31,7 +32,7 @@ updated: 2026-11-26
 
 | 構成要素 | 実行基盤とサイズ | OS・ミドルウェア・ライブラリの版 | パラメータ | 通信の許可 |
 |---|---|---|---|---|
-| 画面（PWA） | 本人の iPad と Android（RD-11 NFR-007） | 端末のブラウザ（Safari、Chrome）。部品の版は `package.json` で固定する（DD-01 3章） | service worker は、`/_next/static/` の中の名前に版の付いたファイルだけを保存し、画面の HTML はネットワークを先に読み、API の応答は保存しない（新しい版を出したときに古い画面が残らないため。DD-04 3.6）。CSP は 2.4 | Tailscale Serve の NEXUS の名前だけへ。記事の画像と元の記事は端末が直に読む（T12） |
+| 画面（PWA） | 本人の iPad と Android（RD-11 NFR-007） | 端末のブラウザ（Safari、Chrome）。部品の版は `package.json` で固定する（DD-01 3章） | service worker は、`/_next/static/` の中の名前に版の付いたファイルだけを保存し、画面の HTML はネットワークを先に読み、API の応答は保存しない（新しい版を出したときに古い画面が残らないため。DD-04 3.6）。`public/img/` の画像は名前の終わりに版の番号（`_001` など）を付け、Web サーバが `Cache-Control: public, max-age=31536000, immutable` を付けて返す。画像を替えるときは名前の番号を上げる（Tailscale 越しに開くたびに読み直さないため。CR-017）。CSP は 2.4 | Tailscale Serve の NEXUS の名前だけへ。記事の画像と元の記事は端末が直に読む（T12） |
 | Web サーバ | Mac mini（1台）。Node.js の1つのプロセス | Node.js の長期サポート版の最新（Homebrew で `node@<番号>` を入れる。番号は入れるときに nodejs.org の一覧で確かめる。BD-01 5章）。Next.js ほかは `package.json` で固定し、Renovate で上げる（NFR-026） | `next start` を `127.0.0.1` の 48400 で待ち受ける。設定は 2.3 の環境変数。起動のときに DB のマイグレーションを当てる（DD-03 5章） | 受け付ける: Tailscale Serve から 127.0.0.1:48400 だけ（NFR-012）。配信元から 127.0.0.1:48400 |
 | AI Runner | Mac mini。Node.js の1つのプロセス | Web サーバと同じ | 同時に 2 つ、1 回 5 分（NFR-017）、待ちを読む間隔 500 ミリ秒（DD-02 3章 P06）。CLI の引数と設定は 2.5 | 待ち受けない（BD-10 2章）。CLI は 2.5 の範囲でだけ外へ出る |
 | DB | Mac mini の内蔵のディスクの1つのファイル | SQLite（Node.js に入っている版。ADR-020）。起動のときに M21 が、FTS5 の trigram と `backup` が使えるかを確かめ、使えなければ DD-06 E17 で止まる | `~/Library/Application Support/nexus/nexus.db`。フォルダの権限は本人のユーザだけ（`0700`）。接続の設定は DD-05 1章（WAL、`busy_timeout` 5,000 ミリ秒、外部キー）。容量は 1 年に最大 約 390 MB（DD-03 4章） | ファイルなので通信しない |

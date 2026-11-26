@@ -2,8 +2,8 @@
 id: DD-02
 name: 処理設計書（処理ロジック）
 phase: 詳細設計
-version: 1.1
-updated: 2026-11-25
+version: 1.2
+updated: 2026-11-26
 ---
 
 # DD-02 処理設計書（処理ロジック）（NEXUS）
@@ -14,6 +14,7 @@ updated: 2026-11-25
 - 0.3: X-05 RV17 の指摘で、FN-021、FN-022 の多重起動を M31 で防ぐ形にした（2026-11-25）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: CR-014 で、FN-022 の手順2に2月29日の境の日時を足した（2026-11-25 RD-01 SH01）。
+- 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、FN-014 の `listConversations` に、最初の質問の本文を添えることを足した。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 - この書類でトランザクションと書いたところの境界と方式は DD-05、例外の分類と再試行の中身は DD-06 で決める。この書類は、どこで何を当てるかだけを書く。
 
@@ -237,7 +238,7 @@ sequenceDiagram
 #### 処理の手順
 
 1. M11 は 3章 P01 で端末の鍵を確かめる（`createConversation` はオリジンも）。
-2. `listConversations`: M18 は `targetContentId` があれば `conversation` の `target_content_id` がその値の行を、無ければ `target_content_id` が空の行を、`last_spoken_at` の新しい順に 3章 P03 で返す（RD-03 R14）。`targetTitle` は `content.title` を添える。
+2. `listConversations`: M18 は `targetContentId` があれば `conversation` の `target_content_id` がその値の行を、無ければ `target_content_id` が空の行を、`last_spoken_at` の新しい順に 3章 P03 で返す（RD-03 R14）。`targetTitle` は `content.title` を添える。`firstQuestionText` は、その会話の話し手が owner の一番古い `message` の本文を添え、無ければ空にする（SCR-006-O02 の最初の質問の書き出し。画面が会話ごとに読み直さないため。CR-017）。
 3. `createConversation`:
    1. M18 は `target` があれば、`target.kind` が `phrase` のときに `phrase`、`sentence`、`position` があることを確かめる。無ければ 400。
    2. `content` を `target.contentId` で読む。無ければ、`target` を捨て、対象の無い会話にし、`notice` に MSG-011 を入れる（RD-06 UC-012）。
