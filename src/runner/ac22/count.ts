@@ -65,13 +65,14 @@ export async function countAc22Evidence(
         counts.writeEditNotebookBashCalls += 1;
       }
       // 成功は tool_result の is_error が偽であるときだけ。結果の無い呼び出しは成功として数えない。
+      // errors には「失敗か、成功と決められない」を入れる。false のときだけ is_error が真偽値の false。
       const succeeded = errors.get(use.id) === false;
       if (!succeeded) continue;
       if (READ_TOOLS.has(use.name)) {
         const paths = readTargets(use, workdir);
         if (use.name === "Glob" || use.name === "Grep") {
           paths.push(
-            ...resultPaths(results.get(use.id), searchBase(use, workdir)),
+            ...resultPaths(use, results.get(use.id), searchBase(use, workdir)),
           );
         }
         if (
@@ -136,7 +137,9 @@ function parseRun(text: string): {
         block.type === "tool_result" &&
         typeof block.tool_use_id === "string"
       ) {
-        errors.set(block.tool_use_id, block.is_error === true);
+        // 成功は is_error が真偽値の false のときだけ（DD-09 2.5 手順 3「is_error が偽だった」）。
+        // is_error が無いときや真偽値でないときは、成功と決められないので成功として数えない。
+        errors.set(block.tool_use_id, block.is_error !== false);
         results.set(block.tool_use_id, resultText(block.content));
       }
     }
@@ -165,11 +168,18 @@ function searchBase(use: ToolUse, workdir: string | undefined): string {
 }
 
 // Glob と Grep の結果に並んだファイルの道を1行ずつ取り出す（本人の答え、案A）。相対の道は検索先を起点にする。
-// 件数の見出しや「見つからない」の行は道でないので除く。Grep の content と count の出力の
-// `道:行番号:中身`、`道-行番号-中身`、`道:件数` は、道の部分だけを取る。
-function resultPaths(text: string | undefined, base: string): string[] {
+// 件数の見出しや「見つからない」の行は道でないので除く。Grep は output_mode に合わせて道と本文を分ける。
+//   - files_with_matches（既定）と Glob: 1行が1つの道。
+//   - count: `道:件数`。
+//   - content: 一致の行は `道:行番号:本文`（-n が偽なら `道:本文`）、前後の行（-A、-B、-C、context）は
+//     `道-行番号-本文`（-n が偽なら `道-本文`）。道の付かない行（1つのファイルだけを検索したとき）は読まない。
+function resultPaths(
+  use: ToolUse,
+  text: string | undefined,
+  base: string,
+): string[] {
   if (text === undefined) return [];
-  const paths: string[] = [];
+  const lines: string[] = [];
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (line === "" || line === "--") continue;
@@ -180,13 +190,53 @@ function resultPaths(text: string | undefined, base: string): string[] {
     ) {
       continue;
     }
-    const path = line
-      .replace(/:\d+:.*$/, "")
-      .replace(/-\d+-.*$/, "")
-      .replace(/:\d+$/, "");
-    paths.push(resolve(base, expandHome(path)));
+    lines.push(line);
   }
-  return paths;
+  const mode = use.name === "Grep" ? use.input.output_mode : undefined;
+  let paths: string[];
+  if (mode === "content") {
+    paths = grepContentPaths(lines, use.input);
+  } else if (mode === "count") {
+    paths = lines.map((line) => line.replace(/:\d+$/, ""));
+  } else {
+    paths = lines;
+  }
+  return paths.map((path) => resolve(base, expandHome(path)));
+}
+
+// Grep の content の出力から道を取り出す。一致の行の道は、-n が偽でなければ最初の `:行番号:` の前
+// （見つからなければ最初の `:` の前）、-n が偽なら最初の `:` の前とする。前後の行を出す設定のときは、
+// 前後の行の `-` と本文の中の `:` を区別できないので、一致の行から取った道のうち、その行の頭に
+// `:` か `-` を続けて当たる最も短いものをその行の道とする（前後の行のファイルには必ず一致の行がある）。
+function grepContentPaths(
+  lines: string[],
+  input: Record<string, unknown>,
+): string[] {
+  const lineNumbers = input["-n"] !== false;
+  const matchPath = (line: string): string | undefined => {
+    const numbered = lineNumbers ? /:\d+:/.exec(line) : null;
+    const idx = numbered ? numbered.index : line.indexOf(":");
+    return idx > 0 ? line.slice(0, idx) : undefined;
+  };
+  const hasContext = ["-A", "-B", "-C", "context"].some(
+    (key) => typeof input[key] === "number" && (input[key] as number) > 0,
+  );
+  const candidates = new Set<string>();
+  for (const line of lines) {
+    const path = matchPath(line);
+    if (path !== undefined) candidates.add(path);
+  }
+  if (!hasContext) return [...candidates];
+  const sepRe = lineNumbers ? /^(?::\d+:|-\d+-)/ : /^[:-]/;
+  const sorted = [...candidates].sort((a, b) => a.length - b.length);
+  const paths = new Set<string>();
+  for (const line of lines) {
+    const path = sorted.find(
+      (c) => line.startsWith(c) && sepRe.test(line.slice(c.length)),
+    );
+    if (path !== undefined) paths.add(path);
+  }
+  return [...paths];
 }
 
 // Read は file_path、Glob と Grep は path（無ければ作業の場所）を指す。Glob の pattern と Grep の glob も
