@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": ["WebSearch", "WebFetch"],
+    "deny": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Read(~/projects/brain-harness/.git/**)",
+      "Read(~/projects/brain-harness/.claude/**)",
+      "Read(~/projects/brain-harness/**/.env*)",
+      "Read(~/projects/brain-harness/**/*.pem)",
+      "Read(~/projects/brain-harness/**/*.key)",
+      "Read(~/projects/brain-harness/**/*.p12)",
+      "Read(~/projects/brain-harness/**/id_rsa*)",
+      "Read(~/projects/brain-harness/**/id_ed25519*)",
+      "Read(~/projects/brain-harness/**/*credential*)",
+      "Read(~/projects/brain-harness/**/*secret*)",
+      "Read(~/projects/brain-harness/**/.netrc)",
+      "Read(~/projects/brain-harness/**/.npmrc)",
+      "WebFetch(domain:localhost)",
+      "WebFetch(domain:127.0.0.1)",
+      "WebFetch(domain:*.ts.net)",
+      "WebFetch(domain:*.local)"
+    ],
+    "blockReadsOutsideWorkingDirectories": true,
+    "blockWritesOutsideWorkingDirectories": true
+  }
+}

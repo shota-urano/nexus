@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  NEXUS の定期ジョブ BAT-002（node dist/jobs/main.js purge）。毎月 1 日の 3:30。DD-09 2.6、BD-02 5.1。
+  雛形である。構築のスクリプト（deploy/setup.sh）が __HOME__（本人のホーム）、__REPO__（リポジトリ）、
+  __NODE__（Node.js の絶対の道）を書き込み、~/Library/LaunchAgents/ に置く（DD-09 2.6、4章 手順 3）。
+  __TAILNET__ と __BACKUP_VOLUME__ は、OP01 で本人が書き込む（DD-09 3章）。
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>jp.uslab.nexus.purge</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__NODE__</string>
+		<string>__REPO__/dist/jobs/main.js</string>
+		<string>purge</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>__REPO__</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>NEXUS_ENV</key>
+		<string>production</string>
+		<key>NEXUS_DATA_DIR</key>
+		<string>__HOME__/Library/Application Support/nexus</string>
+		<key>NEXUS_LOG_DIR</key>
+		<string>__HOME__/Library/Logs/nexus</string>
+		<key>NEXUS_PORT</key>
+		<string>48400</string>
+		<key>NEXUS_ORIGIN</key>
+		<string>https://nexus.__TAILNET__.ts.net</string>
+		<key>NEXUS_BACKUP_DIR</key>
+		<string>/Volumes/__BACKUP_VOLUME__/nexus-backup</string>
+		<key>NEXUS_AI_PROVIDER</key>
+		<string>claude</string>
+		<key>NEXUS_CLAUDE_BIN</key>
+		<string>__HOME__/.local/bin/claude</string>
+		<key>NEXUS_BRAIN_HARNESS_DIR</key>
+		<string>__HOME__/projects/brain-harness</string>
+		<key>TZ</key>
+		<string>Asia/Tokyo</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Day</key>
+		<integer>1</integer>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>__HOME__/Library/Logs/nexus/launchd-job.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/Library/Logs/nexus/launchd-job.log</string>
+</dict>
+</plist>
