@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: launchd と CLI の設定の雛形、運用の手順書、契約のテスト、総合テスト、受入テスト、配信元の改修
 ---
 

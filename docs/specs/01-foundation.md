@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: リポジトリの足場、make verify、層の規則、共通層（M23）、DB の接続とマイグレーションの仕組み（M21）
 ---
 
