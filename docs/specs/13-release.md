@@ -49,13 +49,13 @@ Messages API への切り替え（ADR-017 の見直しのとき）。
 
 ## 9. 実装単位
 
-- [ ] [Backend] `deploy/` に、launchd の4つの雛形、`claude-settings.json`、`env` の雛形と、構築のスクリプト（フォルダを作り、雛形に本人のホームの道を書き込んで置く）を置く（NFR-005、NFR-016、NFR-025、DD-01 M01、DD-09 2.5・2.6・4章、CR-013）
+- [x] [Backend] `deploy/` に、launchd の4つの雛形、`claude-settings.json`、`env` の雛形と、構築のスクリプト（フォルダを作り、雛形に本人のホームの道を書き込んで置く）を置く（NFR-005、NFR-016、NFR-025、DD-01 M01、DD-09 2.5・2.6・4章、CR-013）（se/13-release）
   - 受け入れ基準: deploy のフォルダに launchd の雛形4つと、CLI の設定の雛形と、環境変数の雛形がある; launchd の雛形4つが plutil の lint を通る; CLI の設定の雛形の許可、拒否、作業の場所の外の読み取りと書き込みを断る設定の値が DD-09 2.5 の表と同じ; 構築のスクリプトを一時のホームで動かすと DD-09 4章の手順 3 のフォルダが権限 0700 でできる
-- [ ] [Backend] 運用の手順書 `docs/operations/` の OP01〜OP11 を書く（NFR-027、BD-11 7章）
+- [x] [Backend] 運用の手順書 `docs/operations/` の OP01〜OP11 を書く（NFR-027、BD-11 7章）（se/13-release）
   - 受け入れ基準: DD-10 TC128 が通る
-- [ ] [Backend] 全ての operation の応答を `docs/api/openapi.yaml` と照らす契約のテストを作る（NFR-015、DD-01 M10、ADR-021）
+- [x] [Backend] 全ての operation の応答を `docs/api/openapi.yaml` と照らす契約のテストを作る（NFR-015、DD-01 M10、ADR-021）（se/13-release）
   - 受け入れ基準: DD-10 TC102 が通る
-- [ ] [Backend] AC22 の証拠の数える処理を作る（NFR-016、NFR-019、DD-09 2.5）
+- [x] [Backend] AC22 の証拠の数える処理を作る（NFR-016、NFR-019、DD-09 2.5）（se/13-release）
   - 受け入れ基準: DD-10 TC112 が通る
 - [ ] （人間） 本番を構築する（OP01。Node.js の長期サポート版、Tailscale Service `svc:nexus`、LaunchAgents、自動のログインの確かめ、DD-09 4章の構築後の確かめ）（NFR-005、NFR-011、NFR-012）
 - [ ] （人間） brain-harness の送り先を NEXUS に替え、配信元の鍵と、元の記事の URL・画像の URL・テーマの項目を足し、3日間 cerebellum と両方に送る（IF-001、ADR-002、ADR-014、REQ-026、Q-062、Q-065）
