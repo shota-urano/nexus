@@ -21,7 +21,7 @@ export interface Feature {
   icon: ReactNode;
 }
 
-// アイコンは 32 × 32 の座標で、線だけで描く。
+// アイコンは 32 × 32 の座標で、線だけで描く。絵は BD-13 の試作 `prototype/app/page.tsx` の `I` と同じにする。
 export const FEATURES: readonly Feature[] = [
   {
     key: "news",
@@ -31,10 +31,19 @@ export const FEATURES: readonly Feature[] = [
     color: "#ffb85e",
     icon: (
       <>
-        <circle cx="16" cy="16" r="4" />
-        <ellipse cx="16" cy="16" rx="13" ry="6" transform="rotate(-25 16 16)" />
-        <circle cx="27" cy="11" r="1.6" />
-        <circle cx="5" cy="21" r="1.6" />
+        <ellipse
+          cx="16"
+          cy="16"
+          rx="14"
+          ry="7"
+          transform="rotate(-32 16 16)"
+          opacity="0.65"
+        />
+        <path d="m7 20 8-13 5 12 6-7" />
+        <circle cx="7" cy="20" r="2" />
+        <circle cx="15" cy="7" r="2" />
+        <circle cx="20" cy="19" r="2" />
+        <circle cx="26" cy="12" r="1.5" />
       </>
     ),
   },
@@ -46,8 +55,8 @@ export const FEATURES: readonly Feature[] = [
     color: "#8eb5fa",
     icon: (
       <>
-        <path d="M5 8c4-2 8-1 11 2 3-3 7-4 11-2v17c-4-2-8-1-11 2-3-3-7-4-11-2Z" />
-        <path d="M16 10v17" />
+        <path d="M4 7c5-2 9-1 12 2 3-3 7-4 12-2v18c-5-2-9-1-12 2-3-3-7-4-12-2Z" />
+        <path d="M16 9v18M8 18l3-7 3 7M9 16h4M21 13h3M21 17h3" />
       </>
     ),
   },
@@ -59,8 +68,8 @@ export const FEATURES: readonly Feature[] = [
     color: "#ffb85e",
     icon: (
       <>
-        <path d="M5 19 8 8h16l3 11v6H5Z" />
-        <path d="M5 19h7l2 3h4l2-3h7" />
+        <path d="m4 20 3-12h18l3 12v7H4Z" />
+        <path d="M4 20h7l2 3h6l2-3h7M12 13h8M16 10v6" />
       </>
     ),
   },
@@ -72,8 +81,9 @@ export const FEATURES: readonly Feature[] = [
     color: "#c3a2fb",
     icon: (
       <>
-        <circle cx="14" cy="14" r="8" />
-        <path d="m20 20 7 7" />
+        <circle cx="16" cy="16" r="11" />
+        <path d="m21 10-3 9-8 3 3-9Z" />
+        <path d="M16 2v3M16 27v3M2 16h3M27 16h3" />
       </>
     ),
   },
@@ -85,8 +95,8 @@ export const FEATURES: readonly Feature[] = [
     color: "#8ed2bc",
     icon: (
       <>
-        <path d="M6 6h5v20H6ZM13 6h5v20h-5Z" />
-        <path d="m21 7 4-1 3 19-4 1Z" />
+        <path d="M5 7v20h22M9 6h5v17H9ZM17 5h5v18h-5ZM25 7l4 15" />
+        <path d="M10 11h3M18 10h3" />
       </>
     ),
   },
@@ -98,8 +108,8 @@ export const FEATURES: readonly Feature[] = [
     color: "#c3a2fb",
     icon: (
       <>
-        <path d="M7 7h18a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H15l-7 5v-5H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" />
-        <path d="M10 15h12" />
+        <path d="M7 7h18a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H15l-7 5v-5H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" />
+        <path d="M9 16h3l2-4 4 8 2-4h3" />
       </>
     ),
   },
