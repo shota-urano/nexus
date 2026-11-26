@@ -473,6 +473,7 @@ paths:
           headers:
             Location: { schema: { type: string } }
             Set-Cookie: { schema: { type: string } }
+        '500': { $ref: '#/components/responses/Internal' }
   /api/health:
     get:
       operationId: getHealth
