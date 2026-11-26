@@ -1,0 +1,222 @@
+import { readdir, readFile } from "node:fs/promises";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
+
+// AC22 の証拠の数える処理（13-release の実装単位4。NFR-016、NFR-019、DD-09 2.5「AC22 の証拠の残し方」手順 3）。
+// eventLogDir の中の全ての `<実行ID>.jsonl` を読み、assistant の出来事の tool_use と、user の出来事の
+// tool_result を tool_use_id で組にして数える。数だけを返し、中身は返さない（手順 4）。
+
+export type Ac22Purpose = "answer" | "relate" | "summarize";
+
+export interface Ac22CountInput {
+  eventLogDir: string;
+  // 読み取りを許す場所（作業の場所と --add-dir のフォルダ）。絶対の道。
+  allowedDirs: string[];
+  // 読ませないファイルの型。絶対の道のグロブ（`**`、`*`、`?`）。
+  denyReadPatterns: string[];
+  // ページの読み取りを拒む宛先。`*.ts.net` のような先頭の `*.` を許す。
+  denyFetchDomains: string[];
+  // 実行ID（ファイル名から `.jsonl` を除いたもの）から用途への対応。呼ぶ側が ai_runs から作る。
+  purposeByRunId: Record<string, Ac22Purpose>;
+}
+
+export interface Ac22Counts {
+  writeEditNotebookBashCalls: number;
+  forbiddenReadSuccesses: number;
+  relateSummarizeToolCalls: number;
+  forbiddenFetchSuccesses: number;
+}
+
+interface ToolUse {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+const WRITE_TOOLS = new Set(["Write", "Edit", "NotebookEdit", "Bash"]);
+const READ_TOOLS = new Set(["Read", "Glob", "Grep"]);
+
+export async function countAc22Evidence(
+  input: Ac22CountInput,
+): Promise<Ac22Counts> {
+  const counts: Ac22Counts = {
+    writeEditNotebookBashCalls: 0,
+    forbiddenReadSuccesses: 0,
+    relateSummarizeToolCalls: 0,
+    forbiddenFetchSuccesses: 0,
+  };
+  const allowedDirs = input.allowedDirs.map((dir) => resolve(dir));
+  const denyRead = input.denyReadPatterns.map(globToRegExp);
+  const workdir = allowedDirs[0];
+
+  const names = (await readdir(input.eventLogDir))
+    .filter((name) => name.endsWith(".jsonl"))
+    .sort();
+  for (const name of names) {
+    const runId = basename(name, ".jsonl");
+    const purpose = input.purposeByRunId[runId];
+    const { uses, errors } = parseRun(
+      await readFile(join(input.eventLogDir, name), "utf8"),
+    );
+    for (const use of uses) {
+      if (purpose === "relate" || purpose === "summarize") {
+        counts.relateSummarizeToolCalls += 1;
+      }
+      if (WRITE_TOOLS.has(use.name)) {
+        counts.writeEditNotebookBashCalls += 1;
+      }
+      // 成功は tool_result の is_error が偽であるときだけ。結果の無い呼び出しは成功として数えない。
+      const succeeded = errors.get(use.id) === false;
+      if (!succeeded) continue;
+      if (READ_TOOLS.has(use.name)) {
+        const paths = readTargets(use, workdir);
+        if (
+          paths.some(
+            (path) =>
+              !allowedDirs.some((dir) => isInside(path, dir)) ||
+              denyRead.some((re) => re.test(path)),
+          )
+        ) {
+          counts.forbiddenReadSuccesses += 1;
+        }
+      } else if (use.name === "WebFetch") {
+        const host = hostOf(use.input.url);
+        if (
+          host !== null &&
+          input.denyFetchDomains.some((domain) => domainMatches(host, domain))
+        ) {
+          counts.forbiddenFetchSuccesses += 1;
+        }
+      }
+    }
+  }
+  return counts;
+}
+
+function parseRun(text: string): {
+  uses: ToolUse[];
+  errors: Map<string, boolean>;
+} {
+  const uses = new Map<string, ToolUse>();
+  const errors = new Map<string, boolean>();
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(event)) continue;
+    // 部分の出来事（stream_event）は数えず、assistant の出来事だけを tool_use の正本にする。
+    if (event.type !== "assistant" && event.type !== "user") continue;
+    const message = event.message;
+    if (!isRecord(message) || !Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      if (!isRecord(block)) continue;
+      if (
+        event.type === "assistant" &&
+        block.type === "tool_use" &&
+        typeof block.id === "string" &&
+        typeof block.name === "string"
+      ) {
+        uses.set(block.id, {
+          id: block.id,
+          name: block.name,
+          input: isRecord(block.input) ? block.input : {},
+        });
+      } else if (
+        event.type === "user" &&
+        block.type === "tool_result" &&
+        typeof block.tool_use_id === "string"
+      ) {
+        errors.set(block.tool_use_id, block.is_error === true);
+      }
+    }
+  }
+  return { uses: [...uses.values()], errors };
+}
+
+// Read は file_path、Glob と Grep は path（無ければ作業の場所）を指す。Glob の型が絶対の道なら、それも見る。
+function readTargets(use: ToolUse, workdir: string | undefined): string[] {
+  const targets: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value === "string" && value !== "") {
+      targets.push(resolve(workdir ?? "/", expandHome(value)));
+    }
+  };
+  if (use.name === "Read") {
+    add(use.input.file_path);
+  } else {
+    if (typeof use.input.path === "string" && use.input.path !== "") {
+      add(use.input.path);
+    } else if (workdir !== undefined) {
+      targets.push(workdir);
+    }
+    if (
+      use.name === "Glob" &&
+      typeof use.input.pattern === "string" &&
+      isAbsolute(use.input.pattern)
+    ) {
+      add(use.input.pattern);
+    }
+  }
+  return targets;
+}
+
+function expandHome(value: string): string {
+  const home = process.env.HOME;
+  if (home && (value === "~" || value.startsWith("~/"))) {
+    return join(home, value.slice(1));
+  }
+  return value;
+}
+
+function isInside(path: string, dir: string): boolean {
+  return path === dir || path.startsWith(dir.endsWith(sep) ? dir : dir + sep);
+}
+
+// `**/` は0個以上のフォルダ（`.` で始まるものも含む）、末尾の `/**` はそのフォルダ自身と中の全て、
+// `*` は `/` を含まない0文字以上、`?` は `/` でない1文字に当てる。
+function globToRegExp(pattern: string): RegExp {
+  let out = "";
+  for (let i = 0; i < pattern.length; i += 1) {
+    const ch = pattern[i];
+    if (pattern.startsWith("/**", i) && i + 3 === pattern.length) {
+      out += "(?:/.*)?";
+      break;
+    }
+    if (pattern.startsWith("**/", i)) {
+      out += "(?:.*/)?";
+      i += 2;
+    } else if (pattern.startsWith("**", i)) {
+      out += ".*";
+      i += 1;
+    } else if (ch === "*") {
+      out += "[^/]*";
+    } else if (ch === "?") {
+      out += "[^/]";
+    } else {
+      out += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  return new RegExp(`^${out}$`);
+}
+
+function hostOf(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function domainMatches(host: string, domain: string): boolean {
+  const d = domain.toLowerCase();
+  if (d.startsWith("*.")) return host.endsWith(d.slice(1));
+  return host === d;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
