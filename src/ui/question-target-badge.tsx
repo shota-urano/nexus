@@ -1,6 +1,6 @@
 // 質問の対象の印（BD-09 6章、BD-03 SCR-006-O01、DD-01 M07）。AI チャットの上に、
 // 何を対象にしているか（ページ、記事、語句と文、図のノード）と、見出しか語句を出す。
-// 種類は API の QuestionTarget の kind に合わせる。
+// 種類は API の QuestionTarget の kind に合わせる。色は BD-13 の試作に合わせてアンバーにする（Tailwind の設定の値）。
 
 export type QuestionTargetKind = "page" | "article" | "phrase" | "node";
 
@@ -20,8 +20,8 @@ export function QuestionTargetBadge({
   label: string;
 }) {
   return (
-    <p className="flex min-w-0 items-center gap-2 px-4 py-2 text-sm">
-      <span className="shrink-0 rounded border px-1.5 text-xs">
+    <p className="flex min-w-0 items-center gap-2 px-3 py-1.5 text-sm text-hud-amber">
+      <span className="shrink-0 rounded-full border border-hud-amber px-1.5 text-xs">
         {QUESTION_TARGET_KIND_LABELS[kind]}
       </span>
       <span className="min-w-0 truncate">{label}</span>
