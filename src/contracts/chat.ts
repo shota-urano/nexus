@@ -68,6 +68,7 @@ export const conversationSchema = z.object({
   conversationId: id,
   target: questionTargetSchema.nullable(),
   targetTitle: z.string().nullable().optional(),
+  firstQuestionText: z.string().nullable().optional(),
   startedAt: dateTime,
   lastSpokenAt: dateTime,
 });
