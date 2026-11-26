@@ -6,6 +6,8 @@
  * 暗い土台と、アンバーの光。
  */
 @theme {
+  /* 試作のページ全体の背景（:root の --bg） */
+  --color-hud-bg: #07080d;
   --color-hud-panel: rgb(22 24 34 / 0.78);
   /* 試作の上部の帯（.topbar）の背景 */
   --color-hud-bar: rgb(7 8 13 / 0.92);
@@ -20,4 +22,13 @@
   /* 試作の押す部品と発言の角の丸み、発言の幅の上限 */
   --radius-hud: 10px;
   --container-bubble: 85%;
+}
+
+/*
+ * ページ全体の背景（BD-13 の試作 prototype/app/globals.css の html, body）。
+ * 画面の高さに満たないときも、白を見せない。
+ */
+html,
+body {
+  background-color: var(--color-hud-bg);
 }
