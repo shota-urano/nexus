@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { basename, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 
 // AC22 の証拠の数える処理（13-release の実装単位4。NFR-016、NFR-019、DD-09 2.5「AC22 の証拠の残し方」手順 3）。
 // eventLogDir の中の全ての `<実行ID>.jsonl` を読み、assistant の出来事の tool_use と、user の出来事の
@@ -136,28 +136,32 @@ function parseRun(text: string): {
   return { uses: [...uses.values()], errors };
 }
 
-// Read は file_path、Glob と Grep は path（無ければ作業の場所）を指す。Glob の型が絶対の道なら、それも見る。
+// Read は file_path、Glob と Grep は path（無ければ作業の場所）を指す。Glob の pattern と Grep の glob も
+// 読む先の型なので、検索先を起点にした道（絶対の道ならそのまま）にして判定に含める。Grep の glob に `/` が
+// 無いときは、どの深さのファイル名にも当たる（ripgrep の決まり）ので、検索先の下の `**/` を付けた道も見る。
 function readTargets(use: ToolUse, workdir: string | undefined): string[] {
   const targets: string[] = [];
-  const add = (value: unknown) => {
-    if (typeof value === "string" && value !== "") {
-      targets.push(resolve(workdir ?? "/", expandHome(value)));
-    }
-  };
+  const toPath = (base: string, value: string) =>
+    resolve(base, expandHome(value));
+  const str = (value: unknown): string | undefined =>
+    typeof value === "string" && value !== "" ? value : undefined;
   if (use.name === "Read") {
-    add(use.input.file_path);
-  } else {
-    if (typeof use.input.path === "string" && use.input.path !== "") {
-      add(use.input.path);
-    } else if (workdir !== undefined) {
-      targets.push(workdir);
-    }
-    if (
-      use.name === "Glob" &&
-      typeof use.input.pattern === "string" &&
-      isAbsolute(use.input.pattern)
-    ) {
-      add(use.input.pattern);
+    const filePath = str(use.input.file_path);
+    if (filePath !== undefined) targets.push(toPath(workdir ?? "/", filePath));
+    return targets;
+  }
+  const path = str(use.input.path);
+  const base = path !== undefined ? toPath(workdir ?? "/", path) : workdir;
+  if (base !== undefined) targets.push(base);
+  const root = base ?? "/";
+  if (use.name === "Glob") {
+    const pattern = str(use.input.pattern);
+    if (pattern !== undefined) targets.push(toPath(root, pattern));
+  } else if (use.name === "Grep") {
+    const glob = str(use.input.glob);
+    if (glob !== undefined) {
+      targets.push(toPath(root, glob));
+      if (!glob.includes("/")) targets.push(join(root, "**", glob));
     }
   }
   return targets;
