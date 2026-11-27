@@ -159,3 +159,24 @@ export function checkResearchReportPayload(
   }
   return { ok: true, value: { ...shape.data, approaches: checked } };
 }
+
+// 課題の一覧の応答の形（`docs/api/openapi.yaml` の `ResearchTopicList`、`ResearchTopicSummary`。
+// DD-04 `listResearchTopics`、DD-02 FN-026）。画面層の M32 が応答を確かめるのに使う。
+export const researchTopicSummarySchema = z.object({
+  topicId: z.string(),
+  title: z.string(),
+  status: z.enum(RESEARCH_STATUSES),
+  lastWeek: z.number().int().min(1),
+  lastReceivedAt: z.string(),
+  latestContentId: z.number().int().min(1),
+  hasUnread: z.boolean(),
+});
+
+export const researchTopicListSchema = z.object({
+  topics: z.array(researchTopicSummarySchema),
+});
+
+export type ResearchTopicSummaryView = z.infer<
+  typeof researchTopicSummarySchema
+>;
+export type ResearchTopicListView = z.infer<typeof researchTopicListSchema>;
