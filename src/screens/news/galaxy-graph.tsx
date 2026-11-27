@@ -164,6 +164,10 @@ function Graph({
       zoomOnPinch={!locked}
       zoomOnScroll={!locked}
       zoomOnDoubleClick={!locked}
+      // 操作キー（Space で移動・Meta/Control で拡大縮小）でも図が動かないよう、
+      // 面を開いている間はキーも切る。undefined を渡すと React Flow の既定に戻る。
+      panActivationKeyCode={locked ? null : undefined}
+      zoomActivationKeyCode={locked ? null : undefined}
       fitView
       minZoom={0.2}
       proOptions={PRO_OPTIONS}
