@@ -131,15 +131,33 @@ export function NewsGalaxyScreen({
     return { nodes: shown, links: allLinks };
   }, [galaxy, extraNodes, extraLinks, theme, readStates]);
 
-  // 図を画面に合わせ直すきっかけにするノードの組。案内で足した記事は含めない（足しただけでは
-  // 中心を保ったまま図を動かさない）。日付とテーマで替わる。
-  const fitKey = useMemo(() => {
-    if (galaxy === null) return "";
-    return galaxy.nodes
-      .filter((node) => theme === ALL_THEMES || node.theme === theme)
-      .map((node) => node.contentId)
-      .join(",");
-  }, [galaxy, theme]);
+  // 図を画面に合わせ直すきっかけ。日付かテーマが替わって、案内で足した記事も含めた出すノードの組が
+  // 前と替わったら数を進める。案内で関係のある記事を足しただけのときは組を覚え直すだけで数を
+  // 進めない（中心を保ったまま図を動かさない）。
+  const shownKey = nodes.map((node) => node.contentId).join(",");
+  const [fitBasis, setFitBasis] = useState({
+    galaxy,
+    theme,
+    shown: shownKey,
+    version: 0,
+  });
+  if (
+    fitBasis.galaxy !== galaxy ||
+    fitBasis.theme !== theme ||
+    fitBasis.shown !== shownKey
+  ) {
+    const switched = fitBasis.galaxy !== galaxy || fitBasis.theme !== theme;
+    setFitBasis({
+      galaxy,
+      theme,
+      shown: shownKey,
+      version:
+        switched && fitBasis.shown !== shownKey
+          ? fitBasis.version + 1
+          : fitBasis.version,
+    });
+  }
+  const fitKey = String(fitBasis.version);
 
   const select = useCallback((contentId: number) => {
     setCenter(contentId);
