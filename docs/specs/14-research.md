@@ -1,5 +1,5 @@
 ---
-status: draft
+status: confirmed
 範囲: 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）
 ---
 
