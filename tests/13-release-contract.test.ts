@@ -13,6 +13,7 @@ import {
 } from "../src/server/db/connection";
 import { createIngest } from "../src/server/ingest";
 import { ENGLISH_KIND } from "../src/server/kinds/english/ingest";
+import { RESEARCH_KIND } from "../src/server/kinds/research/ingest";
 import { createFakeClock } from "../src/server/shared/clock";
 import { createLogger } from "../src/server/shared/logger";
 import { createSecret, hashSecret } from "../src/server/shared/secret";
@@ -203,6 +204,9 @@ async function loadRoutes() {
     learningResult:
       await import("../src/app/api/learning/sets/[date]/result/route"),
     researchReports: await import("../src/app/api/research/reports/route"),
+    researchTopics: await import("../src/app/api/app/research/topics/route"),
+    researchReport:
+      await import("../src/app/api/app/research/reports/[contentId]/route"),
   };
 }
 
@@ -219,6 +223,8 @@ interface Seed {
   E2: number;
   E1_DATE: string;
   E2_DATE: string;
+  // 課題 rag-eval の1週目の週報（D2 の課題 B の1週目と同じ形。CR-020）。
+  R1: number;
   // A1 の会話（発言なし）。
   C1: number;
   // 作成中の応答がある会話。
@@ -333,6 +339,47 @@ function seedD1(db: Database, logDir: string): Seed {
     );
   const E1 = englishId(E1_DATE);
   const E2 = englishId(E2_DATE);
+
+  // 週報: 課題 rag-eval の1週目（2026-11-23 送り）。受け取りの関数で入れる（DD-10 3章 D2）。
+  const research = {
+    source: "brain-research",
+    topicId: "rag-eval",
+    topicTitle: "RAG の評価",
+    week: 1,
+    sentOn: "2026-11-23",
+    status: "ended",
+    answerMd: "評価の軸を先に決める。",
+    approaches: [
+      {
+        title: "評価の軸を決める",
+        howToMd: "正しさと網羅の2つの軸を先に決める。",
+        sourceUrls: [
+          "https://example.com/research/axis",
+          "https://example.com/research/axis-2",
+        ],
+        marks: ["added", "disputed"],
+        counterMd: "反対の意見。",
+      },
+    ],
+    unknownsMd: "人の評価との差。",
+    changesMd: "初めての週報",
+  };
+  clock.set("2026-11-23T07:00:00.000+09:00");
+  const researchOutcome = ingest.receive(
+    "brain-research",
+    RESEARCH_KIND,
+    research,
+    JSON.stringify(research),
+  );
+  if (!researchOutcome.ok) throw new Error("週報を入れられない");
+  clock.set(NOW);
+  const R1 = Number(
+    db
+      .prepare(
+        "SELECT r.content_id FROM research_report AS r JOIN research_topic AS t ON t.topic_id = r.topic_id WHERE t.topic_key = 'rag-eval' AND r.week = 1",
+      )
+      .get()?.content_id,
+  );
   run(
     "INSERT INTO english_answer (content_id, answers_json, completed_at) VALUES (?, ?, ?)",
     E2,
@@ -388,6 +435,7 @@ function seedD1(db: Database, logDir: string): Seed {
     E2,
     E1_DATE,
     E2_DATE,
+    R1,
     C1,
     C2,
     doneReply,
@@ -626,6 +674,73 @@ const CASES: Record<string, OperationCases> = {
         call: (s) =>
           s.routes.article.GET(
             request(s, "GET", `/api/app/news/articles/${MISSING_ID}`),
+            params({ contentId: String(MISSING_ID) }),
+          ),
+      },
+    ],
+  },
+  listResearchTopics: {
+    failure: "afterDeviceKey",
+    cases: [
+      {
+        status: 200,
+        label: "課題の一覧",
+        call: (s) =>
+          s.routes.researchTopics.GET(
+            request(s, "GET", "/api/app/research/topics"),
+          ),
+      },
+      {
+        status: 401,
+        label: "鍵なし",
+        call: (s) =>
+          s.routes.researchTopics.GET(
+            request(s, "GET", "/api/app/research/topics", NO_COOKIE),
+          ),
+      },
+    ],
+  },
+  getResearchReport: {
+    failure: "afterDeviceKey",
+    cases: [
+      {
+        status: 200,
+        label: "課題 rag-eval の1週目",
+        call: (s) =>
+          s.routes.researchReport.GET(
+            request(s, "GET", `/api/app/research/reports/${s.seed.R1}`),
+            params({ contentId: String(s.seed.R1) }),
+          ),
+      },
+      {
+        status: 401,
+        label: "鍵なし",
+        call: (s) =>
+          s.routes.researchReport.GET(
+            request(
+              s,
+              "GET",
+              `/api/app/research/reports/${s.seed.R1}`,
+              NO_COOKIE,
+            ),
+            params({ contentId: String(s.seed.R1) }),
+          ),
+      },
+      {
+        status: 404,
+        label: "週報でない内容（記事 A1）",
+        call: (s) =>
+          s.routes.researchReport.GET(
+            request(s, "GET", `/api/app/research/reports/${s.seed.A1}`),
+            params({ contentId: String(s.seed.A1) }),
+          ),
+      },
+      {
+        status: 404,
+        label: "無い内容",
+        call: (s) =>
+          s.routes.researchReport.GET(
+            request(s, "GET", `/api/app/research/reports/${MISSING_ID}`),
             params({ contentId: String(MISSING_ID) }),
           ),
       },
@@ -1326,10 +1441,18 @@ afterAll(() => {
 describe("TC102 全ての operation の応答が openapi.yaml に合う（DD-04 1章 実装との一致、DD-04 3.4、ADR-021）", () => {
   it("TC102 DD-04 2章の全ての operation（定義ファイルの全ての operationId）を確かめる", () => {
     expect([...OPERATIONS.keys()].sort()).toEqual(Object.keys(CASES).sort());
-    expect(OPERATIONS.size).toBe(27);
+    expect(OPERATIONS.size).toBe(29);
     expect(OPERATIONS.get("postResearchReport")).toMatchObject({
       method: "post",
       path: "/api/research/reports",
+    });
+    expect(OPERATIONS.get("listResearchTopics")).toMatchObject({
+      method: "get",
+      path: "/api/app/research/topics",
+    });
+    expect(OPERATIONS.get("getResearchReport")).toMatchObject({
+      method: "get",
+      path: "/api/app/research/reports/{contentId}",
     });
   });
 
