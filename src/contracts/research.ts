@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { contentStateSchema } from "./news";
 
 // 共有の型層 M10（DD-01 1.1、ADR-019）。IF-005 の週報の本文の形 `ResearchReportPayload`
 // （`docs/api/openapi.yaml` の `ResearchReportPayload`、`ApproachPayload`、`ResearchStatus`、
@@ -180,3 +181,44 @@ export type ResearchTopicSummaryView = z.infer<
   typeof researchTopicSummarySchema
 >;
 export type ResearchTopicListView = z.infer<typeof researchTopicListSchema>;
+
+// 週報の応答の形（`docs/api/openapi.yaml` の `ResearchReportDetail`、`Approach`。DD-04
+// `getResearchReport`、DD-02 FN-027）。画面層の M32 が応答を確かめるのに使う。
+// 出典の URL は、http と https のものだけを画面でリンクにする（BD-03 SCR-011-A08）。
+export const approachSchema = z.object({
+  title: z.string(),
+  howToMd: z.string(),
+  sourceUrls: z.array(z.string()),
+  sourceCount: z.number().int().min(0),
+  marks: z.array(z.enum(APPROACH_MARKS)),
+  counterMd: z.string().nullable(),
+});
+
+export const researchWeekSchema = z.object({
+  contentId: z.number().int().min(1),
+  week: z.number().int().min(1),
+  sentOn: z.string(),
+  isRead: z.boolean(),
+});
+
+export const researchReportDetailSchema = z.object({
+  contentId: z.number().int().min(1),
+  topicId: z.string(),
+  topicTitle: z.string(),
+  week: z.number().int().min(1),
+  sentOn: z.string(),
+  status: z.enum(RESEARCH_STATUSES),
+  answerMd: z.string(),
+  approaches: z.array(approachSchema),
+  unknownsMd: z.string(),
+  changesMd: z.string(),
+  receivedAt: z.string(),
+  state: contentStateSchema,
+  weeks: z.array(researchWeekSchema),
+});
+
+export type ApproachView = z.infer<typeof approachSchema>;
+export type ResearchWeekView = z.infer<typeof researchWeekSchema>;
+export type ResearchReportDetailView = z.infer<
+  typeof researchReportDetailSchema
+>;
