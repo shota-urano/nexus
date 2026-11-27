@@ -15,6 +15,7 @@ import { type ReactNode, useState } from "react";
 //   引き上げと引き下げは、取っ手のボタンでもできる（指で引けないときの代わり）。
 // - 動きを減らす設定のときは、M07 の MotionSettings が動きを止める（NFR-008）。
 // - 押す場所は 44 ピクセル四方以上にする（RD-11 NFR-008）。
+// - 中身のスクロールは端に着いても後ろの画面へ伝えない（overscroll-behavior: contain）。
 // - tone="hud" は、BD-13 の試作の面（暗い土台、アンバーの枠と光）の色にする。色は Tailwind の設定の値を使う。
 
 type SheetTone = "plain" | "hud";
@@ -133,7 +134,9 @@ function SheetPanel({
           閉じる
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {children}
+      </div>
     </motion.section>
   );
 }

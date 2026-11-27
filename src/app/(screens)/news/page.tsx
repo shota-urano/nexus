@@ -1,11 +1,12 @@
-import { ArticleScreen } from "../../../screens/news/article-screen";
 import { TopBar } from "../_frame/top-bar";
+import { ArticleRoute } from "./article-route";
 import { NewsGalaxyRoute } from "./galaxy-route";
 
 // SCR-002 News Galaxy の道 `/news`（DD-01 M01）。中身は M03 に任せる。
 // SCR-003 記事の案内は道を持たない（DD-01 M01）ので、SCR-001、SCR-007〜SCR-009 から全画面で開くときは
 // 同じ道に `article={contentId}` を付けて開く（M05 の一覧の行の行き先）。
 // 記事の案内の「AI に質問」（SCR-003-A05）は案内の操作の並びに置く（BD-03 SCR-003 の 3.2）。
+// 「AI に質問」を押すと、その記事を対象に AI チャットの面（SCR-006）を開く（BD-03 4章）。
 
 const ID_PATTERN = /^[1-9][0-9]*$/;
 
@@ -26,7 +27,7 @@ export default async function NewsRoute({
     return (
       <main>
         <TopBar title="記事の案内" />
-        <ArticleScreen contentId={articleIdOf(article)} />
+        <ArticleRoute contentId={articleIdOf(article)} />
       </main>
     );
   }
