@@ -315,6 +315,7 @@ export function NewsGalaxyScreen({
         open={opened !== null}
         title="記事の案内"
         onClose={closeSheet}
+        tone="hud"
       >
         {opened !== null && (
           <ArticlePanel
