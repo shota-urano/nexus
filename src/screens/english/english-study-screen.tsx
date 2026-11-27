@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchEnglishSet, markOpened } from "../../client/english";
 import type { EnglishSetDetail } from "../../contracts/english";
+import type { ReadingSelection } from "../../ui/kinds/english/reading";
 import { EmptyState } from "../../ui/empty-state";
 import { EnglishStudy } from "./english-study";
 import { ENGLISH_MESSAGES } from "./messages";
@@ -23,7 +24,14 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-export function EnglishStudyScreen({ contentId }: { contentId: number }) {
+export function EnglishStudyScreen({
+  contentId,
+  onSelect,
+}: {
+  contentId: number;
+  /** 読む教材で選んでいる箇所が替わったとき（SCR-005-A09 の対象）。選んでいなければ null */
+  onSelect?: (selection: ReadingSelection | null) => void;
+}) {
   const [state, setState] = useState<State>({ phase: "loading" });
 
   useEffect(() => {
@@ -55,5 +63,5 @@ export function EnglishStudyScreen({ contentId }: { contentId: number }) {
   if (state.phase === "failed") {
     return <EmptyState message={ENGLISH_MESSAGES["MSG-019"]} />;
   }
-  return <EnglishStudy set={state.set} />;
+  return <EnglishStudy set={state.set} onSelect={onSelect} />;
 }
