@@ -1,9 +1,11 @@
 import type { Database } from "../db/connection";
 import { NexusError } from "../shared/errors";
+import type { MessageId } from "../shared/messages";
 import { englishChat } from "./english/chat";
 import { englishIngest } from "./english/ingest";
 import { newsChat } from "./news/chat";
 import { newsIngest } from "./news/ingest";
+import { researchIngest } from "./research/ingest";
 
 // 種類の一覧（DD-01 M14。NFR-004）。種類ごとの操作を種類の値から引けるようにする。
 // 共通の部分（M13、DD-02 3章 P08）は種類の値を直に分けず、この一覧から引く。
@@ -16,8 +18,9 @@ export interface KindItem {
   title: string;
   // 検索の本文（DD-02 3章 P08）。
   searchBody: string;
-  insertDetail(db: Database, contentId: number): void;
-  updateDetail(db: Database, contentId: number): void;
+  // `receivedAt` は受け取った日時（週報は研究課題の最後に届いた日時に入れる。DD-02 FN-025 手順 6.2）。
+  insertDetail(db: Database, contentId: number, receivedAt: string): void;
+  updateDetail(db: Database, contentId: number, receivedAt: string): void;
 }
 
 // 全体の形の確かめの結果。`date` は日付の項目（`today` のまま）か、断るときに分からなければ null。
@@ -37,16 +40,20 @@ export interface KindIngest {
   keyField: string;
   // 1件以上残したら、記事の関係の判定を待ちに入れるか。
   relatesAfterIngest: boolean;
+  // 残す途中で失敗したときの MSG（省くと MSG-045。週報は MSG-046。DD-02 FN-025）。
+  failureMessage?: MessageId;
   // `rawBody` は届いた本文の文字（原文を残す種類が使う。DD-02 FN-007 手順 4.3）。
   checkBatch(payload: unknown, rawBody?: string): KindBatchCheck;
   checkItem(raw: unknown): KindItemCheck;
-  // 同じ対象日の同じ値の内容ID。無ければ null（英語は日付だけで決まる）。
+  // 同じ対象日の同じ値の内容ID。無ければ null（英語は日付だけで決まる。週報は課題の ID と週で決まる）。
   findContentId(db: Database, date: string, key: string): number | null;
 }
 
 const KINDS = new Map<string, KindIngest>([
   [newsIngest.kind, newsIngest satisfies KindIngest],
   [englishIngest.kind, englishIngest satisfies KindIngest],
+  // 週報（DD-01 M33。CR-020）。
+  [researchIngest.kind, researchIngest satisfies KindIngest],
 ]);
 
 export function isKind(kind: string): boolean {

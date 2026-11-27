@@ -112,6 +112,21 @@ export const MESSAGES = {
     kind: "error",
     text: "記事を残せませんでした（{理由}）。この送信の記事は1件も残していません。送り直してください。",
   },
+  // MSG-046〜MSG-050 は調査の週報（CR-020）。
+  "MSG-046": {
+    kind: "error",
+    text: "週報を残せませんでした（{理由}）。この週報は残していません。送り直してください。",
+  },
+  "MSG-047": { kind: "info", text: "調査の週報はまだ届いていません。" },
+  "MSG-048": { kind: "error", text: "週報が見つかりません。" },
+  "MSG-049": {
+    kind: "error",
+    text: "週報を送りませんでした。{項目} の形が正しくありません。",
+  },
+  "MSG-050": {
+    kind: "error",
+    text: "NEXUS に送れませんでした（{理由}）。NEXUS が動いているかを確かめてから送り直してください。",
+  },
 } as const satisfies Record<string, { kind: MessageKind; text: string }>;
 
 export type MessageId = keyof typeof MESSAGES;

@@ -4,7 +4,8 @@ info:
   version: 0.1.0
   description: |
     NEXUS の API の正本（DD-04 1章）。端末の画面が使う API（/api/app/、/register）と、
-    配信元が使う API（/api/inbox/、/api/learning/。今の cerebellum の形に合わせる。BD-06 4.1）を定義する。
+    配信元が使う API（/api/inbox/、/api/learning/。今の cerebellum の形に合わせる。BD-06 4.1。
+    IF-005 の /api/research/ は NEXUS が決めた道。CR-020）を定義する。
     認可、冪等性、副作用、エラーと MSG の対応は DD-04 に書く。
 servers:
   - url: /
@@ -586,6 +587,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '500': { $ref: '#/components/responses/SenderInternal' }
+  /api/research/reports:
+    post:
+      operationId: postResearchReport
+      tags: [sender]
+      summary: 調査の週報を受け取る（IF-005、FN-025。CR-020）
+      security: [{ senderKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResearchReportPayload' }
+      responses:
+        '200':
+          description: 受け取った（MSG-031）。同じ課題の同じ週は置き換えた
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResearchReportResult' }
+        '400': { $ref: '#/components/responses/SenderBadRequest' }
+        '401': { $ref: '#/components/responses/SenderUnauthorized' }
+        '413': { $ref: '#/components/responses/SenderTooLarge' }
+        '500': { $ref: '#/components/responses/SenderInternal' }
 
 components:
   securitySchemes:
@@ -681,7 +703,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     SenderInternal:
-      description: 残せなかった（IF-001 は MSG-045）。何も残していない
+      description: 残せなかった（IF-001 は MSG-045、IF-005 は MSG-046）。何も残していない
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -700,7 +722,7 @@ components:
       maxLength: 2048
     Kind:
       type: string
-      description: 情報の種類（BD-07 4.2。今は news と english）。種類を足すときに値が増えるので enum にしない（NFR-004。DD-01 M14）
+      description: 情報の種類（BD-07 4.2。今は news、english、research。research は CR-020）。種類を足すときに値が増えるので enum にしない（NFR-004。DD-01 M14）
     RelationType: { type: string, enum: [follow_up, background, same_actor, related_topic] }
     ReplyState: { type: string, enum: [writing, done, failed, cancelled] }
     MessageIdText:
@@ -1116,3 +1138,55 @@ components:
               answer: { type: string, maxLength: 500 }
         feeling: { type: string, const: '' }
         completedAt: { $ref: '#/components/schemas/DateTime' }
+    ResearchStatus: { type: string, enum: [active, ended], description: 課題の状態（BD-07 4.2。CR-020） }
+    ApproachMark: { type: string, enum: [added, more_sources, disputed], description: 方法の印（BD-07 4.2。CR-020） }
+    ApproachPayload:
+      type: object
+      additionalProperties: false
+      required: [title, howToMd, sourceUrls, marks]
+      description: 方法1件（BD-06 IF-005 3.2。上限は Q-096 の答え）
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+        howToMd: { type: string, minLength: 1, description: 8 KiB まで（UTF-8 のバイト数。zod で確かめる） }
+        sourceUrls:
+          type: array
+          minItems: 0
+          maxItems: 50
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Url' }
+        marks:
+          type: array
+          minItems: 0
+          maxItems: 3
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/ApproachMark' }
+        counterMd: { oneOf: [{ type: string, description: 2 KiB まで（UTF-8 のバイト数） }, { type: 'null' }] }
+    ResearchReportPayload:
+      type: object
+      additionalProperties: false
+      required: [source, topicId, topicTitle, week, sentOn, status, answerMd, approaches, unknownsMd, changesMd]
+      description: 全体で 256 KiB まで（BD-06 IF-005 3.2、Q-088 の答え）。欄ごとの上限は Q-096 の答え
+      properties:
+        source: { type: string, const: brain-research }
+        topicId: { type: string, pattern: '^[a-z0-9-]{1,64}$' }
+        topicTitle: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+        week: { type: integer, minimum: 1 }
+        sentOn: { $ref: '#/components/schemas/Date' }
+        status: { $ref: '#/components/schemas/ResearchStatus' }
+        answerMd: { type: string, minLength: 1, description: 4 KiB まで（UTF-8 のバイト数） }
+        approaches:
+          type: array
+          minItems: 0
+          maxItems: 15
+          items: { $ref: '#/components/schemas/ApproachPayload' }
+        unknownsMd: { type: string, description: 8 KiB まで（UTF-8 のバイト数）。空の文字も受ける }
+        changesMd: { type: string, minLength: 1, description: 8 KiB まで（UTF-8 のバイト数）。変化が無ければ「変化なし」 }
+    ResearchReportResult:
+      type: object
+      required: [source, topicId, week, receivedAt, replaced]
+      properties:
+        source: { type: string, const: brain-research }
+        topicId: { type: string }
+        week: { type: integer, minimum: 1 }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        replaced: { type: boolean, description: 同じ課題の同じ週を置き換えたか }

@@ -44,13 +44,15 @@ export type IngestOutcome =
       receivedAt: string;
       itemCount: number;
       rejected: RejectedItem[];
+      // 残した内容のうち、前の内容を置き換えたものがあったか（週報の `replaced`。DD-02 FN-025 手順 7）。
+      replaced: boolean;
     }
   // 全体の形か件数が正しくない（DD-02 FN-001 手順 4）。断った記録は作ってある。
   | { ok: false; message: MessageRef };
 
 export interface Ingest {
-  // 受け取る（DD-02 FN-001 手順 4〜7、FN-007 手順 2〜4）。手順 7（FN-007 は手順 4）の途中で
-  // 失敗したら、断った記録を作ってから投げる。`rawBody` は届いた本文の文字（原文を残す種類が使う）。
+  // 受け取る（DD-02 FN-001 手順 4〜7、FN-007 手順 2〜4、FN-025 手順 4〜6）。手順 7（FN-007 は手順 4、
+  // FN-025 は手順 6）の途中で失敗したら、断った記録を作ってから投げる。`rawBody` は届いた本文の文字（原文を残す種類が使う）。
   receive(
     sender: IngestSender,
     kind: string,
@@ -73,7 +75,7 @@ export function rejectionReason(message: MessageRef): string {
   return `${message.id}（${values.map(([name, value]) => `${name}: ${value}`).join("、")}）`;
 }
 
-// 手順 7 の失敗の、MSG-045 に差し込む理由（DD-06 2章の分類名。内部の中身は入れない）。
+// 手順 7 の失敗の、MSG-045（週報は MSG-046）に差し込む理由（DD-06 2章の分類名。内部の中身は入れない）。
 export function failureReason(error: unknown): string {
   return error instanceof NexusError && error.code === "DB_UNAVAILABLE"
     ? "DB が使えない"
@@ -170,6 +172,7 @@ export function createIngest(deps: {
       // 手順 7: 1つのトランザクションで残す（DD-05 2章）。
       const receivedAt = formatDateTime(now);
       let deliveryId: number;
+      let replaced = false;
       try {
         deliveryId = inWriteTransaction(db, () => {
           const id = insertAcceptedDelivery(db, {
@@ -189,15 +192,17 @@ export function createIngest(deps: {
                 receivedAt,
                 deliveryId: id,
               });
-              item.insertDetail(db, contentId);
+              item.insertDetail(db, contentId, receivedAt);
             } else {
               contentId = existing;
+              replaced = true;
               updateContentOnReplace(db, contentId, {
                 title: item.title,
+                targetDate,
                 receivedAt,
                 deliveryId: id,
               });
-              item.updateDetail(db, contentId);
+              item.updateDetail(db, contentId, receivedAt);
             }
             replaceSearchIndexRow(
               db,
@@ -212,7 +217,7 @@ export function createIngest(deps: {
         });
       } catch (error) {
         recordRejected(sender, targetDate, {
-          id: "MSG-045",
+          id: ops.failureMessage ?? "MSG-045",
           values: { 理由: failureReason(error) },
         });
         throw error;
@@ -225,6 +230,7 @@ export function createIngest(deps: {
         receivedAt,
         itemCount: kept.length,
         rejected,
+        replaced,
       };
     },
   };
