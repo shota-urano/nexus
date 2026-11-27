@@ -68,7 +68,8 @@ export function buildEnglishAnswerMaterial(
     const sentence = sentenceAt(reading, target);
     const notes = sentence?.notes ?? [];
     lines.push(
-      `対象の文: ${target.sentence ?? ""}`,
+      // 位置が指す文があれば、その元の文を使う（送られた文は上限の長さで切られていることがある）。
+      `対象の文: ${sentence?.en ?? target.sentence ?? ""}`,
       `対象の語句: ${target.phrase ?? ""}`,
       "その文の注:",
       ...(notes.length === 0
