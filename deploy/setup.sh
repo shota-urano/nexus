@@ -7,14 +7,15 @@
 #    - claude-settings.json → ~/Library/Application Support/nexus/claude-settings.json（0600）。
 #      `~` は permissions の「ホームからの道」の書き方なので、直さずにそのまま置く（DD-09 2.5）。
 #    - launchd の雛形4つ → ~/Library/LaunchAgents/。__REPO__（このリポジトリ）と __NODE__（Node.js の絶対の道）も書き込む。
+#    - nexus-send → このリポジトリの bin/nexus-send（0755。Git で管理しない）。__NODE__ と __REPO__ を書き込む（DD-09 2.7）。
 # launchd に読み込ませるのは手順 5 で、このスクリプトはしない。
 # 別のディスクの nexus-backup（手順 4）と、__TAILNET__、__BACKUP_VOLUME__ の書き込みは、本人が OP01 で行う。
 #
 # Node.js の道は、NEXUS_NODE_BIN があればそれ、無ければ Homebrew の node@<番号> のうち長期サポート版で一番大きい番号、
 # それも無ければ PATH の node を使う（DD-09 2.1）。どれも長期サポート版（process.release.lts がある）であることを確かめる。
 # NEXUS_NODE_BIN が実行できないか長期サポート版でなければ、何もせずに終了コード 1 で止まる。
-# NEXUS_NODE_BIN が無く、長期サポート版が見つからなければ、launchd の設定は置かずに知らせる（フォルダ、env、
-# claude-settings.json は置く）。
+# NEXUS_NODE_BIN が無く、長期サポート版が見つからなければ、launchd の設定と bin/nexus-send は置かずに知らせる
+# （フォルダ、env、claude-settings.json は置く）。
 set -eu
 # 親のフォルダ（~/Library/LaunchAgents など）はふだんの権限で作り、置くファイルだけを本人だけが読めるようにする。
 umask 022
@@ -35,11 +36,16 @@ DATA_DIR="$HOME/Library/Application Support/nexus"
 WORK_DIR="$DATA_DIR/ai-workdir"
 LOG_DIR="$HOME/Library/Logs/nexus"
 AGENTS_DIR="$HOME/Library/LaunchAgents"
+SEND_DIR="$REPO_DIR/bin"
 LABELS="jp.uslab.nexus.web jp.uslab.nexus.runner jp.uslab.nexus.backup jp.uslab.nexus.purge"
 
 # sed の置き換えの文字列に使えるよう、\ と & と区切りの | を逃がす。
 sed_escape() {
   printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
+}
+# sh の "…" の中に書けるよう、\ と " と $ と ` を逃がしてから sed 用に逃がす。
+sh_sed_escape() {
+  sed_escape "$(printf '%s' "$1" | sed -e 's/[\\"$`]/\\&/g')"
 }
 # plist の文字列に使えるよう、XML の & < > を逃がしてから sed 用に逃がす。
 xml_sed_escape() {
@@ -105,7 +111,7 @@ echo "claude-settings.json を置いた（0600）: $DATA_DIR/claude-settings.jso
 
 # 2. launchd の設定
 if [ -z "$node_bin" ]; then
-  echo "Node.js の長期サポート版が見つからないので、launchd の設定は置かなかった。NEXUS_NODE_BIN に Node.js の絶対の道を入れて、もう一度動かす。" >&2
+  echo "Node.js の長期サポート版が見つからないので、launchd の設定と bin/nexus-send は置かなかった。NEXUS_NODE_BIN に Node.js の絶対の道を入れて、もう一度動かす。" >&2
 else
   mkdir -p "$AGENTS_DIR"
   home=$(xml_sed_escape "$HOME")
@@ -119,6 +125,18 @@ else
     mv "$target.tmp" "$target"
   done
   echo "launchd の設定を置いた（Node.js: ${node_bin}）: $AGENTS_DIR/jp.uslab.nexus.*.plist"
+fi
+
+# 2. 送信のコマンド bin/nexus-send（DD-09 2.7。CR-020）
+if [ -n "$node_bin" ]; then
+  mkdir -p "$SEND_DIR"
+  repo=$(sh_sed_escape "$REPO_DIR")
+  node=$(sh_sed_escape "$node_bin")
+  target="$SEND_DIR/nexus-send"
+  sed -e "s|__REPO__|$repo|g" -e "s|__NODE__|$node|g" "$DEPLOY_DIR/nexus-send" >"$target.tmp"
+  chmod 0755 "$target.tmp"
+  mv "$target.tmp" "$target"
+  echo "送信のコマンドを置いた（Node.js: ${node_bin}）: $target"
 fi
 
 echo "残り: __TAILNET__ と __BACKUP_VOLUME__ を env と launchd の設定に書き込み、別のディスクに nexus-backup（0700）を作る（DD-09 4章 手順 4。OP01）。"
