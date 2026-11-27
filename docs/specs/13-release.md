@@ -70,7 +70,7 @@ Messages API への切り替え（ADR-017 の見直しのとき）。
 - [ ] （人間） 受入テストを行う（NFR-007、NFR-008、NFR-009、NFR-011、NFR-029、REQ-026）
 - [x] [Backend] 構築の雛形のテスト `tests/13-release-deploy.test.ts` の `run` が、起動の口が標準エラーの末尾に足す「標準入力に書けない」を出力に混ぜず、`plutil` の結果だけで比べるようにして、子のプロセスが先に終わったときに不安定に落ちないようにする（DD-01 M26、DD-06 1章）（se/13-release）
   - 受け入れ基準: `tests/13-release-deploy.test.ts` の launchd の雛形の Label の確かめが、子のプロセスが標準入力を読まずに終わっても通る; Label の確かめが、`plutil` の標準出力だけを比べ、標準エラーを比べる値に含めない
-- [ ] [Backend] 構築のスクリプト `deploy/setup.sh` が、`deploy/nexus-send` の雛形に Node.js の道とリポジトリの道を書き込んで `bin/nexus-send`（実行の権限、Git で管理しない）を置くようにする。運用の手順書の OP01（送信のコマンドの置き場所）、OP03（brain-research の鍵を作り、研究ループの `NEXUS_SENDER_KEY` に入れる）、OP05（研究ループの送信の失敗の確かめ方と、送信のコマンドでの送り直し）を足す（FN-024、FN-028、DD-09 2.7・4章、BD-11 OP01・OP03・OP05、CR-020）
+- [x] [Backend] 構築のスクリプト `deploy/setup.sh` が、`deploy/nexus-send` の雛形に Node.js の道とリポジトリの道を書き込んで `bin/nexus-send`（実行の権限、Git で管理しない）を置くようにする。運用の手順書の OP01（送信のコマンドの置き場所）、OP03（brain-research の鍵を作り、研究ループの `NEXUS_SENDER_KEY` に入れる）、OP05（研究ループの送信の失敗の確かめ方と、送信のコマンドでの送り直し）を足す（FN-024、FN-028、DD-09 2.7・4章、BD-11 OP01・OP03・OP05、CR-020）（se/13-release-2）
   - 受け入れ基準: DD-10 TC128 が通る; 構築のスクリプトを一時のホームで動かすと、`bin/nexus-send` が実行の権限で置かれ、中の Node.js の道と `dist/cli/send/main.js` の道が絶対の道である; `.gitignore` に `bin/nexus-send` がある; OP03 に `sender-key issue brain-research` と `NEXUS_SENDER_KEY` が書いてあり、OP05 に `nexus-send` での送り直しが書いてある
 - [ ] （人間） 本番で `sender-key issue brain-research` の鍵を作り、brain-harness の研究ループの `NEXUS_SENDER_KEY` と `NEXUS_SEND_URL` に入れる（OP03。FN-024、IF-005、Q-090）
 - [ ] （人間） brain-harness の側で研究ループを作り、最初の週報を手で作って `~/apps/nexus/bin/nexus-send` で送る（brain-harness の作業で、NEXUS のリポジトリでは行わない。IF-005、DD-09 4章 構築後の確認）
