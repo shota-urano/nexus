@@ -608,6 +608,37 @@ paths:
         '401': { $ref: '#/components/responses/SenderUnauthorized' }
         '413': { $ref: '#/components/responses/SenderTooLarge' }
         '500': { $ref: '#/components/responses/SenderInternal' }
+  /api/app/research/topics:
+    get:
+      operationId: listResearchTopics
+      tags: [app]
+      summary: 研究課題の一覧（FN-026、SCR-010。CR-020）
+      security: [{ deviceKey: [] }]
+      responses:
+        '200':
+          description: 最後に届いた日時の新しい順。続きは無い
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResearchTopicList' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '500': { $ref: '#/components/responses/Internal' }
+  /api/app/research/reports/{contentId}:
+    get:
+      operationId: getResearchReport
+      tags: [app]
+      summary: 週報（FN-027、SCR-011。CR-020）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: その週の週報と、同じ課題の週の一覧
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResearchReportDetail' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
 
 components:
   securitySchemes:
@@ -1196,3 +1227,56 @@ components:
         week: { type: integer, minimum: 1 }
         receivedAt: { $ref: '#/components/schemas/DateTime' }
         replaced: { type: boolean, description: 同じ課題の同じ週を置き換えたか }
+    ResearchTopicSummary:
+      type: object
+      required: [topicId, title, status, lastWeek, lastReceivedAt, latestContentId, hasUnread]
+      properties:
+        topicId: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/ResearchStatus' }
+        lastWeek: { type: integer, minimum: 1 }
+        lastReceivedAt: { $ref: '#/components/schemas/DateTime' }
+        latestContentId: { $ref: '#/components/schemas/Id' }
+        hasUnread: { type: boolean }
+    ResearchTopicList:
+      type: object
+      required: [topics]
+      properties:
+        topics: { type: array, items: { $ref: '#/components/schemas/ResearchTopicSummary' } }
+    Approach:
+      type: object
+      required: [title, howToMd, sourceUrls, sourceCount, marks, counterMd]
+      properties:
+        title: { type: string }
+        howToMd: { type: string }
+        sourceUrls: { type: array, items: { $ref: '#/components/schemas/Url' } }
+        sourceCount: { type: integer, minimum: 0, description: sourceUrls の数（Q-088 の答え） }
+        marks: { type: array, items: { $ref: '#/components/schemas/ApproachMark' } }
+        counterMd: { oneOf: [{ type: string }, { type: 'null' }] }
+    ResearchReportDetail:
+      type: object
+      required: [contentId, topicId, topicTitle, week, sentOn, status, answerMd, approaches, unknownsMd, changesMd, receivedAt, state, weeks]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        topicId: { type: string }
+        topicTitle: { type: string }
+        week: { type: integer, minimum: 1 }
+        sentOn: { $ref: '#/components/schemas/Date' }
+        status: { $ref: '#/components/schemas/ResearchStatus' }
+        answerMd: { type: string }
+        approaches: { type: array, items: { $ref: '#/components/schemas/Approach' } }
+        unknownsMd: { type: string }
+        changesMd: { type: string }
+        receivedAt: { $ref: '#/components/schemas/DateTime' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        weeks:
+          type: array
+          description: 同じ課題の週の一覧。週の大きい順
+          items:
+            type: object
+            required: [contentId, week, sentOn, isRead]
+            properties:
+              contentId: { $ref: '#/components/schemas/Id' }
+              week: { type: integer, minimum: 1 }
+              sentOn: { $ref: '#/components/schemas/Date' }
+              isRead: { type: boolean }

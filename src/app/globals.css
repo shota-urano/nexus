@@ -22,6 +22,12 @@
   /* 一覧の行の種類の印「週報」の色（CR-020。BD-03 と試作に無いため本人が決めた。2026-11-27） */
   --color-kind-research: #8ed2bc;
 
+  /* 週報の方法の印の色（BD-03 SCR-011 3.2、Q-095 の答え。試作 prototype/lib/research.ts の MARKS）。
+     今週足したは緑、出典が増えたはアンバー、反対の意見ありは赤みのある色 */
+  --color-mark-added: #5fd3a2;
+  --color-mark-more: #ffb85e;
+  --color-mark-disputed: #ff7f8e;
+
   /* 試作の押す部品と発言の角の丸み、発言の幅の上限 */
   --radius-hud: 10px;
   --container-bubble: 85%;

@@ -47,6 +47,16 @@ function summaryOf(key: FeatureKey, home: Home | null): ReactNode {
       return home.learning.isCompleted
         ? `${home.learning.learningTheme}（完了）`
         : home.learning.learningTheme;
+    case "research":
+      // 未読の週報の数（SCR-001-O10。`getHome` の `research.unreadCount`）。
+      return (
+        <>
+          未読{" "}
+          {home !== null && (
+            <b className="text-base">{home.research.unreadCount}</b>
+          )}
+        </>
+      );
     case "inbox":
       return (
         <>

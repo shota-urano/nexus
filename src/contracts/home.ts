@@ -36,6 +36,10 @@ export const homeSchema = z.object({
     )
     .max(3),
   notices: z.array(homeNoticeSchema),
+  // Research のカードに出す値（DD-02 FN-020。CR-020）。週報の未着は出さない。
+  research: z.object({
+    unreadCount: count,
+  }),
 });
 
 export type HomeNotice = z.infer<typeof homeNoticeSchema>;
