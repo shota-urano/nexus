@@ -62,7 +62,7 @@ describe("TC100 sender-key issue の配信元の名前が値に無い（FN-024 �
     expect(err).toEqual([
       formatMessage("MSG-044", {
         配信元: "cerebellum",
-        配信元の一覧: "brain-harness、sharpen",
+        配信元の一覧: "brain-harness、sharpen、brain-research",
       }),
     ]);
     expect(out).toEqual([]);
@@ -75,7 +75,7 @@ describe("TC100 sender-key issue の配信元の名前が値に無い（FN-024 �
     expect(err).toEqual([
       formatMessage("MSG-044", {
         配信元: "cerebellum",
-        配信元の一覧: "brain-harness、sharpen",
+        配信元の一覧: "brain-harness、sharpen、brain-research",
       }),
     ]);
   });
@@ -236,7 +236,7 @@ describe("管理のコマンドのプロセスの入口（src/cli/main.ts）", (
     expect(result.stderr).toEqual([
       formatMessage("MSG-044", {
         配信元: "cerebellum",
-        配信元の一覧: "brain-harness、sharpen",
+        配信元の一覧: "brain-harness、sharpen、brain-research",
       }),
     ]);
     expect(result.stdout).toEqual([]);

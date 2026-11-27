@@ -17,9 +17,11 @@ import { createSecret, hashSecret } from "../shared/secret";
 // 鍵そのものは作ったときに返すだけで、残さない。
 
 // 配信元と、その鍵で使える連携（BD-07 4.2。NFR-014）。並びは BD-07 4.2 の並び順。
+// brain-research は IF-005 だけを使える（CR-020。Q-090 の答え）。
 export const SENDER_INTERFACES = {
   "brain-harness": ["IF-001"],
   sharpen: ["IF-002", "IF-003"],
+  "brain-research": ["IF-005"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type Sender = keyof typeof SENDER_INTERFACES;
