@@ -2,7 +2,7 @@
 id: DD-04
 name: API 詳細設計書
 phase: 詳細設計
-version: 1.4
+version: 1.5
 updated: 2026-11-27
 ---
 
@@ -18,6 +18,7 @@ updated: 2026-11-27
 - 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、`openapi.yaml` の `Conversation` に `firstQuestionText` を足した（`listConversations` と `createConversation` の応答）。
 - 1.3: X-04 CR-018（2026-11-27 RD-01 SH01 が承認）で、`createConversation` の画面の欄から SCR-002-A05 を外した。API は変えない。
 - 1.4: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`postResearchReport`（IF-005）、`listResearchTopics`、`getResearchReport` を足し、`Home` に `research` を足した。IF-005 の各欄の上限は Q-096 の答え（2026-11-27）による。
+- 1.5: X-04 CR-021（2026-11-27 RD-01 SH01 が承認）で、CR-020 の API の定義（`postResearchReport`、`listResearchTopics`、`getResearchReport` と、その schema、`Home` の `research`）を `openapi.yaml` から外し、それぞれを作る実装単位（仕様書 05、11、14）で足すことにした。この書類の CR-020 の表と決定は変えない。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル
@@ -28,6 +29,7 @@ updated: 2026-11-27
 | 形式と版 | OpenAPI 3.1.0 |
 | 形式の検査 | Redocly CLI の `lint` で、形式の誤りと参照の抜けを確かめる（ADR-021）。検証のコマンドに入れ、コミットの前と CI で動かす（コマンドの中身は DD-09） |
 | 実装との一致の確かめ方 | M10（DD-01）の zod の形は、定義ファイルを見て手で書く。DD-10 の結合テストで、全ての operation の応答の本文を、定義ファイルの schema で Ajv を使って確かめる（ADR-021）。SSE（`streamReply`）と転送（`openRegistration`）は schema で表しきれないので、出来事の並びと `Location`・`Set-Cookie` を DD-10 の個別のテストで確かめる |
+| 定義を足す時機（CR-021） | `openapi.yaml` には、実装した operation と schema だけを置く。DD-10 TC102 が全ての operation を実装と照らすので、実装より先に足すと main のテストが落ちるため（2026-11-27 に CR-020 で起きた）。設計で決めた API は、この書類の 2章と 5章の表に先に書き、`openapi.yaml` には、その API を作る実装単位で足す。CR-020 の3つの operation と schema の形は、コミット `1bf26ef` の `docs/api/openapi.yaml` に書いたものを正とする |
 
 ## 2. API の一覧
 

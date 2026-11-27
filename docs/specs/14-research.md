@@ -56,7 +56,7 @@ MSG-047、MSG-048、MSG-019、MSG-003（BD-09 1.1）。DD-06 E03、E05、E08。
 
 ## 9. 実装単位
 
-- [ ] [Backend] 課題の一覧 `listResearchTopics` と週報 `getResearchReport`（週の一覧、出典の数）を M33 で作る（FN-026、FN-027、DD-01 M11・M33、DD-02 FN-026・FN-027、DD-04、CR-020）
+- [ ] [Backend] 課題の一覧 `listResearchTopics` と週報 `getResearchReport`（週の一覧、出典の数）を M33 で作り、`docs/api/openapi.yaml` に2つの operation（`/api/app/research/topics`、`/api/app/research/reports/{contentId}`）と応答の schema（`ResearchTopicList`、`ResearchTopicSummary`、`ResearchReportDetail`、`Approach`）を足す（DD-04 の定義どおり。CR-021）（FN-026、FN-027、DD-01 M11・M33、DD-02 FN-026・FN-027、DD-04、CR-020）
   - 受け入れ基準: DD-10 TC138、DD-10 TC139、DD-10 TC102 が通る
 - [ ] [Frontend] 課題の一覧の画面 SCR-010（M32）を作る（FN-026、DD-01 M32、BD-03 SCR-010、CR-020）
   - 受け入れ基準: DD-10 TC140 が通る
