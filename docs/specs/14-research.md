@@ -56,13 +56,13 @@ MSG-047、MSG-048、MSG-019、MSG-003（BD-09 1.1）。DD-06 E03、E05、E08。
 
 ## 9. 実装単位
 
-- [ ] [Backend] 課題の一覧 `listResearchTopics` と週報 `getResearchReport`（週の一覧、出典の数）を M33 で作り、`docs/api/openapi.yaml` に2つの operation（`/api/app/research/topics`、`/api/app/research/reports/{contentId}`）と応答の schema（`ResearchTopicList`、`ResearchTopicSummary`、`ResearchReportDetail`、`Approach`）を足す（DD-04 の定義どおり。CR-021）（FN-026、FN-027、DD-01 M11・M33、DD-02 FN-026・FN-027、DD-04、CR-020）
+- [x] [Backend] 課題の一覧 `listResearchTopics` と週報 `getResearchReport`（週の一覧、出典の数）を M33 で作り、`docs/api/openapi.yaml` に2つの operation（`/api/app/research/topics`、`/api/app/research/reports/{contentId}`）と応答の schema（`ResearchTopicList`、`ResearchTopicSummary`、`ResearchReportDetail`、`Approach`）を足す（DD-04 の定義どおり。CR-021）（FN-026、FN-027、DD-01 M11・M33、DD-02 FN-026・FN-027、DD-04、CR-020）（se/14-research）
   - 受け入れ基準: DD-10 TC138、DD-10 TC139、DD-10 TC102 が通る
-- [ ] [Frontend] 課題の一覧の画面 SCR-010（M32）を作る（FN-026、DD-01 M32、BD-03 SCR-010、CR-020）
+- [x] [Frontend] 課題の一覧の画面 SCR-010（M32）を作る（FN-026、DD-01 M32、BD-03 SCR-010、CR-020）（se/14-research）
   - 受け入れ基準: DD-10 TC140 が通る
-- [ ] [Frontend] 課題の週報の画面 SCR-011（M32。今週の変化と全体像、方法の印と広げる操作、週の切り替え、既読と保存、AI に質問、出典のリンク）を、BD-03 SCR-011 3.2 の見た目（行の左の色の帯、枠と文字の色のタグ、その場で広げる）で作る（FN-027、FN-005、FN-006、DD-01 M32・M08、BD-03 SCR-011、Q-095、CR-020）
+- [x] [Frontend] 課題の週報の画面 SCR-011（M32。今週の変化と全体像、方法の印と広げる操作、週の切り替え、既読と保存、AI に質問、出典のリンク）を、BD-03 SCR-011 3.2 の見た目（行の左の色の帯、枠と文字の色のタグ、その場で広げる）で作る（FN-027、FN-005、FN-006、DD-01 M32・M08、BD-03 SCR-011、Q-095、CR-020）（se/14-research）
   - 受け入れ基準: DD-10 TC141 が通る; 幅 390 ピクセルと iPad の幅（1180 ピクセル）のどちらでも、方法がその場で広がり、左右に並ばない
-- [ ] [Frontend] 画面の道 M01 に、課題の一覧 `/research`（SCR-010）と課題の週報 `/research/{contentId}`（SCR-011）を足し、上の帯（ロゴでホームへ戻る）を付ける。道の中身は、この仕様書の SCR-010、SCR-011 の行で作った M32 の部品にする（DD-01 M01・M32、BD-03 2章 遷移表、CR-020。CR-023 で 06-app-shell から移した）
+- [x] [Frontend] 画面の道 M01 に、課題の一覧 `/research`（SCR-010）と課題の週報 `/research/{contentId}`（SCR-011）を足し、上の帯（ロゴでホームへ戻る）を付ける。道の中身は、この仕様書の SCR-010、SCR-011 の行で作った M32 の部品にする（DD-01 M01・M32、BD-03 2章 遷移表、CR-020。CR-023 で 06-app-shell から移した）（se/14-research）
   - 受け入れ基準: `/research` と `/research/1` を開くと、上の帯と M32 の部品が出る; 上の帯のロゴを押すと `/` へ戻る; service worker の保存の対象が `/_next/static/` の中だけのままである
-- [ ] [Frontend] ホームの円形 HUD（M02）を7つのセグメントにして Research を足し、Research のカードに「未読 {件数}」（`getHome` の `research.unreadCount`。11-home の行で足す）を出し、カードを押すと `/research`（SCR-010）へ移る。HUD の7分割は試作のまま、Research のアイコンは虫眼鏡と折れ線（試作の `researchB`）にする（SCR-001-O01・O10、DD-01 M02、BD-03 SCR-001、Q-095、CR-020）
+- [x] [Frontend] ホームの円形 HUD（M02）を7つのセグメントにして Research を足し、Research のカードに「未読 {件数}」（`getHome` の `research.unreadCount`。11-home の行で足す）を出し、カードを押すと `/research`（SCR-010）へ移る。HUD の7分割は試作のまま、Research のアイコンは虫眼鏡と折れ線（試作の `researchB`）にする（SCR-001-O01・O10、DD-01 M02、BD-03 SCR-001、Q-095、CR-020）（se/14-research）
   - 受け入れ基準: DD-10 TC143、DD-10 TC114 が通る; Research のアイコンの SVG の path が、試作 `prototype/app/page.tsx` の `researchB` の path と同じである
