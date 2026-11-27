@@ -31,6 +31,8 @@ import { WaitMark } from "./wait-mark";
 // - 案内で関係のある記事を押すと、図の中心もその記事に移す（BD-03 遷移表 SCR-003-A06）。
 // - 0件は MSG-001、読めなければ MSG-019。読み込み中は図の場所に待つ印を出し、日付とテーマは選べる。
 //   401 のときは図を出さない（全面の知らせは M01 の枠が出す）。
+// - 案内の面を開いている間は、図を指でずらす操作と拡大縮小を切る。案内で関係のある記事を
+//   足しただけのときは、図を画面に合わせ直さない（BD-03 SCR-002・SCR-003、BD-09 5章）。
 // - 中心の記事が替わると `onCenterChange` で知らせる。上の帯の「AI に質問」（A05）は、中心の記事を
 //   選んでいるときだけ道（M01）が出す（CR-003）。案内の「AI に質問」は `onAskAi` に内容ID を渡す。
 
@@ -129,6 +131,16 @@ export function NewsGalaxyScreen({
     return { nodes: shown, links: allLinks };
   }, [galaxy, extraNodes, extraLinks, theme, readStates]);
 
+  // 図を画面に合わせ直すきっかけにするノードの組。案内で足した記事は含めない（足しただけでは
+  // 中心を保ったまま図を動かさない）。日付とテーマで替わる。
+  const fitKey = useMemo(() => {
+    if (galaxy === null) return "";
+    return galaxy.nodes
+      .filter((node) => theme === ALL_THEMES || node.theme === theme)
+      .map((node) => node.contentId)
+      .join(",");
+  }, [galaxy, theme]);
+
   const select = useCallback((contentId: number) => {
     setCenter(contentId);
     setOpened(contentId);
@@ -210,6 +222,8 @@ export function NewsGalaxyScreen({
         center={center}
         thisYear={thisYear}
         onSelect={select}
+        locked={opened !== null}
+        fitKey={fitKey}
       />
     );
   }

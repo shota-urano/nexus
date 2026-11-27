@@ -33,4 +33,6 @@ html,
 body {
   background-color: var(--color-hud-bg);
   color: var(--color-hud-text);
+  /* ページ全体を弾ませない（下から出る面のスクロールが端に着いたときも。BD-09 5章） */
+  overscroll-behavior: none;
 }

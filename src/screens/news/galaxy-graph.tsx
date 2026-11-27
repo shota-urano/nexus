@@ -24,6 +24,8 @@ import { layoutGalaxy } from "./galaxy-layout";
 // - 中心が移ったら、ノードを新しい置き場所へ動かし、図を画面に合わせる。動きを減らす設定の
 //   ときは動かさずに切り替える（BD-09 5章 アクセシビリティ）。
 // - ノードを押すと `onSelect` を呼ぶ（SCR-002-A04）。ノードは指で動かさない。
+// - `locked` の間（記事の案内の面を開いている間）は、図を指でずらす操作と拡大縮小を切る
+//   （面の中のスクロールで後ろの図が動かないため。BD-03 SCR-002・SCR-003）。
 
 type ArticleNodeData = {
   node: GalaxyNode;
@@ -77,9 +79,25 @@ interface GraphProps {
   center: number | null;
   thisYear: number;
   onSelect: (contentId: number) => void;
+  /** true の間は、図を指でずらす操作と拡大縮小を受け付けない（記事の案内の面を開いている間） */
+  locked?: boolean;
+  /**
+   * 図を画面に合わせ直すきっかけになる、出すノードの組。替わったとき（と中心が移ったとき）だけ
+   * 合わせ直す。案内で関係のある記事を足しただけでは替えない（中心を保ったまま動かさない）
+   */
+  fitKey: string;
 }
 
-function Graph({ nodes, links, date, center, thisYear, onSelect }: GraphProps) {
+function Graph({
+  nodes,
+  links,
+  date,
+  center,
+  thisYear,
+  onSelect,
+  locked = false,
+  fitKey,
+}: GraphProps) {
   const reduceMotion = useReduceMotion();
   const { fitView } = useReactFlow();
 
@@ -125,14 +143,13 @@ function Graph({ nodes, links, date, center, thisYear, onSelect }: GraphProps) {
       });
   }, [nodes, links, center]);
 
-  // 中心が移るか、出すノードが替わったら、図を画面に合わせる。
-  const shape = flowNodes.map((node) => node.id).join(",");
+  // 中心が移るか、出すノードの組（fitKey）が替わったら、図を画面に合わせる。
   useEffect(() => {
     const timer = setTimeout(() => {
       void fitView({ padding: 0.2, duration: reduceMotion ? 0 : 500 });
     }, 0);
     return () => clearTimeout(timer);
-  }, [fitView, shape, center, reduceMotion]);
+  }, [fitView, fitKey, center, reduceMotion]);
 
   return (
     <ReactFlow
@@ -143,6 +160,10 @@ function Graph({ nodes, links, date, center, thisYear, onSelect }: GraphProps) {
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
+      panOnDrag={!locked}
+      zoomOnPinch={!locked}
+      zoomOnScroll={!locked}
+      zoomOnDoubleClick={!locked}
       fitView
       minZoom={0.2}
       proOptions={PRO_OPTIONS}
