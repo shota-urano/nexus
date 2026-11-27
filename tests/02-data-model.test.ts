@@ -63,9 +63,11 @@ const DATE = "2026-11-25";
 let db: Database;
 beforeEach(() => {
   db = openDatabase(":memory:");
+  // この実装単位の受け入れ基準は 0001 を空の DB に当てたときの形なので、0001 だけを当てる
+  // （0002 以後の変更は 02-data-model-research-report.test.ts で確かめる）。
   applyMigrations(
     db,
-    readMigrations(MIGRATIONS_DIR),
+    readMigrations(MIGRATIONS_DIR).filter((m) => m.version === 1),
     createFakeClock(new Date(AT)),
   );
 });
