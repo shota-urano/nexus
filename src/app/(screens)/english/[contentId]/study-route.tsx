@@ -13,8 +13,18 @@ import { TopBar } from "../../_frame/top-bar";
 // - 選んでいなければ、その教材のページ全体（`kind: "page"` と内容ID）を対象にする。
 // 面は学習の画面の上に重ねるだけなので、閉じても学習の画面の答えと段はそのまま残る。
 
-// `openapi.yaml` の QuestionTarget の phrase の長さの上限。
+// `openapi.yaml` の QuestionTarget の phrase と sentence の長さの上限。
+// 超えるときは上限の長さで切って送る。位置はそのまま送り、AI に渡す材料はサーバが内容ID と位置から引く。
 const PHRASE_MAX_LENGTH = 200;
+const SENTENCE_MAX_LENGTH = 2000;
+
+// 上限の長さ（UTF-16 の単位）で切る。切り口で文字が半分にならないよう、残った上位サロゲートは落とす。
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max);
+  const last = head.charCodeAt(head.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? head.slice(0, -1) : head;
+}
 
 function targetOf(
   contentId: number,
@@ -25,8 +35,8 @@ function targetOf(
     kind: "phrase",
     contentId,
     // 文だけを選んだときは、その文を語句にもする（kind が phrase のときは語句が要る。DD-02 2章 C07）。
-    phrase: selection.phrase ?? selection.sentence.slice(0, PHRASE_MAX_LENGTH),
-    sentence: selection.sentence,
+    phrase: clip(selection.phrase ?? selection.sentence, PHRASE_MAX_LENGTH),
+    sentence: clip(selection.sentence, SENTENCE_MAX_LENGTH),
     position: {
       part: "reading",
       paragraphIndex: selection.paragraphIndex,
