@@ -49,6 +49,15 @@ const SCREEN_SIDE = [...LAYERS.screen, ...LAYERS.parts, ...LAYERS.client];
 
 const of = (...names) => names.flatMap((name) => LAYERS[name]);
 
+// 業務層のうち M33（週報の種類。`src/server/kinds/research`）を除いたもの。
+const BUSINESS_EXCEPT_M33 = [
+  "src/server/{auth,ingest,contents,chat,home,ai-jobs}/**",
+  "src/server/kinds/*",
+  "src/server/kinds/!(research)/**",
+  "src/runner/purposes/**",
+  "src/jobs/{backup,purge,lock}/**",
+];
+
 const layerZones = [
   // DD-01 1.1 画面（PWA）
   {
@@ -90,8 +99,16 @@ const layerZones = [
   })),
   {
     target: LAYERS.business,
-    from: [...SCREEN_SIDE, ...of("contracts", "entry")],
+    from: [...SCREEN_SIDE, ...of("entry")],
     message: "業務層は業務層、データ層、共通層だけを読み込む（DD-01 1.2）。",
+  },
+  {
+    // 業務層から共有の型層を呼ぶのは M33 だけ（IF-005 の本文の形を M34 と同じ定義で確かめるため。
+    // DD-01 1.2。CR-020）。
+    target: BUSINESS_EXCEPT_M33,
+    from: of("contracts"),
+    message:
+      "業務層は業務層、データ層、共通層だけを読み込む。共有の型層を呼ぶのは M33 だけ（DD-01 1.2）。",
   },
   {
     target: LAYERS.business.filter((dir) => dir !== "src/runner/purposes/**"),

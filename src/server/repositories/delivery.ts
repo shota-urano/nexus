@@ -2,7 +2,7 @@ import type { Database } from "../db/connection";
 
 // ENT-010 受け取りの記録（DD-03 `delivery`）の書き込み（DD-01 M22）。
 
-export type DeliverySender = "brain-harness" | "sharpen";
+export type DeliverySender = "brain-harness" | "sharpen" | "brain-research";
 
 // 受け取った記録を作る（DD-02 FN-001 手順 7.1）。作った受け取りの記録ID を返す。
 export function insertAcceptedDelivery(

@@ -24,11 +24,19 @@ export const ERROR_CLASSES = {
   E17: { code: "STARTUP_MISMATCH", level: "fatal" },
 } as const satisfies Record<string, { code: string; level: LogLevel }>;
 
-export type ErrorClass = keyof typeof ERROR_CLASSES;
-export type ErrorCode = (typeof ERROR_CLASSES)[ErrorClass]["code"];
+// 送り手の側（送信のコマンド M34）のログにだけ出る分類（DD-06 E18。CR-020）。
+// NEXUS のプロセスの分類（E01〜E17）とは別の表に置き、内部のエラーコードの引き当てには両方を使う。
+export const SENDER_ERROR_CLASSES = {
+  E18: { code: "SEND_UNREACHABLE", level: "warn" },
+} as const satisfies Record<string, { code: string; level: LogLevel }>;
+
+const ALL_ERROR_CLASSES = { ...ERROR_CLASSES, ...SENDER_ERROR_CLASSES };
+
+export type ErrorClass = keyof typeof ALL_ERROR_CLASSES;
+export type ErrorCode = (typeof ALL_ERROR_CLASSES)[ErrorClass]["code"];
 
 const CLASS_OF_CODE = Object.fromEntries(
-  Object.entries(ERROR_CLASSES).map(([klass, { code }]) => [code, klass]),
+  Object.entries(ALL_ERROR_CLASSES).map(([klass, { code }]) => [code, klass]),
 ) as Record<ErrorCode, ErrorClass>;
 
 export function errorClassOf(code: ErrorCode): ErrorClass {
@@ -36,7 +44,7 @@ export function errorClassOf(code: ErrorCode): ErrorClass {
 }
 
 export function logLevelOf(code: ErrorCode): LogLevel {
-  return ERROR_CLASSES[errorClassOf(code)].level;
+  return ALL_ERROR_CLASSES[errorClassOf(code)].level;
 }
 
 export interface NexusErrorOptions {

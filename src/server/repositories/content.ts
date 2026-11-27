@@ -28,16 +28,28 @@ export function insertContent(
   return Number(result.lastInsertRowid);
 }
 
-// 置き換えのときに、見出し、届いた日時、受け取りの記録ID を新しい値にする。内容ID は変えない
-// （BD-02 FN-001 業務ルール）。
+// 置き換えのときに、見出し、対象日、届いた日時、受け取りの記録ID を新しい値にする。内容ID は変えない
+// （BD-02 FN-001 業務ルール）。対象日はニュースと英語では変わらず、週報は送った日が変わりうる
+// （DD-02 FN-025 手順 6.3）。
 export function updateContentOnReplace(
   db: Database,
   contentId: number,
-  input: { title: string; receivedAt: string; deliveryId: number },
+  input: {
+    title: string;
+    targetDate: string;
+    receivedAt: string;
+    deliveryId: number;
+  },
 ): void {
   db.prepare(
-    "UPDATE content SET title = ?, received_at = ?, delivery_id = ? WHERE content_id = ?",
-  ).run(input.title, input.receivedAt, input.deliveryId, contentId);
+    "UPDATE content SET title = ?, target_date = ?, received_at = ?, delivery_id = ? WHERE content_id = ?",
+  ).run(
+    input.title,
+    input.targetDate,
+    input.receivedAt,
+    input.deliveryId,
+    contentId,
+  );
 }
 
 // 受け取った日時が境より前の受け取りの記録を指す内容の、受け取りの記録ID を空にする。

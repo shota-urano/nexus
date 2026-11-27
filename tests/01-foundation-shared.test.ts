@@ -260,9 +260,32 @@ describe("M23 乱数と照合値（DD-02 3章 P05）", () => {
 describe("M23 MSG の一覧（BD-09 1章）", () => {
   it("BD-09 の MSG を全て持ち、差し込む値を埋める", () => {
     const ids = Object.keys(MESSAGES);
-    expect(ids).toHaveLength(36);
+    // BD-09 1章の MSG-001〜MSG-021、MSG-031〜MSG-050（MSG-046〜MSG-050 は CR-020）。
+    expect(ids).toHaveLength(41);
     expect(ids).toContain("MSG-021");
     expect(ids).toContain("MSG-045");
+    for (const id of ["MSG-046", "MSG-047", "MSG-048", "MSG-049", "MSG-050"]) {
+      expect(ids).toContain(id);
+    }
+    expect(
+      formatMessage("MSG-046", {
+        理由: "予期しない失敗",
+      }),
+    ).toBe(
+      "週報を残せませんでした（予期しない失敗）。この週報は残していません。送り直してください。",
+    );
+    expect(formatMessage("MSG-047")).toBe("調査の週報はまだ届いていません。");
+    expect(formatMessage("MSG-048")).toBe("週報が見つかりません。");
+    expect(formatMessage("MSG-049", { 項目: "answerMd" })).toBe(
+      "週報を送りませんでした。answerMd の形が正しくありません。",
+    );
+    expect(
+      formatMessage("MSG-050", {
+        理由: "接続を断られた",
+      }),
+    ).toBe(
+      "NEXUS に送れませんでした（接続を断られた）。NEXUS が動いているかを確かめてから送り直してください。",
+    );
     expect(
       formatMessage("MSG-031", { 配信元: "brain-harness", 件数: 10 }),
     ).toBe("brain-harness から 10 件を受け取りました。");
