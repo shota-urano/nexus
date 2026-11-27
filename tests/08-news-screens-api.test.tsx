@@ -153,12 +153,16 @@ function shownTitles(): string[] {
     .map((element) => element.querySelector("p")?.textContent ?? "");
 }
 
-// テーマの選択ボタン（名前はテーマの名前と件数。CR-018）。
-function themeButton(theme: string): HTMLElement {
-  const escaped = theme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return screen.getByRole("button", {
-    name: new RegExp(`^\\s*${escaped}[^0-9]*\\d+[^0-9]*$`),
-  });
+// テーマの選択欄（名前「テーマ」の select。CR-019）で、選択肢の文字が theme のものを選ぶ。
+function chooseTheme(theme: string): void {
+  const select = screen.getByRole("combobox", {
+    name: "テーマ",
+  }) as HTMLSelectElement;
+  const option = [...select.options].find(
+    (candidate) => candidate.textContent?.trim() === theme,
+  );
+  if (option === undefined) throw new Error(`テーマの選択肢が無い: ${theme}`);
+  fireEvent.change(select, { target: { value: option.value } });
 }
 
 function centerTitles(): string[] {
@@ -182,11 +186,10 @@ describe("TC21 API の本当の応答（TC19）で、テーマで絞り、A1 を
     );
     expect(centerTitles()).toEqual([]);
 
-    // テーマはブラウザの select でなく、件数付きのボタンの並びで選ぶ（CR-018）。
-    expect(screen.queryByRole("combobox", { name: "テーマ" })).toBeNull();
-    fireEvent.click(themeButton("半導体"));
+    // テーマは名前「テーマ」の選択欄で選ぶ（CR-019）。
+    chooseTheme("半導体");
     await waitFor(() => expect(shownTitles()).toEqual(["今日の記事 A3"]));
-    fireEvent.click(themeButton("AI"));
+    chooseTheme("AI");
     await waitFor(() =>
       expect(shownTitles().sort()).toEqual(
         ["今日の記事 A1", "今日の記事 A2", "3日前の記事 P1"].sort(),

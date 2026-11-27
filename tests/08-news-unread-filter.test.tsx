@@ -20,6 +20,9 @@ import { installReactFlowStubs } from "./fixtures/react-flow";
 // 08-news の実装単位5（BD-03 SCR-002、CR-018）。News Galaxy の上の帯から「AI に質問」（SCR-002-A05）を
 // 外し、テーマ（SCR-002-I02）を件数付きの選択ボタンの並びにし、並びの先頭に「未読」の切り替え
 // （SCR-002-I03、SCR-002-A06）を置く。
+// CR-019（実装単位7）で、テーマは名前「テーマ」の選択欄に戻り、「未読」はテーマの選択欄から離した
+// 「未読だけ」のスイッチ（role="switch"）になった。テーマのボタンの並びと「未読」の並びの中の位置を
+// 求めていた確かめは CR-019 に合わせて書き直し、絞り込みの決まりの確かめはそのまま残す。
 // 受け入れ基準:
 // - 記事を選んでも、上の帯に「AI に質問」が出ない。
 // - テーマの選択がボタンの並びで、ボタンに件数が出て、押したテーマの記事だけが図に出る。
@@ -30,8 +33,8 @@ import { installReactFlowStubs } from "./fixtures/react-flow";
 // - 記事の案内で「読んだ」を押すと、未読の数が1つ減る。
 // - 押す場所が全て 44 ピクセル四方以上である。
 //
-// ボタンの名前は「テーマの名前（か「すべて」「未読」）と件数」とし、名前の中の数字を件数として読む。
-// 数字の前後の飾り（「件」や括弧）は問わない。
+// 「未読だけ」のスイッチの名前は「未読だけ」と未読の数とし、名前の中の数字を未読の数として読む。
+// 数字の前後の飾り（「件」や括弧）は問わない。テーマは選択欄の選択肢の文字で選ぶ。
 
 const ROOT = resolve(__dirname, "..");
 const GLOBALS_CSS = join(ROOT, "src/app/globals.css");
@@ -205,12 +208,24 @@ function countButtonPattern(label: string, count?: number): RegExp {
   return new RegExp(`^\\s*${escapeRegExp(label)}[^0-9]*${digits}[^0-9]*$`);
 }
 
-function themeButton(label: string, count?: number): HTMLElement {
-  return screen.getByRole("button", { name: countButtonPattern(label, count) });
+// テーマの選択欄（CR-019）。
+function themeSelect(): HTMLSelectElement {
+  return screen.getByRole("combobox", { name: "テーマ" }) as HTMLSelectElement;
 }
 
+// 選択欄で、選択肢の文字が label のものを選ぶ。
+function chooseTheme(label: string): void {
+  const select = themeSelect();
+  const option = [...select.options].find(
+    (candidate) => candidate.textContent?.trim() === label,
+  );
+  if (option === undefined) throw new Error(`テーマの選択肢が無い: ${label}`);
+  fireEvent.change(select, { target: { value: option.value } });
+}
+
+// 「未読だけ」のスイッチ（CR-019）。
 function unreadToggle(): HTMLElement {
-  return screen.getByRole("button", { name: countButtonPattern("未読") });
+  return screen.getByRole("switch", { name: countButtonPattern("未読だけ") });
 }
 
 function countIn(element: HTMLElement): number {
@@ -257,29 +272,26 @@ describe("上の帯（SCR-002-A05 は CR-018 でやめた）", () => {
   });
 });
 
-describe("テーマの選択ボタンの並び（SCR-002-I02、A03）", () => {
-  it("テーマはブラウザの select でなく、「すべて」と各テーマの件数付きのボタンが並ぶ", async () => {
+describe("テーマの選択欄（SCR-002-I02、A03。CR-019 で選択欄に戻した）", () => {
+  it("テーマは「すべて」と各テーマを選択肢に持つ選択欄で、テーマのボタンの並びは無い", async () => {
     stubApi(SAME_DAY);
     const { container } = render(<NewsGalaxyScreen />);
     await screen.findByText("記事A1 AI 未読");
 
-    expect(screen.queryByRole("combobox", { name: "テーマ" })).toBeNull();
-    expect(screen.queryByRole("listbox", { name: "テーマ" })).toBeNull();
-    // 残る select は日付だけ。
+    // select は日付とテーマの2つ。
     const selects = [...container.querySelectorAll("select")];
-    expect(selects.map((select) => select.getAttribute("aria-label"))).toEqual([
-      "日付",
-    ]);
-
-    const all = themeButton("すべて", 5);
-    const ai = themeButton("AI", 3);
-    const chip = themeButton("半導体", 2);
-    // 「すべて」と各テーマのボタンは、同じ並びに横に並ぶ。
-    expect(ai.parentElement).toBe(all.parentElement);
-    expect(chip.parentElement).toBe(all.parentElement);
+    expect(
+      selects.map((select) => select.getAttribute("aria-label")).sort(),
+    ).toEqual(["テーマ", "日付"].sort());
+    const texts = [...themeSelect().options].map(
+      (option) => option.textContent?.trim() ?? "",
+    );
+    expect(texts[0]).toBe("すべて");
+    expect(texts.slice(1).sort()).toEqual(["AI", "半導体"].sort());
+    expect(container.querySelectorAll("[aria-pressed]")).toHaveLength(0);
   });
 
-  it("テーマのボタンを押すと、そのテーマの記事だけが図に出て、「すべて」で全てに戻る。サーバは呼ばない", async () => {
+  it("テーマを選ぶと、そのテーマの記事だけが図に出て、「すべて」で全てに戻る。サーバは呼ばない", async () => {
     stubApi(SAME_DAY);
     render(<NewsGalaxyScreen />);
     await screen.findByText("記事A1 AI 未読");
@@ -293,20 +305,20 @@ describe("テーマの選択ボタンの並び（SCR-002-I02、A03）", () => {
       ].sort(),
     );
 
-    fireEvent.click(themeButton("半導体", 2));
+    chooseTheme("半導体");
     await waitFor(() =>
       expect(shownTitles()).toEqual([
         "記事S1 半導体 未読",
         "記事S2 半導体 既読",
       ]),
     );
-    fireEvent.click(themeButton("AI", 3));
+    chooseTheme("AI");
     await waitFor(() =>
       expect(shownTitles()).toEqual(
         ["記事A1 AI 未読", "記事A2 AI 未読", "記事A3 AI 既読"].sort(),
       ),
     );
-    fireEvent.click(themeButton("すべて", 5));
+    chooseTheme("すべて");
     await waitFor(() => expect(shownTitles()).toHaveLength(5));
     expect(calls.map((call) => call.url)).toEqual(["/api/app/news/galaxy"]);
   });
@@ -320,24 +332,18 @@ describe("「未読」の切り替え（SCR-002-I03、A06）", () => {
     // 12-01 の記事のうち未読は A1、A2、S1 の3件。11-28 の P1 は未読でも数えない。
     expect(countIn(unreadToggle())).toBe(3);
     expect(
-      screen.getByRole("button", { name: countButtonPattern("未読", 3) }),
+      screen.getByRole("switch", { name: countButtonPattern("未読だけ", 3) }),
     ).toBeTruthy();
   });
 
-  it("「未読」は、テーマの並びの先頭に置く", async () => {
+  it("「未読だけ」は、テーマの選択欄から離して置く（CR-019）", async () => {
     stubApi(SAME_DAY);
     render(<NewsGalaxyScreen />);
     await screen.findByText("記事A1 AI 未読");
     const toggle = unreadToggle();
-    const all = themeButton("すべて");
-    // 文書の順で、「未読」が「すべて」と各テーマより前にある。
-    expect(
-      toggle.compareDocumentPosition(all) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      toggle.compareDocumentPosition(themeButton("AI")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const select = themeSelect();
+    expect(select.contains(toggle)).toBe(false);
+    expect(toggle.contains(select)).toBe(false);
   });
 
   it("「未読」を押すと既読の記事のノードが図から消え、もう一度押すと戻る", async () => {
@@ -380,13 +386,13 @@ describe("「未読」の切り替え（SCR-002-I03、A06）", () => {
     await screen.findByText("記事A1 AI 未読");
 
     // テーマを先に選び、次に「未読」。
-    fireEvent.click(themeButton("半導体"));
+    chooseTheme("半導体");
     await waitFor(() => expect(shownTitles()).not.toContain("記事A1 AI 未読"));
     fireEvent.click(unreadToggle());
     await waitFor(() => expect(shownTitles()).toEqual(["記事S1 半導体 未読"]));
 
     // 「未読」のまま、テーマを替える。
-    fireEvent.click(themeButton("AI"));
+    chooseTheme("AI");
     await waitFor(() =>
       expect(shownTitles()).toEqual(
         ["記事A1 AI 未読", "記事A2 AI 未読", "記事P1 過去 未読"].sort(),
@@ -413,7 +419,7 @@ describe("「未読」の切り替え（SCR-002-I03、A06）", () => {
     await screen.findByText("記事A1 AI 未読");
     fireEvent.click(unreadToggle());
     await waitFor(() => expect(shownTitles()).toHaveLength(3));
-    fireEvent.click(themeButton("半導体"));
+    chooseTheme("半導体");
     await waitFor(() => expect(shownTitles()).toEqual(["記事S1 半導体 未読"]));
   });
 
@@ -427,7 +433,7 @@ describe("「未読」の切り替え（SCR-002-I03、A06）", () => {
     await waitFor(() => expect(shownTitles()).not.toContain("記事A3 AI 既読"));
     fireEvent.click(unreadToggle());
     await waitFor(() => expect(shownTitles()).toContain("記事A3 AI 既読"));
-    fireEvent.click(themeButton("AI"));
+    chooseTheme("AI");
     fireEvent.click(unreadToggle());
     await waitFor(() =>
       expect(shownTitles()).toEqual(
@@ -456,7 +462,7 @@ describe("「未読」の切り替え（SCR-002-I03、A06）", () => {
     );
     await waitFor(() => expect(countIn(unreadToggle())).toBe(2));
     expect(
-      screen.getByRole("button", { name: countButtonPattern("未読", 2) }),
+      screen.getByRole("switch", { name: countButtonPattern("未読だけ", 2) }),
     ).toBeTruthy();
     expect(galaxyCalls()).toHaveLength(1);
   });
@@ -598,19 +604,17 @@ function pressables(container: HTMLElement): HTMLElement[] {
 }
 
 describe("押す場所の大きさ（BD-09 5章）", () => {
-  it("上の帯と、日付・「未読」・テーマの並びの押す場所が全て 44 ピクセル四方以上である", async () => {
+  it("上の帯と、日付・「未読だけ」・テーマの選択欄の押す場所が全て 44 ピクセル四方以上である", async () => {
     stubApi(WITH_PAST);
     const { container } = render(<NewsGalaxyRoute onAskAi={vi.fn()} />);
     await screen.findByText("記事A1 AI 未読");
     const root = await compiledGlobals();
 
     const targets = pressables(container);
-    // 少なくとも、ホームへ戻る操作、日付、「未読」、「すべて」と各テーマ（2つ）がある。
-    expect(targets.length).toBeGreaterThanOrEqual(6);
+    // 少なくとも、ホームへ戻る操作、日付、「未読だけ」、テーマの選択欄がある（CR-019）。
+    expect(targets.length).toBeGreaterThanOrEqual(4);
     expect(targets).toContain(unreadToggle());
-    expect(targets).toContain(themeButton("すべて"));
-    expect(targets).toContain(themeButton("AI"));
-    expect(targets).toContain(themeButton("半導体"));
+    expect(targets).toContain(themeSelect());
     expect(targets).toContain(screen.getByRole("combobox", { name: "日付" }));
 
     const small: string[] = [];
@@ -636,7 +640,7 @@ describe("押す場所の大きさ（BD-09 5章）", () => {
     const { container } = render(<NewsGalaxyRoute onAskAi={vi.fn()} />);
     await screen.findByText("記事A1 AI 未読");
     fireEvent.click(unreadToggle());
-    fireEvent.click(themeButton("AI"));
+    chooseTheme("AI");
     await waitFor(() =>
       expect(shownTitles()).toEqual(
         ["記事A1 AI 未読", "記事A2 AI 未読", "記事P1 過去 未読"].sort(),

@@ -29,9 +29,10 @@ import { WaitMark } from "./wait-mark";
 //   `related` のうち、図に無い記事と線を図に足す（DD-02 FN-003 手順 5）。動いている間に押し直すと、
 //   前の読み込みを止め、最後の1回だけを受ける。
 // - 案内で関係のある記事を押すと、図の中心もその記事に移す（BD-03 遷移表 SCR-003-A06）。
-// - 「未読」の切り替え（I03、A06。CR-018）を押すと、図を未読の記事だけにし、もう一度押すと全てに戻す。
-//   テーマの絞り込みと重ね、サーバは呼ばない。切り替えには選んだ日の記事のうち未読の数を添え、
-//   案内で既読を変えるとその数も変える。テーマの選択ボタンには選んだ日の記事の件数を添える。
+// - テーマ（I02）は選択欄にする（CR-019）。選択肢は「すべて」と応答の `themes`（選んだ日の記事のテーマ）。
+// - 「未読だけ」のスイッチ（I03、A06。CR-018、CR-019）を入にすると、図を未読の記事だけにし、切にすると
+//   全てに戻す。テーマの絞り込みと重ね、サーバは呼ばない。スイッチには選んだ日の記事のうち未読の数を
+//   添え、案内で既読を変えるとその数も変える。
 // - 0件は MSG-001、読めなければ MSG-019。読み込み中は図の場所に待つ印を出し、日付とテーマは選べる。
 //   401 のときは図を出さない（全面の知らせは M01 の枠が出す）。
 // - 案内の面を開いている間は、図を指でずらす操作と拡大縮小を切る。案内で関係のある記事を
@@ -127,20 +128,16 @@ export function NewsGalaxyScreen({
     return { nodes: shown, links: allLinks };
   }, [galaxy, extraNodes, extraLinks, theme, unreadOnly, readStates]);
 
-  // 選んだ日の記事（関係の先の過去の記事は除く）の、テーマごとの件数と未読の数。
+  // 選んだ日の記事（関係の先の過去の記事は除く）のうち未読の数。
   const counts = useMemo(() => {
-    const byTheme = new Map<string, number>();
-    let total = 0;
     let unread = 0;
     if (galaxy !== null) {
       for (const node of galaxy.nodes) {
         if (node.targetDate !== galaxy.date) continue;
-        total += 1;
-        byTheme.set(node.theme, (byTheme.get(node.theme) ?? 0) + 1);
         if (!withState(node, readStates).isRead) unread += 1;
       }
     }
-    return { byTheme, total, unread };
+    return { unread };
   }, [galaxy, readStates]);
 
   // 図を画面に合わせ直すきっかけ。日付かテーマが替わって、案内で足した記事も含めた出すノードの組が
@@ -266,7 +263,7 @@ export function NewsGalaxyScreen({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* 日付は題名の下に置き、その下に「未読」とテーマの選択ボタンを横に並べる（BD-03 SCR-002 の 3.2）。 */}
+      {/* 日付は題名の下に置き、その下にテーマの選択欄と、離して「未読だけ」のスイッチを置く（BD-03 SCR-002 の 3.2、CR-019）。 */}
       <div className="flex flex-col gap-2 px-4 pb-2 text-sm">
         <select
           aria-label="日付"
@@ -281,31 +278,27 @@ export function NewsGalaxyScreen({
             </option>
           ))}
         </select>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-          <FilterChip
-            label="未読"
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <select
+            aria-label="テーマ"
+            value={theme}
+            disabled={!hasArticles}
+            onChange={(event) => setTheme(event.target.value)}
+            className="min-h-11 min-w-11 max-w-full rounded-hud border border-hud-line bg-hud-field px-3 text-hud-amber disabled:opacity-60"
+          >
+            <option value={ALL_THEMES}>すべて</option>
+            {(galaxy?.themes ?? []).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <UnreadSwitch
             count={counts.unread}
-            pressed={unreadOnly}
+            checked={unreadOnly}
             disabled={!hasArticles}
-            onClick={() => setUnreadOnly((previous) => !previous)}
+            onToggle={() => setUnreadOnly((previous) => !previous)}
           />
-          <FilterChip
-            label="すべて"
-            count={counts.total}
-            pressed={theme === ALL_THEMES}
-            disabled={!hasArticles}
-            onClick={() => setTheme(ALL_THEMES)}
-          />
-          {(galaxy?.themes ?? []).map((name) => (
-            <FilterChip
-              key={name}
-              label={name}
-              count={counts.byTheme.get(name) ?? 0}
-              pressed={theme === name}
-              disabled={!hasArticles}
-              onClick={() => setTheme(name)}
-            />
-          ))}
         </div>
       </div>
       <div className="relative min-h-[60dvh] flex-1 overflow-hidden">
@@ -342,37 +335,49 @@ function withState(
   return state === undefined ? node : { ...node, ...state };
 }
 
-// 件数付きの丸い選択ボタン（SCR-002-I02、I03。CR-018）。ボタンの名前は「{label} {件数}件」。
-// 押す場所は 44 ピクセル四方以上にする（RD-11 NFR-008）。
-function FilterChip({
-  label,
+// 「未読だけ」の入と切のスイッチ（SCR-002-I03、A06。CR-019）。ボタンの名前は「未読だけ {未読の数}件」。
+// 入のときは、つまみを右へ寄せてアンバーにし、溝もアンバーにする。押す場所は 44 ピクセル四方以上にする
+// （RD-11 NFR-008）。
+function UnreadSwitch({
   count,
-  pressed,
+  checked,
   disabled,
-  onClick,
+  onToggle,
 }: {
-  label: string;
   count: number;
-  pressed: boolean;
+  checked: boolean;
   disabled: boolean;
-  onClick: () => void;
+  onToggle: () => void;
 }) {
   return (
     <button
       type="button"
-      aria-label={`${label} ${count}件`}
-      aria-pressed={pressed}
+      role="switch"
+      aria-checked={checked}
+      aria-label={`未読だけ ${count}件`}
       disabled={disabled}
-      onClick={onClick}
-      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-full border px-4 whitespace-nowrap disabled:opacity-60 ${
-        pressed
-          ? "border-hud-amber bg-hud-amber/15 text-hud-amber"
-          : "border-hud-veil bg-hud-field text-hud-text"
-      }`}
+      onClick={onToggle}
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center gap-3 rounded-hud px-1 whitespace-nowrap text-hud-text disabled:opacity-60"
     >
-      <span>{label}</span>
-      <span className={pressed ? "text-hud-amber" : "text-hud-muted"}>
+      <span>未読だけ</span>
+      <span className={checked ? "text-hud-amber" : "text-hud-muted"}>
         {count}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative inline-block h-6 w-11 shrink-0 rounded-full border transition-colors ${
+          checked
+            ? "border-hud-amber bg-hud-amber/40"
+            : "border-hud-line bg-hud-field"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-4.5 w-4.5 rounded-full transition-transform ${
+            checked
+              ? "translate-x-5 bg-hud-amber"
+              : "translate-x-0 bg-hud-muted"
+          }`}
+        />
       </span>
     </button>
   );
