@@ -37,9 +37,10 @@ const ENV_NAMES = [
   "NEXUS_ORIGIN",
 ] as const;
 const HTTP_METHODS = ["get", "put", "post", "delete", "patch"] as const;
-// 配信元の本文の上限（BD-06 IF-001 3.2 は 1 MiB、IF-002 3.2 は 256 KiB）。
+// 配信元の本文の上限（BD-06 IF-001 3.2 は 1 MiB、IF-002 3.2 と IF-005 3.2 は 256 KiB）。
 const NEWS_BATCH_LIMIT_BYTES = 1024 * 1024;
 const ENGLISH_SET_LIMIT_BYTES = 256 * 1024;
+const RESEARCH_REPORT_LIMIT_BYTES = 256 * 1024;
 const MISSING_ID = 999_999;
 
 // ---- 定義ファイル ----
@@ -201,6 +202,7 @@ async function loadRoutes() {
     learningSet: await import("../src/app/api/learning/sets/[date]/route"),
     learningResult:
       await import("../src/app/api/learning/sets/[date]/result/route"),
+    researchReports: await import("../src/app/api/research/reports/route"),
   };
 }
 
@@ -210,6 +212,7 @@ interface Seed {
   K1: string;
   KB: string;
   KS: string;
+  KR: string;
   registrationCode: string;
   A1: number;
   E1: number;
@@ -296,6 +299,7 @@ function seedD1(db: Database, logDir: string): Seed {
   const senderKeys = createSenderKeys({ db, clock });
   const KB = senderKeys.issue("brain-harness").key;
   const KS = senderKeys.issue("sharpen").key;
+  const KR = senderKeys.issue("brain-research").key;
   const registrationCode = createDevices({ db, clock }).add("android").code;
 
   // 英語: 2026-11-30 の E2（完了済み）、2026-12-01 の E1（未完了）。
@@ -377,6 +381,7 @@ function seedD1(db: Database, logDir: string): Seed {
     K1,
     KB,
     KS,
+    KR,
     registrationCode,
     A1,
     E1,
@@ -504,6 +509,28 @@ const newsBatch = (date: string) => ({
       theme: "AI",
     },
   ],
+});
+
+// IF-005 の週報（BD-06 IF-005 3.2。方法 1 件）。
+const researchReport = () => ({
+  source: "brain-research",
+  topicId: "second-brain",
+  topicTitle: "RAG の評価",
+  week: 1,
+  sentOn: "2026-12-01",
+  status: "active",
+  answerMd: "評価の軸を先に決める。",
+  approaches: [
+    {
+      title: "評価の軸を決める",
+      howToMd: "正しさと網羅の2つの軸を先に決める。",
+      sourceUrls: ["https://example.com/research/axis"],
+      marks: ["added"],
+      counterMd: null,
+    },
+  ],
+  unknownsMd: "",
+  changesMd: "変化なし",
 });
 
 // 本文が上限を超える JSON（埋め草だけで上限のバイト数になる）。
@@ -1115,6 +1142,45 @@ const CASES: Record<string, OperationCases> = {
       ];
     })(),
   },
+  postResearchReport: {
+    failure: "afterSenderKey",
+    cases: (() => {
+      const post =
+        (body: string, bearer: (s: Server) => string | null) => (s: Server) =>
+          s.routes.researchReports.POST(
+            request(s, "POST", "/api/research/reports", {
+              cookie: null,
+              origin: null,
+              bearer: bearer(s),
+              body,
+            }),
+          );
+      const KR = (s: Server) => s.seed.KR;
+      const payload = researchReport();
+      return [
+        {
+          status: 200,
+          label: "課題 second-brain の1週目",
+          call: post(json(payload), KR),
+        },
+        {
+          status: 400,
+          label: "answerMd の無い週報",
+          call: post(json({ ...payload, answerMd: undefined }), KR),
+        },
+        {
+          status: 401,
+          label: "brain-harness の鍵",
+          call: post(json(payload), (s) => s.seed.KB),
+        },
+        {
+          status: 413,
+          label: "256 KiB を超える本文",
+          call: post(oversized(payload, RESEARCH_REPORT_LIMIT_BYTES), KR),
+        },
+      ];
+    })(),
+  },
   getEnglishSetForSender: {
     failure: "afterSenderKey",
     cases: senderReadCases("set"),
@@ -1260,7 +1326,11 @@ afterAll(() => {
 describe("TC102 全ての operation の応答が openapi.yaml に合う（DD-04 1章 実装との一致、DD-04 3.4、ADR-021）", () => {
   it("TC102 DD-04 2章の全ての operation（定義ファイルの全ての operationId）を確かめる", () => {
     expect([...OPERATIONS.keys()].sort()).toEqual(Object.keys(CASES).sort());
-    expect(OPERATIONS.size).toBe(26);
+    expect(OPERATIONS.size).toBe(27);
+    expect(OPERATIONS.get("postResearchReport")).toMatchObject({
+      method: "post",
+      path: "/api/research/reports",
+    });
   });
 
   it("TC102 定義ファイルに書いた全ての状態の番号（正常、4xx、500）を、どの operation でも起こして確かめる", () => {

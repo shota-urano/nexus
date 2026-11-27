@@ -1,0 +1,126 @@
+# DD-04 の postResearchReport と、その求めと応答の schema（CR-021。コミット 1bf26ef の docs/api/openapi.yaml を正とする）。
+# tests/05-ingest-research-report.test.ts の TC102 が、docs/api/openapi.yaml と形（description と summary を除く）を照らす。
+paths:
+  /api/research/reports:
+    post:
+      operationId: postResearchReport
+      tags: [sender]
+      summary: 調査の週報を受け取る（IF-005、FN-025。CR-020）
+      security: [{ senderKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResearchReportPayload" }
+      responses:
+        "200":
+          description: 受け取った（MSG-031）。同じ課題の同じ週は置き換えた
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchReportResult" }
+        "400": { $ref: "#/components/responses/SenderBadRequest" }
+        "401": { $ref: "#/components/responses/SenderUnauthorized" }
+        "413": { $ref: "#/components/responses/SenderTooLarge" }
+        "500": { $ref: "#/components/responses/SenderInternal" }
+schemas:
+  ResearchStatus:
+    {
+      type: string,
+      enum: [active, ended],
+      description: 課題の状態（BD-07 4.2。CR-020）,
+    }
+  ApproachMark:
+    {
+      type: string,
+      enum: [added, more_sources, disputed],
+      description: 方法の印（BD-07 4.2。CR-020）,
+    }
+  ApproachPayload:
+    type: object
+    additionalProperties: false
+    required: [title, howToMd, sourceUrls, marks]
+    description: 方法1件（BD-06 IF-005 3.2。上限は Q-096 の答え）
+    properties:
+      title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+      howToMd:
+        {
+          type: string,
+          minLength: 1,
+          description: 8 KiB まで（UTF-8 のバイト数。zod で確かめる）,
+        }
+      sourceUrls:
+        type: array
+        minItems: 0
+        maxItems: 50
+        uniqueItems: true
+        items: { $ref: "#/components/schemas/Url" }
+      marks:
+        type: array
+        minItems: 0
+        maxItems: 3
+        uniqueItems: true
+        items: { $ref: "#/components/schemas/ApproachMark" }
+      counterMd:
+        {
+          oneOf:
+            [
+              { type: string, description: 2 KiB まで（UTF-8 のバイト数） },
+              { type: "null" },
+            ],
+        }
+  ResearchReportPayload:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        source,
+        topicId,
+        topicTitle,
+        week,
+        sentOn,
+        status,
+        answerMd,
+        approaches,
+        unknownsMd,
+        changesMd,
+      ]
+    description: 全体で 256 KiB まで（BD-06 IF-005 3.2、Q-088 の答え）。欄ごとの上限は Q-096 の答え
+    properties:
+      source: { type: string, const: brain-research }
+      topicId: { type: string, pattern: "^[a-z0-9-]{1,64}$" }
+      topicTitle:
+        { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+      week: { type: integer, minimum: 1 }
+      sentOn: { $ref: "#/components/schemas/Date" }
+      status: { $ref: "#/components/schemas/ResearchStatus" }
+      answerMd:
+        {
+          type: string,
+          minLength: 1,
+          description: 4 KiB まで（UTF-8 のバイト数）,
+        }
+      approaches:
+        type: array
+        minItems: 0
+        maxItems: 15
+        items: { $ref: "#/components/schemas/ApproachPayload" }
+      unknownsMd:
+        {
+          type: string,
+          description: 8 KiB まで（UTF-8 のバイト数）。空の文字も受ける,
+        }
+      changesMd:
+        {
+          type: string,
+          minLength: 1,
+          description: 8 KiB まで（UTF-8 のバイト数）。変化が無ければ「変化なし」,
+        }
+  ResearchReportResult:
+    type: object
+    required: [source, topicId, week, receivedAt, replaced]
+    properties:
+      source: { type: string, const: brain-research }
+      topicId: { type: string }
+      week: { type: integer, minimum: 1 }
+      receivedAt: { $ref: "#/components/schemas/DateTime" }
+      replaced: { type: boolean, description: 同じ課題の同じ週を置き換えたか }
