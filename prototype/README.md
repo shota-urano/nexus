@@ -15,8 +15,8 @@
 
 - `/research`: 課題の一覧（SCR-010）
 - `/research/report?id=102`: 課題の週報（SCR-011）。切り替えは URL の引数で行う
-  - `marks=a`（既定）: 印を色を塗った丸いタグに記号と文字で出す。`marks=b`: 行の左に色の帯、タグは枠と文字の色
-  - `layout=inline`: 方法をその場で下に広げる。`layout=split`: 方法の一覧を左、選んだ方法を右に出す（iPad 向け）。省くと幅 900 ピクセル以上は split
+  - `marks=b`（既定。Q-095 の答え）: 行の左に色の帯、タグは枠と文字の色。帯の色は 反対の意見あり → 今週足した → 出典が増えた の順で先の印の色。`marks=a`: 印を色を塗った丸いタグで出す（採らなかった案）
+  - `layout=inline`（既定。Q-095 の答えで、どの幅でもこれ）: 方法をその場で下に広げる。`layout=split`: 幅 900 ピクセル以上で方法の一覧を左、選んだ方法を右に出す（採らなかった案）
   - `open=2,3`: 初めから広げておく方法の番号
-- `/?sel=2&icon=a|b|c`: ホームで Research を選んだ状態。Research のアイコンの案 A（フラスコ）、B（虫眼鏡と折れ線）、C（紙の束とチェック）
-- 撮った画面: `shots/q095-*.png`（Playwright の chromium-headless-shell で、幅 390 は2倍、iPad の幅は1倍で撮った）
+- `/?sel=2&icon=a|b|c`: ホームで Research を選んだ状態。Research のアイコンは B（虫眼鏡と折れ線。既定。Q-095 の答え）。A（フラスコ）と C（紙の束とチェック）は採らなかった案
+- 撮った画面: `shots/q095-*.png`。`q095-decided-*` は Q-095 の答えの形、`q095-alt-*` は採らなかった案。`next build` と `next start` で動かし、Playwright の chromium-headless-shell で、動きを減らす設定にして撮った（幅 390 は2倍、iPad の幅は1倍）。開発用のサーバ（`npm run dev`）では、ホームの motion の要素のハイドレーションの食い違いの知らせが画面に出る（前からある。見た目には関係しない）

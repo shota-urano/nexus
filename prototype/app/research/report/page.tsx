@@ -1,9 +1,9 @@
 "use client";
 // SCR-011 課題の週報の試作（Q-095、CR-020）。データは作り物。
 // 見比べるための切り替え（URL の引数）:
-//   marks=a（既定）: 印を色を塗った丸いタグに記号と文字で出す / marks=b: 行の左に色の帯、タグは枠と文字の色
-//   layout=inline: 方法をその場で下に広げる / layout=split: 方法の一覧を左、選んだ方法を右に出す（iPad 向け）
-//   layout を省くと、幅 900 ピクセル以上は split、それより狭いと inline
+//   marks=b（既定。Q-095 の答え）: 行の左に色の帯、タグは枠と文字の色 / marks=a: 印を色を塗った丸いタグに記号と文字で出す（採らなかった案）
+//   layout=inline（既定。Q-095 の答えで、どの幅でもこれ）: 方法をその場で下に広げる / layout=split: 方法の一覧を左、選んだ方法を右に出す（採らなかった案）
+//   帯の色は、印が2つ以上あるとき 反対の意見あり → 今週足した → 出典が増えた の順で先の印の色（BD-03 SCR-011）
 //   open=0,2: 初めから広げておく方法の番号（撮るため）
 import "../../home.css";
 import "../research.css";
@@ -14,6 +14,9 @@ import ReactMarkdown from "react-markdown";
 import { formatDate } from "@/lib/data";
 import { MARKS, host, reports, type Approach, type Mark } from "@/lib/research";
 import { Chat } from "@/components/Chat";
+
+// 帯の色の優先順（BD-03 SCR-011。Q-095 の答え）
+const BAND_ORDER: Mark[] = ["disputed", "added", "more_sources"];
 
 function MarkTag({ m }: { m: Mark }) {
   const d = MARKS[m];
@@ -49,9 +52,9 @@ function useWide() {
 function Body() {
   const sp = useSearchParams();
   const id = Number(sp.get("id") ?? 102);
-  const marksVariant = sp.get("marks") === "b" ? "b" : "a";
+  const marksVariant = sp.get("marks") === "a" ? "a" : "b";
   const wide = useWide();
-  const layout = sp.get("layout") ?? (wide ? "split" : "inline");
+  const layout = sp.get("layout") === "split" && wide ? "split" : "inline";
   const initialOpen = (sp.get("open") ?? "").split(",").filter(Boolean).map(Number);
   const [open, setOpen] = useState<number[]>(initialOpen);
   const [picked, setPicked] = useState<number>(initialOpen[0] ?? 0);
@@ -69,7 +72,8 @@ function Body() {
       <div style={{ marginTop: 8 }}>
         {r.approaches.map((a, i) => {
           const isOpen = layout === "split" ? picked === i : open.includes(i);
-          const lead = a.marks[0] ? MARKS[a.marks[0]].color : "transparent";
+          const top = BAND_ORDER.find((m) => a.marks.includes(m));
+          const lead = top ? MARKS[top].color : "transparent";
           return (
             <div className="r-ap" key={i}>
               <button className="r-ap-row" aria-expanded={isOpen} onClick={() => (layout === "split" ? setPicked(i) : toggle(i))} style={{ ["--lead" as string]: lead }}>
