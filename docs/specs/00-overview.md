@@ -39,7 +39,7 @@ flowchart LR
 | 11 | [`11-home.md`](./11-home.md) | ホームの表示（FN-020）の API と画面（SCR-001）、端末の API のオリジンの確かめの通し | Frontend | 08、09、10 |
 | 12 | [`12-batch.md`](./12-batch.md) | 定期ジョブの入口（M27）、BAT-001（FN-021）、BAT-002（FN-022） | Backend | 05 |
 | 13 | [`13-release.md`](./13-release.md) | launchd と CLI の設定の雛形、運用の手順書、契約のテスト、総合テスト、受入テスト、配信元の改修 | Backend、（人間） | 11、12 |
-| 14 | [`14-research.md`](./14-research.md) | 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）。CR-020 | Frontend | 05、06、07、10、11 |
+| 14 | [`14-research.md`](./14-research.md) | 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）、道 `/research`（CR-023 で 06 から移した）。CR-020 | Frontend | 05、07、10、11 |
 
 - 「前提」は、先に終わっている必要がある仕様書の番号である（DD-11 1章）。
 
