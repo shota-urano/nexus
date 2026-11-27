@@ -19,6 +19,9 @@
   --color-hud-muted: #a8a196;
   --color-hud-warn: #ff9a6b;
 
+  /* 一覧の行の種類の印「週報」の色（CR-020。BD-03 と試作に無いため本人が決めた。2026-11-27） */
+  --color-kind-research: #8ed2bc;
+
   /* 試作の押す部品と発言の角の丸み、発言の幅の上限 */
   --radius-hud: 10px;
   --container-bubble: 85%;
