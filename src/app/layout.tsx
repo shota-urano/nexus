@@ -9,9 +9,19 @@ export const viewport = {
 } satisfies Viewport;
 
 // ホーム画面に追加したときの上の帯を、暗い背景に合う黒にする。
+// iPad のホーム画面のアイコン（apple-touch-icon、180px。DD-01 M01、BD-01 NFR-007）。
 export const metadata = {
   appleWebApp: {
     statusBarStyle: "black",
+  },
+  icons: {
+    apple: [
+      {
+        url: "/img/icon/app-icon-180_001.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
 } satisfies Metadata;
 
