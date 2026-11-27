@@ -31,10 +31,6 @@ jobs:
           npm --version
           node -e 'const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync(":memory:"); console.log("sqlite", db.prepare("select sqlite_version() as v").get().v)'
       - run: npm ci
-      - name: 一時の調べ TC126 を単独で回す
-        run: |
-          sysctl -n hw.ncpu
-          for i in 1 2 3; do ./node_modules/.bin/vitest run tests/07-contents-state.test.ts -t TC126 --reporter=verbose || true; done
       - run: make verify
       - name: テストの結果（junit）を残す
         if: always()
