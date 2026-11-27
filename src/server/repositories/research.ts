@@ -112,3 +112,36 @@ export function updateResearchReportRow(
     contentId,
   );
 }
+
+// AI チャットに渡す内容の組み立てで読む週報（DD-02 3章 P07 手順 3。CR-020）。
+export interface ChatResearchReport {
+  topicTitle: string;
+  week: number;
+  status: string;
+  answerMd: string;
+  approachesJson: string;
+  unknownsMd: string;
+  changesMd: string;
+}
+
+// 内容ID の週報と、その課題名。無ければ null。
+export function findChatResearchReport(
+  db: Database,
+  contentId: number,
+): ChatResearchReport | null {
+  const row = db
+    .prepare(
+      "SELECT t.title, r.week, r.status, r.answer_md, r.approaches_json, r.unknowns_md, r.changes_md FROM research_report AS r JOIN research_topic AS t ON t.topic_id = r.topic_id WHERE r.content_id = ?",
+    )
+    .get(contentId);
+  if (row === undefined) return null;
+  return {
+    topicTitle: String(row.title),
+    week: Number(row.week),
+    status: String(row.status),
+    answerMd: String(row.answer_md),
+    approachesJson: String(row.approaches_json),
+    unknownsMd: String(row.unknowns_md),
+    changesMd: String(row.changes_md),
+  };
+}

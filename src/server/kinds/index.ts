@@ -5,6 +5,7 @@ import { englishChat } from "./english/chat";
 import { englishIngest } from "./english/ingest";
 import { newsChat } from "./news/chat";
 import { newsIngest } from "./news/ingest";
+import { researchChat } from "./research/chat";
 import { researchIngest } from "./research/ingest";
 
 // 種類の一覧（DD-01 M14。NFR-004）。種類ごとの操作を種類の値から引けるようにする。
@@ -97,6 +98,8 @@ export interface KindChat {
 const CHAT_KINDS = new Map<string, KindChat>([
   [newsChat.kind, newsChat satisfies KindChat],
   [englishChat.kind, englishChat satisfies KindChat],
+  // 週報（DD-01 M33。CR-020）。
+  [researchChat.kind, researchChat satisfies KindChat],
 ]);
 
 // 種類から AI チャットに渡す内容の組み立てを引く。一覧に無い種類は E16（プログラムの不具合）として断る。
