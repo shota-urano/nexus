@@ -38,6 +38,9 @@ import {
 // - 「読んだ」「未読に戻す」「保存」「保存を外す」（A04〜A06）は SCR-003 と同じアイコンのボタンにし、
 //   結果が出るまで押せなくする。失敗したら MSG-003 を下の知らせに出し、状態は変えない。
 // - 「AI に質問」（A07）は、その週の週報の全体（対象 `page` と内容ID）で AI チャットの面 M06 を開く。
+// - 道（M01）が `topBar` を渡したときは、課題名（O01）と「AI に質問」（A07）を、その上の帯に置く
+//   （BD-03 SCR-011 3.2「[ロゴ] O01 課題名 [AI] A07」、4章）。上の帯は読み込み中も失敗のときも出す（3.5）。
+//   週報を読むまでは課題名が無いので、`title` は null にする。
 
 type Phase = "loading" | "ready" | "notFound" | "failed" | "unauthorized";
 type StateAction = "read" | "saved";
@@ -64,7 +67,19 @@ function thisYearInJapan(now: Date): number {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).getUTCFullYear();
 }
 
-export function ResearchReportScreen({ contentId }: { contentId: number }) {
+// 上の帯を描く関数。課題名（読む前は null）と、帯の右に置く「AI に質問」（読む前は null）を受け取る。
+export type ResearchReportTopBar = (bar: {
+  title: string | null;
+  action: ReactNode;
+}) => ReactNode;
+
+export function ResearchReportScreen({
+  contentId,
+  topBar,
+}: {
+  contentId: number;
+  topBar?: ResearchReportTopBar;
+}) {
   const router = useRouter();
   // 選んだ週（選んだときに開いていた内容ID と、選んだ週の内容ID）。開く内容ID が替わったら使わない。
   const [selected, setSelected] = useState<{ base: number; id: number } | null>(
@@ -154,9 +169,41 @@ export function ResearchReportScreen({ contentId }: { contentId: number }) {
     setChatOpen(true);
   }
 
-  if (phase === "unauthorized") return null;
+  const buttonClass =
+    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-hud-line disabled:opacity-50";
+  const loading = phase === "loading";
+  const askButton =
+    report === null ? null : (
+      <button
+        type="button"
+        onClick={() => askAi(report.contentId)}
+        aria-label="AI に質問"
+        disabled={loading}
+        className={`${buttonClass} shrink-0 text-hud-text`}
+      >
+        <ChatIcon />
+      </button>
+    );
+  // 道が上の帯を渡したときは、帯を中身の上に置く。
+  const withBar = (content: ReactNode) =>
+    topBar === undefined ? (
+      content
+    ) : (
+      <>
+        {topBar({
+          title:
+            report === null || phase === "notFound" || phase === "failed"
+              ? null
+              : report.topicTitle,
+          action: phase === "ready" || phase === "loading" ? askButton : null,
+        })}
+        {content}
+      </>
+    );
+
+  if (phase === "unauthorized") return withBar(null);
   if (phase === "notFound") {
-    return (
+    return withBar(
       <EmptyState
         message={RESEARCH_MESSAGES["MSG-048"]}
         action={
@@ -168,40 +215,31 @@ export function ResearchReportScreen({ contentId }: { contentId: number }) {
             戻る
           </button>
         }
-      />
+      />,
     );
   }
   if (phase === "failed") {
-    return <EmptyState message={RESEARCH_MESSAGES["MSG-019"]} />;
+    return withBar(<EmptyState message={RESEARCH_MESSAGES["MSG-019"]} />);
   }
-  if (report === null) return <WaitMark />;
+  if (report === null) return withBar(<WaitMark />);
 
-  const loading = phase === "loading";
   const thisYear = thisYearInJapan(new Date());
   const { state } = report;
-  const buttonClass =
-    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-hud-line disabled:opacity-50";
   const readLabel = state.isRead ? "未読に戻す" : "読んだ";
   const saveLabel = state.isSaved ? "保存を外す" : "保存";
 
-  return (
+  return withBar(
     <>
       <div className="flex flex-col gap-4 px-4 py-4">
         <header className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <h1 className="min-w-0 flex-1 text-lg font-bold leading-snug">
-              {report.topicTitle}
-            </h1>
-            <button
-              type="button"
-              onClick={() => askAi(report.contentId)}
-              aria-label="AI に質問"
-              disabled={loading}
-              className={`${buttonClass} shrink-0 text-hud-text`}
-            >
-              <ChatIcon />
-            </button>
-          </div>
+          {topBar === undefined && (
+            <div className="flex items-start gap-3">
+              <h1 className="min-w-0 flex-1 text-lg font-bold leading-snug">
+                {report.topicTitle}
+              </h1>
+              {askButton}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
             <span>{`${report.week}週目`}</span>
             <span>{formatListDate(report.sentOn, thisYear)}</span>
@@ -280,7 +318,7 @@ export function ResearchReportScreen({ contentId }: { contentId: number }) {
         onClose={() => setChatOpen(false)}
         target={chatTarget}
       />
-    </>
+    </>,
   );
 }
 

@@ -7,12 +7,15 @@ import type { ReactNode } from "react";
 // ホームへ戻る操作はホームと同じ NEXUS のロゴにし、ボタンの名前を「ホーム」にする。
 // 上の帯は、端末の上端の安全な余白とホームの上の余白（pt-6）の大きいほうだけ下げ、
 // iPad のホーム画面のアプリのウィンドウの操作ボタンに隠れないようにする（CR-018）。
+// 画面名でない題名（SCR-011 の課題名。BD-03 SCR-011 3.3 O01「そのまま」）は `accent={false}` で色を付けない。
 export function TopBar({
   title,
   action,
+  accent = true,
 }: {
   title: string;
   action?: ReactNode;
+  accent?: boolean;
 }) {
   // 題名の最後の語（「News Galaxy」なら「Galaxy」）をアンバーにする（BD-03 SCR-002、CR-018）。
   const cut = title.lastIndexOf(" ");
@@ -34,8 +37,14 @@ export function TopBar({
         />
       </Link>
       <h1 className="flex-1 truncate text-base font-semibold">
-        {head}
-        <span className="text-hud-amber">{last}</span>
+        {accent ? (
+          <>
+            {head}
+            <span className="text-hud-amber">{last}</span>
+          </>
+        ) : (
+          title
+        )}
       </h1>
       {action}
     </header>
