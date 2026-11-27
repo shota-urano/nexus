@@ -2,8 +2,8 @@
 id: DD-04
 name: API 詳細設計書
 phase: 詳細設計
-version: 1.2
-updated: 2026-11-26
+version: 1.3
+updated: 2026-11-27
 ---
 
 # DD-04 API 詳細設計書（NEXUS）
@@ -16,6 +16,7 @@ updated: 2026-11-26
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: CR-015 で、`openapi.yaml` の `openRegistration`（`/register`）に 500 の応答を足した（2026-11-26 RD-01 SH01）。
 - 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、`openapi.yaml` の `Conversation` に `firstQuestionText` を足した（`listConversations` と `createConversation` の応答）。
+- 1.3: X-04 CR-018（2026-11-27 RD-01 SH01 が承認）で、`createConversation` の画面の欄から SCR-002-A05 を外した。API は変えない。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル
@@ -216,7 +217,7 @@ IF-004 は HTTP の API ではないが、BD-06 3.2 で「出来事の項目の�
 | `searchContents` | FN-018、SCR-008-A01、SCR-008-A02、SCR-008-A04 | 本人 | ENT-001、ENT-002、ENT-003 |
 | `listSaved` | FN-019、SCR-009-A01、SCR-009-A03 | 本人 | ENT-001、ENT-006 |
 | `listConversations` | FN-014、SCR-006-A01 | 本人 | ENT-007 |
-| `createConversation` | FN-014、SCR-006-A03、SCR-001-A05、SCR-002-A05、SCR-003-A05、SCR-005-A09 | 本人 | ENT-001、ENT-007 |
+| `createConversation` | FN-014、SCR-006-A03、SCR-001-A05、SCR-003-A05、SCR-005-A09 | 本人 | ENT-001、ENT-007 |
 | `getConversation` | FN-014、SCR-006-A02 | 本人 | ENT-007、ENT-008 |
 | `postQuestion` | FN-015、SCR-006-A04 | 本人 | ENT-007、ENT-008、ENT-009 |
 | `streamReply` | FN-015、FN-016、SCR-006-A04、SCR-006-A05 | 本人 | ENT-008 |
