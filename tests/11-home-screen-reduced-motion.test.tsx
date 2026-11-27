@@ -7,22 +7,35 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Home } from "../src/contracts/home";
 import { HomeScreen } from "../src/screens/home/home-screen";
 import { MotionSettings } from "../src/ui/motion";
+import type { HomeWithResearch } from "./fixtures/home";
 
 // 11-home の実装単位2。ホームの画面 M02 の、動きを減らす設定（NFR-008、BD-09 5章）。
 // 受け入れ基準 DD-10 TC114。Motion は端末の設定を最初に読んだときに覚えるので、
 // 動きを減らさないときのテスト（11-home-screen.test.tsx）とファイルを分ける。
 
-const HOME: Home = {
+const HOME: HomeWithResearch = {
   newCount: 3,
   unreadCount: 5,
   learning: { contentId: 7, learningTheme: "文型", isCompleted: false },
   ai: { writingCount: 0, hasFailure: false },
   picks: [],
   notices: [],
+  research: { unreadCount: 0 },
 };
+
+// HUD は7つのセグメント（14-research の実装単位5。CR-020。Q-095 の答えで7分割は試作のまま）。
+// 1つのセグメントの角度は 360 / 7 度。
+const STEP = 360 / 7;
+
+// HUD の輪の回した角度（transform の rotate(角度 0 0)）を読む。
+function ringDegrees(): number {
+  const transform = screen.getByTestId("hud-ring").getAttribute("transform");
+  const match = /^rotate\((-?[\d.e+-]+) 0 0\)$/.exec(transform ?? "");
+  if (match === null) throw new Error(`角度が読めない: ${transform}`);
+  return Number(match[1]);
+}
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -72,9 +85,7 @@ describe("TC114 動きを減らす設定で HUD のセグメントを押す", ()
     fireEvent.click(screen.getByRole("button", { name: "English" }));
 
     // 押した直後（時間を進めずに）、回した後の角度で描かれている。動きの途中の角度を経ない。
-    expect(screen.getByTestId("hud-ring").getAttribute("transform")).toBe(
-      "rotate(-60 0 0)",
-    );
+    expect(ringDegrees()).toBeCloseTo(-STEP, 2);
     // 選んだ機能が光り、そのカードが前に出て、押すとその画面へ移る。
     expect(screen.getByRole("button", { name: "English" }).ariaPressed).toBe(
       "true",
@@ -95,11 +106,9 @@ describe("TC114 動きを減らす設定で HUD のセグメントを押す", ()
     );
     expect(front.style.opacity).toBe("1");
 
-    // 離れたセグメント（AI Chat）を押しても、近い向き（English の -60 度から +120 度）の角度にすぐ切り替わる。
+    // 離れたセグメント（AI Chat）を押しても、近い向き（English の -STEP 度から +2 × STEP 度）の角度にすぐ切り替わる。
     fireEvent.click(screen.getByRole("button", { name: "AI Chat" }));
-    expect(screen.getByTestId("hud-ring").getAttribute("transform")).toBe(
-      "rotate(60 0 0)",
-    );
+    expect(ringDegrees()).toBeCloseTo(STEP, 2);
     expect(screen.getByTestId("card-chat").dataset.front).toBe("true");
   });
 

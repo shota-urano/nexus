@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { homeSchema, type Home } from "../src/contracts/home";
+import { homeSchema } from "../src/contracts/home";
 import { HomeScreen, LEAVE_STEP_MS } from "../src/screens/home/home-screen";
 import {
   cardOffset,
@@ -18,13 +18,14 @@ import {
 } from "../src/screens/home/hud-angle";
 import { HOME_MESSAGES } from "../src/screens/home/messages";
 import { MESSAGES } from "../src/server/shared/messages";
+import type { HomeWithResearch } from "./fixtures/home";
 
 // 11-home の実装単位2。ホームの画面 M02（BD-03 SCR-001、BD-13 P01）。
 // 動きを減らす設定の TC114 は 11-home-screen-reduced-motion.test.tsx。
 
 const NOW = new Date("2026-11-30T23:00:00.000Z"); // 日本時間 2026-12-01 08:00
 
-const HOME: Home = {
+const HOME: HomeWithResearch = {
   newCount: 12,
   unreadCount: 18,
   learning: { contentId: 7, learningTheme: "文型", isCompleted: false },
@@ -39,6 +40,7 @@ const HOME: Home = {
     { contentId: 12, title: "記事 B", theme: "半導体", imageUrl: null },
   ],
   notices: ["MSG-015", "MSG-016", "MSG-017"],
+  research: { unreadCount: 0 },
 };
 
 // 機能の画面へ移った道（A03）。止められずに押された道（a 要素）を、押された順に記録する。
@@ -142,7 +144,8 @@ describe("ホームの値を出す（SCR-001-A01）", () => {
         ai: { writingCount: 0, hasFailure: false },
         picks: [],
         notices: [],
-      } satisfies Home),
+        research: { unreadCount: 0 },
+      } satisfies HomeWithResearch),
     );
     render(<HomeScreen now={NOW} />);
     const status = await screen.findByRole("region", { name: "ホームの数" });
@@ -342,7 +345,9 @@ describe("機能の画面へ移る動き（SCR-001-A03。RD-07 3章）", () => {
     expect(card("inbox").dataset.leaving).toBe("true");
     // ほかのセグメント、奥のカード、学習の続き、AI の印も受けない。
     fireEvent.click(screen.getByRole("button", { name: "Library" }));
-    fireEvent.click(within(card("english")).getByRole("button"));
+    // 奥のカードは、Inbox の隣（並びの位置 1）の Explore を押す（Q-095 の答えで HUD の7分割は試作のまま。
+    // 2つ上の English は位置 -2 で透明になり押せないため。2026-11-27 本人）。
+    fireEvent.click(within(card("explore")).getByRole("button"));
     expect(fireEvent.click(screen.getByRole("link", { name: "文型" }))).toBe(
       false,
     );
@@ -408,25 +413,28 @@ describe("画像と飾り（BD-03 SCR-001 3.2）", () => {
 });
 
 describe("HUD の角度（BD-03 SCR-001-A02）", () => {
-  it("指で約70度回すと隣の機能を選び、離すとその機能に合わせる（BD-13 P01）", () => {
-    expect(selectedAt(-70, 6)).toBe(1);
-    expect(snapTurn(-70)).toBe(-60);
-    expect(selectedAt(-25, 6)).toBe(0);
+  // HUD は7つのセグメント（CR-020。Q-095 の答えで7分割は試作のまま）。1つのセグメントの角度は 360 / 7 度。
+  const STEP = 360 / 7;
+
+  it("指で1つ分の半分より多く回すと隣の機能を選び、離すとその機能に合わせる（BD-13 P01）", () => {
+    expect(selectedAt(-70, 7)).toBe(1);
+    expect(snapTurn(-70)).toBeCloseTo(-STEP, 9);
+    expect(selectedAt(-25, 7)).toBe(0);
     expect(snapTurn(-25)).toBe(-0);
-    expect(selectedAt(70, 6)).toBe(5);
-    expect(selectedAt(-400, 6)).toBe(1);
+    expect(selectedAt(70, 7)).toBe(6);
+    expect(selectedAt(-400, 7)).toBe(1);
   });
 
   it("セグメントを押すと、近い向きに回る", () => {
-    expect(turnToSelect(0, 1)).toBe(-60);
-    expect(turnToSelect(0, 5)).toBe(60);
-    expect(turnToSelect(-60, 5)).toBe(60);
-    expect(turnToSelect(-300, 0)).toBe(-360);
+    expect(turnToSelect(0, 1)).toBeCloseTo(-STEP, 9);
+    expect(turnToSelect(0, 6)).toBeCloseTo(STEP, 9);
+    expect(turnToSelect(-STEP, 6)).toBeCloseTo(STEP, 9);
+    expect(turnToSelect(-300, 0)).toBeCloseTo(-360, 9);
   });
 
   it("選んだ機能を真ん中にして、前と次のカードを上と下に置く", () => {
-    expect([0, 1, 2, 3, 4, 5].map((i) => cardOffset(i, 0, 6))).toEqual([
-      0, 1, 2, 3, -2, -1,
+    expect([0, 1, 2, 3, 4, 5, 6].map((i) => cardOffset(i, 0, 7))).toEqual([
+      0, 1, 2, 3, -3, -2, -1,
     ]);
   });
 });

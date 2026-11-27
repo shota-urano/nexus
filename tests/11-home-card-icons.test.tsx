@@ -3,15 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Home } from "../src/contracts/home";
 import { FeatureCards } from "../src/screens/home/feature-cards";
 import { FEATURES } from "../src/screens/home/features";
+import type { HomeWithResearch } from "./fixtures/home";
 
 // 11-home の実装単位4。ホームのカードの機能のアイコンを、BD-13 の試作
 // `prototype/app/page.tsx` の同じ機能のアイコンと同じ絵にする（SCR-001、BD-13 P01、DD-01 M02）。
 // 受け入れ基準「機能ごとのアイコンの SVG の path が、試作の同じ機能のアイコンの path と同じである」を確かめる。
 // 試作のアイコンは page.tsx の `const I = { ... }` に機能ごとに書いてあるので、その原文から path の d を読む。
 // TC114 は 11-home-screen-reduced-motion.test.tsx で確かめる。
+// 14-research の実装単位5（CR-020、Q-095）で Research を足した。Research のアイコンは試作の `researchB`（虫眼鏡と折れ線）。
 
 const PROTOTYPE = join(__dirname, "..", "prototype", "app", "page.tsx");
 
@@ -23,6 +24,7 @@ const PROTOTYPE_KEY: Record<string, string> = {
   explore: "explore",
   library: "library",
   chat: "chat",
+  research: "researchB",
 };
 
 // 試作のアイコンの機能ごとの path の d を、書いてある順に読む。
@@ -41,13 +43,14 @@ function prototypePaths(): Record<string, string[]> {
   return result;
 }
 
-const HOME: Home = {
+const HOME: HomeWithResearch = {
   newCount: 3,
   unreadCount: 5,
   learning: { contentId: 7, learningTheme: "文型", isCompleted: false },
   ai: { writingCount: 0, hasFailure: false },
   picks: [],
   notices: [],
+  research: { unreadCount: 0 },
 };
 
 afterEach(() => {
@@ -67,14 +70,14 @@ function cardPaths(key: string): string[] {
 describe("ホームのカードの機能のアイコン（BD-13 P01 の試作と同じ絵）", () => {
   const expected = prototypePaths();
 
-  it("試作の6つの機能のアイコンを読める", () => {
+  it("試作の7つの機能のアイコンを読める", () => {
     for (const key of Object.values(PROTOTYPE_KEY)) {
       expect(expected[key], key).toBeDefined();
       expect(expected[key].length, key).toBeGreaterThan(0);
     }
   });
 
-  it("ホームの機能は試作と同じ6つである", () => {
+  it("ホームの機能は試作と同じ7つである", () => {
     expect(FEATURES.map((f) => f.key).sort()).toEqual(
       Object.keys(PROTOTYPE_KEY).sort(),
     );

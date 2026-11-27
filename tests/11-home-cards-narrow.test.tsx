@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Home } from "../src/contracts/home";
 import {
   NARROW_GAP,
   narrowSlots,
@@ -10,18 +9,20 @@ import {
 } from "../src/screens/home/card-slots";
 import { FeatureCards } from "../src/screens/home/feature-cards";
 import { FEATURES } from "../src/screens/home/features";
+import type { HomeWithResearch } from "./fixtures/home";
 
 // 11-home の実装単位2。幅 480 ピクセル以下で、隣のカードを前のカードのすぐ上と下に詰める
 // （BD-03 SCR-001 3.2「画面幅による違い」、BD-13 P02 の「前のカードの高さを測り、隣のカードをそのすぐ上と下に詰める」）。
 // jsdom は大きさを計算しないので、カードの高さ（offsetHeight）を差し替えて、短いカードと長いカードで確かめる。
 
-const HOME: Home = {
+const HOME: HomeWithResearch = {
   newCount: 3,
   unreadCount: 5,
   learning: { contentId: 7, learningTheme: "文型", isCompleted: false },
   ai: { writingCount: 0, hasFailure: false },
   picks: [],
   notices: [],
+  research: { unreadCount: 0 },
 };
 
 // カードの機能ごとの高さ（ピクセル）。前に出ているときと奥にあるときで変える。
@@ -111,7 +112,8 @@ describe("幅 480 ピクセル以下のカードの間隔（BD-03 SCR-001 3.2、
     expect(topOf("english") - (FRONT_TOP + 90)).toBe(NARROW_GAP);
     rerender(1);
     expect(topOf("english")).toBe(FRONT_TOP);
-    expect(topOf("inbox") - (FRONT_TOP + 160)).toBe(NARROW_GAP);
+    // English の次（並びの位置 1）は Research（Q-095 の答えで HUD の7分割と並びは試作のまま。CR-020）。
+    expect(topOf("research") - (FRONT_TOP + 160)).toBe(NARROW_GAP);
   });
 
   it("広い画面では高さによらず決まった位置に置く", () => {
