@@ -1,0 +1,8 @@
+#!/bin/sh
+# NEXUS の送信のコマンド nexus-send（DD-01 M34、DD-09 2.7。CR-020）。
+#   nexus-send --source brain-research --kind research-report <ファイル>
+# 雛形である。構築のスクリプト（deploy/setup.sh）が __NODE__（Node.js の絶対の道）と
+# __REPO__（リポジトリの絶対の道）を書き込み、実行の権限を付けてリポジトリの bin/nexus-send に置く
+# （DD-09 2.7、4章 手順 3）。送り手はその絶対の道で呼ぶ。PATH は使わない。
+# 送り手の側の環境変数 NEXUS_SEND_URL と NEXUS_SENDER_KEY を読む。鍵は引数に書かない（NFR-019）。
+exec "__NODE__" "__REPO__/dist/cli/send/main.js" "$@"
