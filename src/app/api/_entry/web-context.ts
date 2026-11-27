@@ -11,6 +11,10 @@ import { createHomeView, type HomeView } from "../../../server/home";
 import { createIngest, type Ingest } from "../../../server/ingest";
 import { createNewsView, type NewsView } from "../../../server/kinds/news/view";
 import {
+  createResearchView,
+  type ResearchView,
+} from "../../../server/kinds/research/view";
+import {
   createEnglishLearning,
   type EnglishLearning,
 } from "../../../server/kinds/english/learning";
@@ -51,6 +55,8 @@ export interface WebContext {
   chat: Chat;
   // ホームの表示（DD-01 M19。FN-020）。
   home: HomeView;
+  // 課題の一覧と週報（DD-01 M33。FN-026、FN-027。CR-020）。
+  research: ResearchView;
   clock: Clock;
 }
 
@@ -91,6 +97,7 @@ export function createWebContext(
     const english = createEnglishLearning({ db, clock });
     const chat = createChat({ db, clock });
     const home = createHomeView({ db, clock });
+    const research = createResearchView({ db });
     return {
       logger,
       devices,
@@ -104,6 +111,7 @@ export function createWebContext(
       english,
       chat,
       home,
+      research,
       clock,
     };
   } catch (error) {

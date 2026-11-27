@@ -145,3 +145,133 @@ export function findChatResearchReport(
     changesMd: String(row.changes_md),
   };
 }
+
+// 課題の一覧の1行（DD-02 FN-026 手順 2、3。CR-020）。
+export interface ResearchTopicRow {
+  topicKey: string;
+  title: string;
+  status: string;
+  lastWeek: number;
+  lastReceivedAt: string;
+  latestContentId: number;
+  hasUnread: boolean;
+}
+
+// 研究課題を最後に届いた日時の新しい順（同じ日時は課題の行の ID の大きい順）に全て読む。
+// 最新の週の週報の内容ID と、既読でない週報（`content_state` が無いか `is_read` が 0）があるかを添える。
+// 週報の無い課題は出さない。
+export function listResearchTopicRows(db: Database): ResearchTopicRow[] {
+  return db
+    .prepare(
+      `SELECT t.topic_key, t.title, t.status, t.last_week, t.last_received_at,
+              (SELECT r.content_id FROM research_report AS r
+                WHERE r.topic_id = t.topic_id
+                ORDER BY r.week DESC LIMIT 1) AS latest_content_id,
+              EXISTS (SELECT 1 FROM research_report AS r
+                        LEFT JOIN content_state AS s ON s.content_id = r.content_id
+                       WHERE r.topic_id = t.topic_id
+                         AND (s.content_id IS NULL OR s.is_read = 0)) AS has_unread
+         FROM research_topic AS t
+        WHERE EXISTS (SELECT 1 FROM research_report AS r WHERE r.topic_id = t.topic_id)
+        ORDER BY t.last_received_at DESC, t.topic_id DESC`,
+    )
+    .all()
+    .map((row) => ({
+      topicKey: String(row.topic_key),
+      title: String(row.title),
+      status: String(row.status),
+      lastWeek: Number(row.last_week),
+      lastReceivedAt: String(row.last_received_at),
+      latestContentId: Number(row.latest_content_id),
+      hasUnread: Number(row.has_unread) === 1,
+    }));
+}
+
+// 週報の表示で読む週報と、その内容の状態（DD-02 FN-027 手順 2。CR-020）。
+export interface ResearchReportViewRow {
+  contentId: number;
+  topicId: number;
+  topicKey: string;
+  topicTitle: string;
+  week: number;
+  sentOn: string;
+  status: string;
+  answerMd: string;
+  approachesJson: string;
+  unknownsMd: string;
+  changesMd: string;
+  receivedAt: string;
+  openedAt: string | null;
+  isRead: boolean;
+  isSaved: boolean;
+  savedAt: string | null;
+}
+
+// 内容ID の週報（`content` の `kind` が research）。無いか週報でなければ null。
+export function findResearchReportView(
+  db: Database,
+  contentId: number,
+): ResearchReportViewRow | null {
+  const row = db
+    .prepare(
+      `SELECT c.content_id, c.received_at, t.topic_id, t.topic_key, t.title,
+              r.week, r.sent_on, r.status, r.answer_md, r.approaches_json, r.unknowns_md, r.changes_md,
+              s.opened_at, COALESCE(s.is_read, 0) AS is_read,
+              COALESCE(s.is_saved, 0) AS is_saved, s.saved_at
+         FROM content AS c
+         JOIN research_report AS r ON r.content_id = c.content_id
+         JOIN research_topic AS t ON t.topic_id = r.topic_id
+         LEFT JOIN content_state AS s ON s.content_id = c.content_id
+        WHERE c.content_id = ? AND c.kind = 'research'`,
+    )
+    .get(contentId);
+  if (row === undefined) return null;
+  return {
+    contentId: Number(row.content_id),
+    topicId: Number(row.topic_id),
+    topicKey: String(row.topic_key),
+    topicTitle: String(row.title),
+    week: Number(row.week),
+    sentOn: String(row.sent_on),
+    status: String(row.status),
+    answerMd: String(row.answer_md),
+    approachesJson: String(row.approaches_json),
+    unknownsMd: String(row.unknowns_md),
+    changesMd: String(row.changes_md),
+    receivedAt: String(row.received_at),
+    openedAt: (row.opened_at as string | null) ?? null,
+    isRead: Number(row.is_read) === 1,
+    isSaved: Number(row.is_saved) === 1,
+    savedAt: (row.saved_at as string | null) ?? null,
+  };
+}
+
+// 週の一覧の1行（DD-02 FN-027 手順 3）。
+export interface ResearchWeekRow {
+  contentId: number;
+  week: number;
+  sentOn: string;
+  isRead: boolean;
+}
+
+// 課題の全ての週の週報と、それぞれの既読を、週の大きい順に読む。
+export function listResearchWeeks(
+  db: Database,
+  topicId: number,
+): ResearchWeekRow[] {
+  return db
+    .prepare(
+      `SELECT r.content_id, r.week, r.sent_on, COALESCE(s.is_read, 0) AS is_read
+         FROM research_report AS r
+         LEFT JOIN content_state AS s ON s.content_id = r.content_id
+        WHERE r.topic_id = ?
+        ORDER BY r.week DESC`,
+    )
+    .all(topicId)
+    .map((row) => ({
+      contentId: Number(row.content_id),
+      week: Number(row.week),
+      sentOn: String(row.sent_on),
+      isRead: Number(row.is_read) === 1,
+    }));
+}
