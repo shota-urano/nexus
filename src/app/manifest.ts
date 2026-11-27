@@ -9,5 +9,18 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     lang: "ja",
+    // アイコンは public/img/icon/app-icon_001.png（1024×1024）を縮めたもの。
+    icons: [
+      {
+        src: "/img/icon/app-icon-192_001.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "/img/icon/app-icon-512_001.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
   };
 }
