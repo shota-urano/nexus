@@ -56,7 +56,7 @@ DD-06 E01、E02、E03、E05、E08、E16、E18。MSG-046、MSG-049、MSG-050（CR
   - 受け入れ基準: DD-10 TC30、DD-10 TC31、DD-10 TC32、DD-10 TC33、DD-10 TC34、DD-10 TC119、DD-10 TC121 が通る
 - [x] [Backend] sharpen が読む `getEnglishSetForSender` と `getEnglishResult` を作る（FN-013、IF-003、DD-01 M16、DD-02 FN-013）（se/05-ingest）
   - 受け入れ基準: DD-10 TC35、DD-10 TC36、DD-10 TC37 が通る
-- [ ] [Backend] 週報の受け取り `postResearchReport` を作る。M10 に IF-005 の本文の形 `ResearchReportPayload`（Q-096 の答えの上限）を置き、M14 の種類の一覧に research（M33）を登録し、M33 で形の確かめ、研究課題と週報の作成と置き換え、検索の本文（課題名、現時点の答え、方法の見出し）を作る（FN-025、IF-005、DD-01 M10・M13・M14・M33、DD-02 FN-025・3章 P02・P08、DD-05 3章、CR-020）
+- [ ] [Backend] 週報の受け取り `postResearchReport` を作り、`docs/api/openapi.yaml` に `postResearchReport`（`/api/research/reports`）と、その求めと応答の schema（`ResearchReportPayload`、`ApproachPayload`、`ResearchReportResult`、`ResearchStatus`、`ApproachMark`）を足す（DD-04 の定義どおり。CR-021）。M10 に IF-005 の本文の形 `ResearchReportPayload`（Q-096 の答えの上限）を置き、M14 の種類の一覧に research（M33）を登録し、M33 で形の確かめ、研究課題と週報の作成と置き換え、検索の本文（課題名、現時点の答え、方法の見出し）を作る（FN-025、IF-005、DD-01 M10・M13・M14・M33、DD-02 FN-025・3章 P02・P08、DD-05 3章、CR-020）
   - 受け入れ基準: DD-10 TC130、DD-10 TC131、DD-10 TC132、DD-10 TC133、DD-10 TC134、DD-10 TC135、DD-10 TC136、DD-10 TC137、DD-10 TC102 が通る
 - [ ] [Backend] 送信のコマンド M34 `nexus-send`（引数とファイルと環境変数の確かめ、M10 の `ResearchReportPayload` での形の確かめ、IF-005 への送信、終了コード）と、`npm run build` で `dist/cli/send/main.js` を作ることと、`deploy/nexus-send` の雛形を作る（FN-028、DD-01 M34、DD-02 FN-028、DD-06 E18、DD-09 2.7、CR-020）
   - 受け入れ基準: DD-10 TC146、DD-10 TC147、DD-10 TC148 が通る; `deploy/nexus-send` の雛形に、Node.js の道と `dist/cli/send/main.js` の道を書き込む場所がある
