@@ -2,7 +2,8 @@
 // セグメント i の真ん中は、回す前に右の真ん中（0度）から i × STEP の位置にある。
 // HUD を `turn` だけ回すと、右の真ん中に来るのは `-turn / STEP` に一番近いセグメントである。
 
-export const STEP_DEGREES = 60;
+// 1つのセグメントの角度。HUD は7つのセグメント（FEATURES の数。CR-020。7分割は Q-095 の答えで試作のまま）。
+export const STEP_DEGREES = 360 / 7;
 
 // -180 以上 180 未満にそろえる。
 export function normalizeDegrees(degrees: number): number {

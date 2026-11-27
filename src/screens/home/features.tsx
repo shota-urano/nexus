@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import type { HomeNotice } from "../../contracts/home";
 
-// ホームの6つの機能（BD-03 SCR-001-O01、BD-09 4章）。名前は依頼 2章の英語の名前をそのまま出す。
-// 並びは HUD のセグメントの並び（時計回り）で、最初の News Galaxy を選んだ状態で開く（O01 の初期値）。
+// ホームの7つの機能（BD-03 SCR-001-O01、BD-09 4章）。名前は依頼 2章の英語の名前をそのまま出す。
+// 並びは HUD のセグメントの並び（時計回り）で、試作 `prototype/app/page.tsx` の MODULES と同じ
+// （Research は CR-020。7分割は Q-095 の答えで試作のまま）。最初の News Galaxy を選んだ状態で開く（O01 の初期値）。
 // 行き先は BD-03 2章の遷移表。AI Chat は道を持たず、下から出る面（SCR-006）で開く。
 // 知らせ（O09）は、該当する機能のカードの中に出す（BD-09 2章「ホームのカード」）。
 
 export type FeatureKey =
-  "news" | "english" | "inbox" | "explore" | "library" | "chat";
+  "news" | "english" | "research" | "inbox" | "explore" | "library" | "chat";
 
 export interface Feature {
   key: FeatureKey;
@@ -57,6 +58,22 @@ export const FEATURES: readonly Feature[] = [
       <>
         <path d="M4 7c5-2 9-1 12 2 3-3 7-4 12-2v18c-5-2-9-1-12 2-3-3-7-4-12-2Z" />
         <path d="M16 9v18M8 18l3-7 3 7M9 16h4M21 13h3M21 17h3" />
+      </>
+    ),
+  },
+  {
+    // アイコンは虫眼鏡と折れ線（試作の `researchB`。BD-03 SCR-001 3.2、Q-095 の答え）。
+    // Explore の方位の印とは、形、色（Research は緑、Explore は紫）、機能名で見分ける。
+    key: "research",
+    name: "Research",
+    href: "/research",
+    notice: null,
+    color: "#5fd3a2",
+    icon: (
+      <>
+        <circle cx="13" cy="13" r="8.5" />
+        <path d="m19.5 19.5 8 8" />
+        <path d="m8 15.5 3-3 3 2 4-5" />
       </>
     ),
   },

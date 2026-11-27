@@ -12,7 +12,7 @@ import { type Feature, FeatureIcon } from "./features";
 import { STEP_DEGREES, normalizeDegrees } from "./hud-angle";
 
 // 円形 HUD（BD-03 SCR-001-O01、O02、A02、A05）。
-// - 6つのセグメントを円形に並べ、右の真ん中（0度）に来たセグメントを選んだ機能として光らせる。
+// - 7つのセグメントを円形に並べ、右の真ん中（0度）に来たセグメントを選んだ機能として光らせる。
 // - 指で回すと回り（`onDrag`）、離すと `onRelease` で一番近い機能に合わせる。
 //   セグメントを押すと `onPick` で、その機能が右の真ん中に来るまで回す。
 // - 中心の AI の印を押すと `onCenter`（対象の無い AI チャット。A05）。中心の球は Codex（gpt-image）が
