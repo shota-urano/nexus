@@ -68,7 +68,10 @@ export function ArticleGuide({
           <h3 className="text-lg font-bold leading-snug">{article.title}</h3>
         </div>
       </div>
-      <ReceivedText markdown={article.guideMd} />
+      <ReceivedText
+        markdown={article.guideMd}
+        linkClassName="inline-flex min-h-11 min-w-11 items-center justify-center text-hud-amber underline underline-offset-2"
+      />
       <a
         href={article.sourceUrl}
         target="_blank"
