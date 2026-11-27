@@ -51,14 +51,24 @@ export function isSafeLink(href: string | undefined): href is string {
   }
 }
 
-function Link({ href, children }: { href?: string; children?: ReactNode }) {
+const DEFAULT_LINK_CLASS = "underline underline-offset-2";
+
+function Link({
+  href,
+  children,
+  className = DEFAULT_LINK_CLASS,
+}: {
+  href?: string;
+  children?: ReactNode;
+  className?: string;
+}) {
   if (!isSafeLink(href)) return <span>{children}</span>;
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="underline underline-offset-2"
+      className={className}
     >
       {children}
     </a>
@@ -86,7 +96,25 @@ const COMPONENTS: Components = {
   a: ({ href, children }) => <Link href={href}>{children}</Link>,
 };
 
-export function ReceivedText({ markdown }: { markdown: string }) {
+// linkClassName: リンクの見た目を置き換えるときに渡す。押す場所を 44 ピクセル四方以上に
+// したい面（BD-09 5章）で使う。渡さなければ下線だけのリンクにする。
+export function ReceivedText({
+  markdown,
+  linkClassName,
+}: {
+  markdown: string;
+  linkClassName?: string;
+}) {
+  const components: Components = linkClassName
+    ? {
+        ...COMPONENTS,
+        a: ({ href, children }) => (
+          <Link href={href} className={linkClassName}>
+            {children}
+          </Link>
+        ),
+      }
+    : COMPONENTS;
   return (
     <div className="break-words">
       <ReactMarkdown
@@ -94,7 +122,7 @@ export function ReceivedText({ markdown }: { markdown: string }) {
         skipHtml
         allowedElements={ALLOWED_ELEMENTS}
         unwrapDisallowed
-        components={COMPONENTS}
+        components={components}
       >
         {markdown}
       </ReactMarkdown>

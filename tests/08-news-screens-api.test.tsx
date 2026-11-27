@@ -153,6 +153,14 @@ function shownTitles(): string[] {
     .map((element) => element.querySelector("p")?.textContent ?? "");
 }
 
+// テーマの選択ボタン（名前はテーマの名前と件数。CR-018）。
+function themeButton(theme: string): HTMLElement {
+  const escaped = theme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return screen.getByRole("button", {
+    name: new RegExp(`^\\s*${escaped}[^0-9]*\\d+[^0-9]*$`),
+  });
+}
+
 function centerTitles(): string[] {
   return screen
     .queryAllByTestId("news-node")
@@ -174,13 +182,11 @@ describe("TC21 API の本当の応答（TC19）で、テーマで絞り、A1 を
     );
     expect(centerTitles()).toEqual([]);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "テーマ" }), {
-      target: { value: "半導体" },
-    });
+    // テーマはブラウザの select でなく、件数付きのボタンの並びで選ぶ（CR-018）。
+    expect(screen.queryByRole("combobox", { name: "テーマ" })).toBeNull();
+    fireEvent.click(themeButton("半導体"));
     await waitFor(() => expect(shownTitles()).toEqual(["今日の記事 A3"]));
-    fireEvent.change(screen.getByRole("combobox", { name: "テーマ" }), {
-      target: { value: "AI" },
-    });
+    fireEvent.click(themeButton("AI"));
     await waitFor(() =>
       expect(shownTitles().sort()).toEqual(
         ["今日の記事 A1", "今日の記事 A2", "3日前の記事 P1"].sort(),

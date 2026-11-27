@@ -157,6 +157,14 @@ function shownTitles(): string[] {
     .map((element) => element.querySelector("p")?.textContent ?? "");
 }
 
+// テーマの選択ボタン（名前はテーマの名前と件数。CR-018）。
+function themeButton(theme: string): HTMLElement {
+  const escaped = theme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return screen.getByRole("button", {
+    name: new RegExp(`^\\s*${escaped}[^0-9]*\\d+[^0-9]*$`),
+  });
+}
+
 function nodeElement(title: string): HTMLElement {
   const found = screen
     .getAllByTestId("news-node")
@@ -198,9 +206,9 @@ describe("TC21 テーマで絞り、ノードを押すと記事を中心にし�
     ]);
     expect(calls.map((call) => call.url)).toEqual(["/api/app/news/galaxy"]);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "テーマ" }), {
-      target: { value: "AI" },
-    });
+    // テーマはブラウザの select でなく、件数付きのボタンの並びで選ぶ（CR-018）。
+    expect(screen.queryByRole("combobox", { name: "テーマ" })).toBeNull();
+    fireEvent.click(themeButton("AI"));
     await waitFor(() =>
       expect(shownTitles()).toEqual([
         "今日の記事 A1",
@@ -208,9 +216,7 @@ describe("TC21 テーマで絞り、ノードを押すと記事を中心にし�
         "3日前の記事 P1",
       ]),
     );
-    fireEvent.change(screen.getByRole("combobox", { name: "テーマ" }), {
-      target: { value: "半導体" },
-    });
+    fireEvent.click(themeButton("半導体"));
     await waitFor(() => expect(shownTitles()).toEqual(["今日の記事 A3"]));
     expect(calls).toHaveLength(1);
   });
@@ -539,7 +545,7 @@ describe("M03 記事の案内（SCR-003）", () => {
 });
 
 describe("M03 News Galaxy（SCR-002）", () => {
-  it("上の帯の「AI に質問」は中心の記事を選ぶまで出さず、選ぶと中心の記事の内容ID を渡す（SCR-002-A05、CR-003）", async () => {
+  it("上の帯に「AI に質問」を置かない。中心の記事を選んでも出ない（SCR-002-A05 は CR-018 でやめた）", async () => {
     stubFetch(newsApi());
     const onAskAi = vi.fn();
     render(<NewsGalaxyRoute onAskAi={onAskAi} />);
@@ -549,10 +555,13 @@ describe("M03 News Galaxy（SCR-002）", () => {
       within(header).queryByRole("button", { name: "AI に質問" }),
     ).toBeNull();
 
-    await openA1();
-    fireEvent.click(
-      await within(header).findByRole("button", { name: "AI に質問" }),
-    );
+    const sheet = await openA1();
+    expect(nodeElement("今日の記事 A1").dataset.center).toBe("true");
+    expect(
+      within(header).queryByRole("button", { name: "AI に質問", hidden: true }),
+    ).toBeNull();
+    // 「AI に質問」は記事の案内から開く（SCR-003-A05）。
+    fireEvent.click(within(sheet).getByRole("button", { name: "AI に質問" }));
     expect(onAskAi).toHaveBeenCalledWith(1);
   });
 

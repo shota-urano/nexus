@@ -29,12 +29,15 @@ import { WaitMark } from "./wait-mark";
 //   `related` のうち、図に無い記事と線を図に足す（DD-02 FN-003 手順 5）。動いている間に押し直すと、
 //   前の読み込みを止め、最後の1回だけを受ける。
 // - 案内で関係のある記事を押すと、図の中心もその記事に移す（BD-03 遷移表 SCR-003-A06）。
+// - 「未読」の切り替え（I03、A06。CR-018）を押すと、図を未読の記事だけにし、もう一度押すと全てに戻す。
+//   テーマの絞り込みと重ね、サーバは呼ばない。切り替えには選んだ日の記事のうち未読の数を添え、
+//   案内で既読を変えるとその数も変える。テーマの選択ボタンには選んだ日の記事の件数を添える。
 // - 0件は MSG-001、読めなければ MSG-019。読み込み中は図の場所に待つ印を出し、日付とテーマは選べる。
 //   401 のときは図を出さない（全面の知らせは M01 の枠が出す）。
 // - 案内の面を開いている間は、図を指でずらす操作と拡大縮小を切る。案内で関係のある記事を
 //   足しただけのときは、図を画面に合わせ直さない（BD-03 SCR-002・SCR-003、BD-09 5章）。
-// - 中心の記事が替わると `onCenterChange` で知らせる。上の帯の「AI に質問」（A05）は、中心の記事を
-//   選んでいるときだけ道（M01）が出す（CR-003）。案内の「AI に質問」は `onAskAi` に内容ID を渡す。
+// - 上の帯に「AI に質問」は置かない（A05 は CR-018 でやめた）。案内の「AI に質問」は `onAskAi` に
+//   内容ID を渡す。
 
 type Phase = "loading" | "ready" | "failed" | "unauthorized";
 
@@ -49,11 +52,8 @@ function linkKey(link: GalaxyLink): string {
 }
 
 export function NewsGalaxyScreen({
-  onCenterChange,
   onAskAi,
 }: {
-  /** 中心の記事が替わったとき。中心が無ければ null */
-  onCenterChange?: (contentId: number | null) => void;
   /** 案内で「AI に質問」を押したとき（SCR-003-A05）。その記事の内容ID を渡す */
   onAskAi?: (contentId: number) => void;
 } = {}) {
@@ -67,12 +67,9 @@ export function NewsGalaxyScreen({
     Map<number, Partial<Pick<GalaxyNode, "isNew" | "isRead">>>
   >(new Map());
   const [theme, setTheme] = useState(ALL_THEMES);
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [center, setCenter] = useState<number | null>(null);
   const [opened, setOpened] = useState<number | null>(null);
-
-  useEffect(() => {
-    onCenterChange?.(center);
-  }, [center, onCenterChange]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,6 +85,7 @@ export function NewsGalaxyScreen({
         setExtraLinks([]);
         setReadStates(new Map());
         setTheme(ALL_THEMES);
+        setUnreadOnly(false);
         setCenter(null);
         setOpened(null);
         setPhase("ready");
@@ -102,7 +100,7 @@ export function NewsGalaxyScreen({
 
   const thisYear = thisYearInJapan(new Date());
 
-  // 図に出すノードと線。応答の記事に、案内で足した記事を加え、テーマで絞る。
+  // 図に出すノードと線。応答の記事に、案内で足した記事を加え、テーマと未読で絞る。
   const { nodes, links } = useMemo(() => {
     if (galaxy === null) return { nodes: [], links: [] };
     const all = [...galaxy.nodes];
@@ -115,10 +113,8 @@ export function NewsGalaxyScreen({
     }
     const shown = all
       .filter((node) => theme === ALL_THEMES || node.theme === theme)
-      .map((node) => {
-        const state = readStates.get(node.contentId);
-        return state === undefined ? node : { ...node, ...state };
-      });
+      .map((node) => withState(node, readStates))
+      .filter((node) => !unreadOnly || !node.isRead);
     const keys = new Set<string>();
     const allLinks: GalaxyLink[] = [];
     for (const link of [...galaxy.links, ...extraLinks]) {
@@ -129,7 +125,23 @@ export function NewsGalaxyScreen({
       }
     }
     return { nodes: shown, links: allLinks };
-  }, [galaxy, extraNodes, extraLinks, theme, readStates]);
+  }, [galaxy, extraNodes, extraLinks, theme, unreadOnly, readStates]);
+
+  // 選んだ日の記事（関係の先の過去の記事は除く）の、テーマごとの件数と未読の数。
+  const counts = useMemo(() => {
+    const byTheme = new Map<string, number>();
+    let total = 0;
+    let unread = 0;
+    if (galaxy !== null) {
+      for (const node of galaxy.nodes) {
+        if (node.targetDate !== galaxy.date) continue;
+        total += 1;
+        byTheme.set(node.theme, (byTheme.get(node.theme) ?? 0) + 1);
+        if (!withState(node, readStates).isRead) unread += 1;
+      }
+    }
+    return { byTheme, total, unread };
+  }, [galaxy, readStates]);
 
   // 図を画面に合わせ直すきっかけ。日付かテーマが替わって、案内で足した記事も含めた出すノードの組が
   // 前と替わったら数を進める。案内で関係のある記事を足しただけのときは組を覚え直すだけで数を
@@ -138,18 +150,24 @@ export function NewsGalaxyScreen({
   const [fitBasis, setFitBasis] = useState({
     galaxy,
     theme,
+    unreadOnly,
     shown: shownKey,
     version: 0,
   });
   if (
     fitBasis.galaxy !== galaxy ||
     fitBasis.theme !== theme ||
+    fitBasis.unreadOnly !== unreadOnly ||
     fitBasis.shown !== shownKey
   ) {
-    const switched = fitBasis.galaxy !== galaxy || fitBasis.theme !== theme;
+    const switched =
+      fitBasis.galaxy !== galaxy ||
+      fitBasis.theme !== theme ||
+      fitBasis.unreadOnly !== unreadOnly;
     setFitBasis({
       galaxy,
       theme,
+      unreadOnly,
       shown: shownKey,
       version:
         switched && fitBasis.shown !== shownKey
@@ -248,40 +266,47 @@ export function NewsGalaxyScreen({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2 text-sm">
-        <label className="inline-flex items-center gap-2">
-          日付
-          <select
-            aria-label="日付"
-            value={date ?? ""}
-            disabled={dateOptions.length === 0}
-            onChange={(event) => chooseDate(event.target.value)}
-            className="min-h-11 rounded-md border px-2"
-          >
-            {dateOptions.map((option) => (
-              <option key={option} value={option}>
-                {formatListDate(option, thisYear)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="inline-flex items-center gap-2">
-          テーマ
-          <select
-            aria-label="テーマ"
-            value={theme}
+      {/* 日付は題名の下に置き、その下に「未読」とテーマの選択ボタンを横に並べる（BD-03 SCR-002 の 3.2）。 */}
+      <div className="flex flex-col gap-2 px-4 pb-2 text-sm">
+        <select
+          aria-label="日付"
+          value={date ?? ""}
+          disabled={dateOptions.length === 0}
+          onChange={(event) => chooseDate(event.target.value)}
+          className="min-h-11 min-w-11 self-start rounded-hud border border-hud-line bg-hud-field px-3 text-hud-amber disabled:opacity-60"
+        >
+          {dateOptions.map((option) => (
+            <option key={option} value={option}>
+              {formatListDate(option, thisYear)}
+            </option>
+          ))}
+        </select>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          <FilterChip
+            label="未読"
+            count={counts.unread}
+            pressed={unreadOnly}
             disabled={!hasArticles}
-            onChange={(event) => setTheme(event.target.value)}
-            className="min-h-11 rounded-md border px-2"
-          >
-            <option value={ALL_THEMES}>すべて</option>
-            {(galaxy?.themes ?? []).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+            onClick={() => setUnreadOnly((previous) => !previous)}
+          />
+          <FilterChip
+            label="すべて"
+            count={counts.total}
+            pressed={theme === ALL_THEMES}
+            disabled={!hasArticles}
+            onClick={() => setTheme(ALL_THEMES)}
+          />
+          {(galaxy?.themes ?? []).map((name) => (
+            <FilterChip
+              key={name}
+              label={name}
+              count={counts.byTheme.get(name) ?? 0}
+              pressed={theme === name}
+              disabled={!hasArticles}
+              onClick={() => setTheme(name)}
+            />
+          ))}
+        </div>
       </div>
       <div className="relative min-h-[60dvh] flex-1 overflow-hidden">
         {body}
@@ -290,6 +315,7 @@ export function NewsGalaxyScreen({
         open={opened !== null}
         title="記事の案内"
         onClose={closeSheet}
+        tone="hud"
       >
         {opened !== null && (
           <ArticlePanel
@@ -304,5 +330,50 @@ export function NewsGalaxyScreen({
         )}
       </BottomSheet>
     </div>
+  );
+}
+
+// 案内で変えた新着と既読を、ノードに重ねる。
+function withState(
+  node: GalaxyNode,
+  states: ReadonlyMap<number, Partial<Pick<GalaxyNode, "isNew" | "isRead">>>,
+): GalaxyNode {
+  const state = states.get(node.contentId);
+  return state === undefined ? node : { ...node, ...state };
+}
+
+// 件数付きの丸い選択ボタン（SCR-002-I02、I03。CR-018）。ボタンの名前は「{label} {件数}件」。
+// 押す場所は 44 ピクセル四方以上にする（RD-11 NFR-008）。
+function FilterChip({
+  label,
+  count,
+  pressed,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  pressed: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`${label} ${count}件`}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-full border px-4 whitespace-nowrap disabled:opacity-60 ${
+        pressed
+          ? "border-hud-amber bg-hud-amber/15 text-hud-amber"
+          : "border-hud-veil bg-hud-field text-hud-text"
+      }`}
+    >
+      <span>{label}</span>
+      <span className={pressed ? "text-hud-amber" : "text-hud-muted"}>
+        {count}
+      </span>
+    </button>
   );
 }

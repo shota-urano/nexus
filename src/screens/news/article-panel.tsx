@@ -6,6 +6,7 @@ import type { ArticleDetail, ContentState } from "../../contracts/news";
 import { type BottomNotice, BottomNotices } from "../../ui/bottom-notices";
 import { EmptyState } from "../../ui/empty-state";
 import { ArticleGuide } from "../../ui/kinds/news/article-guide";
+import { BookIcon, BookmarkIcon } from "../../ui/kinds/news/article-icons";
 import {
   NEWS_MESSAGES,
   type StateOperation,
@@ -178,7 +179,7 @@ export function ArticlePanel({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-4"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-hud-line px-4"
             >
               戻る
             </button>
@@ -192,7 +193,11 @@ export function ArticlePanel({
   } else {
     const { state } = article;
     const buttonClass =
-      "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border px-4 disabled:opacity-50";
+      "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-hud-line disabled:opacity-50";
+    // 既読（本）と保存（ブックマーク）はアイコンのボタンにし、名前は BD-09 4章の操作の言葉にする。
+    // 状態が入のときはアイコンを塗り、アンバーにする（SCR-003-O07、CR-018）。
+    const readLabel = state.isRead ? "未読に戻す" : "読んだ";
+    const saveLabel = state.isSaved ? "保存を外す" : "保存";
     body = (
       <ArticleGuide
         article={article}
@@ -202,27 +207,29 @@ export function ArticlePanel({
           <>
             <button
               type="button"
+              aria-label={readLabel}
               disabled={pending.read}
               onClick={() =>
                 change("read", state.isRead ? "未読に戻す" : "既読に", () =>
                   setRead(article.contentId, !state.isRead),
                 )
               }
-              className={buttonClass}
+              className={`${buttonClass} ${state.isRead ? "text-hud-amber" : "text-hud-text"}`}
             >
-              {state.isRead ? "未読に戻す" : "読んだ"}
+              <BookIcon filled={state.isRead} />
             </button>
             <button
               type="button"
+              aria-label={saveLabel}
               disabled={pending.saved}
               onClick={() =>
                 change("saved", state.isSaved ? "保存を外す" : "保存", () =>
                   setSaved(article.contentId, !state.isSaved),
                 )
               }
-              className={buttonClass}
+              className={`${buttonClass} ${state.isSaved ? "text-hud-amber" : "text-hud-text"}`}
             >
-              {state.isSaved ? "保存を外す" : "保存"}
+              <BookmarkIcon filled={state.isSaved} />
             </button>
             <AskAiButton onClick={() => onAskAi?.(article.contentId)} />
           </>

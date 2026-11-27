@@ -12,10 +12,10 @@ import NewsRoute from "../src/app/(screens)/news/page";
 import type { ArticleDetail, Galaxy, GalaxyNode } from "../src/contracts/news";
 import { installReactFlowStubs } from "./fixtures/react-flow";
 
-// 08-news の実装単位3。News Galaxy の上の帯の「AI に質問」（SCR-002-A05）と、記事の案内の
-// 「AI に質問」（SCR-003-A05）を押すと、その記事を対象（kind: "article" と内容ID）に AI チャットの面
+// 08-news の実装単位3。記事の案内の「AI に質問」（SCR-003-A05）を押すと、その記事を対象（kind: "article" と内容ID）に AI チャットの面
 // SCR-006（M06 の ChatSheet）を下から開く。記事の案内を全画面で開いたとき（/news?article={contentId}）も
-// 同じにする（BD-03 SCR-002-A05・SCR-003-A05・4章、DD-01 M01・M03・M06）。
+// 同じにする（BD-03 SCR-003-A05・4章、DD-01 M01・M03・M06）。上の帯の「AI に質問」（SCR-002-A05）は
+// CR-018 でやめたので、上の帯に出ないことを確かめる。
 // 道（M01）の `/news` の入口（page.tsx）を描いて確かめる。質問の対象は、AI チャットの面が呼ぶ
 // `listConversations` の targetContentId と、`createConversation` の本文の target で確かめる。
 
@@ -259,20 +259,21 @@ describe("News Galaxy（/news）から AI チャットを開く", () => {
     await expectChatOpenedFor(1);
   });
 
-  it("上の帯の「AI に質問」を押すと、中心の記事を対象に AI チャットの面が開く（SCR-002-A05）", async () => {
+  it("上の帯には「AI に質問」を置かず、中心の記事は記事の案内の「AI に質問」から開く（SCR-002-A05 は CR-018 でやめた）", async () => {
     stubApi();
     await renderNews();
     await screen.findByText("今日の記事 A2");
     // 上の帯（記事の案内の面を開く前の、ページの帯）。
     const header = screen.getByRole("banner");
     // A2 を押して中心にする。
-    await openArticleSheet("今日の記事 A2");
+    const sheet = await openArticleSheet("今日の記事 A2");
     expect(nodeElement("今日の記事 A2").dataset.center).toBe("true");
     expect(screen.queryByRole("dialog", { name: "AI チャット" })).toBeNull();
+    expect(
+      within(header).queryByRole("button", { name: "AI に質問", hidden: true }),
+    ).toBeNull();
 
-    fireEvent.click(
-      await within(header).findByRole("button", { name: "AI に質問" }),
-    );
+    fireEvent.click(within(sheet).getByRole("button", { name: "AI に質問" }));
     await expectChatOpenedFor(2);
   });
 
