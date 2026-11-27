@@ -2,6 +2,8 @@
 // SCR-008-A03、SCR-009-A02）。色と道は画面の試作 `prototype/` に合わせる（本人の答え）。
 // - ニュース: 記事の案内 SCR-003 を全画面で開く `/news?article={contentId}`
 // - 英語: 英語の学習 SCR-005 `/english/{contentId}`
+// - 週報: 課題の週報 SCR-011 `/research/{contentId}`（CR-020。BD-03 2章 遷移表）。色はデザインシステムの
+//   `--color-kind-research`（globals の @theme。本人の答え）を使う。
 
 interface KindDisplay {
   label: string;
@@ -19,6 +21,11 @@ const KIND_DISPLAYS: Record<string, KindDisplay> = {
     label: "英語",
     color: "#ffb040",
     href: (contentId) => `/english/${contentId}`,
+  },
+  research: {
+    label: "週報",
+    color: "var(--color-kind-research)",
+    href: (contentId) => `/research/${contentId}`,
   },
 };
 
