@@ -11,6 +11,7 @@ import { type BottomNotice, BottomNotices } from "../../ui/bottom-notices";
 import { ConfirmPanel } from "../../ui/confirm-panel";
 import { ReceivedText } from "../../ui/received-text";
 import { EnglishMaterial } from "../../ui/kinds/english/lesson";
+import type { ReadingSelection } from "../../ui/kinds/english/reading";
 import {
   EnglishProblemGrade,
   EnglishProblemQuestion,
@@ -79,7 +80,14 @@ const buttonClass = "min-h-11 rounded border px-4";
 
 type MessageId = keyof typeof ENGLISH_MESSAGES;
 
-export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
+export function EnglishStudy({
+  set,
+  onSelect,
+}: {
+  set: EnglishSetDetail;
+  /** 読む教材で選んでいる箇所が替わったとき（SCR-005-A09 の対象）。選んでいなければ null */
+  onSelect?: (selection: ReadingSelection | null) => void;
+}) {
   const [stage, setStage] = useState<Stage>("material");
   const [index, setIndex] = useState(0);
   // 前に完了した答え。完了で残せたら、残した答えに替える。
@@ -200,7 +208,11 @@ export function EnglishStudy({ set }: { set: EnglishSetDetail }) {
 
       {stage === "material" && (
         <section aria-label="教材の段">
-          <EnglishMaterial lessonMd={set.lessonMd} reading={set.reading} />
+          <EnglishMaterial
+            lessonMd={set.lessonMd}
+            reading={set.reading}
+            onSelect={onSelect}
+          />
           {lastAnswer !== null && (
             <section aria-label="前の答えと採点" className="mt-6">
               <h3 className="font-bold">前の答えと採点</h3>

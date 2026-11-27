@@ -1,6 +1,6 @@
 import type { Reading } from "../../../contracts/english";
 import { ReceivedText } from "../../received-text";
-import { EnglishReading } from "./reading";
+import { EnglishReading, type ReadingSelection } from "./reading";
 
 // 英語の教材の段の表示部品（DD-01 M08。BD-03 SCR-005-O03、O04、BD-02 FN-009）。
 // 教材の本文の後に、読む教材を続けて置く（RD-03 R07、Q-033 の答え）。
@@ -22,9 +22,12 @@ export function lessonWithoutReadingSection(lessonMd: string): string {
 export function EnglishMaterial({
   lessonMd,
   reading,
+  onSelect,
 }: {
   lessonMd: string;
   reading: Reading | null;
+  /** 読む教材で選んでいる箇所が替わったとき（SCR-005-A09 の対象） */
+  onSelect?: (selection: ReadingSelection | null) => void;
 }) {
   return (
     <div>
@@ -35,7 +38,9 @@ export function EnglishMaterial({
           }
         />
       </section>
-      {reading !== null && <EnglishReading reading={reading} />}
+      {reading !== null && (
+        <EnglishReading reading={reading} onSelect={onSelect} />
+      )}
     </div>
   );
 }

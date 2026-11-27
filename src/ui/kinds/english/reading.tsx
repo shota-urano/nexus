@@ -1,6 +1,12 @@
 "use client";
 
-import { type KeyboardEvent, type MouseEvent, useState } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   Reading,
   ReadingNote,
@@ -12,6 +18,16 @@ import type {
 // - 注のある語句を種類（今日の規則、単語、熟語、文法）ごとに色分けし、凡例と「印を隠す」を置く。
 // - 注を押すと、その注の種類と説明を語句の近くに重ねて出す。AI もサーバも呼ばない（FN-009 手順 3）。
 // - 文の注の無い所を押すと、その文の和訳を下に出す。
+// - 開いている注の語句か和訳を出している文を、選んでいる箇所として `onSelect` で知らせる
+//   （SCR-005-A09 の対象。BD-03）。どちらも閉じたときと、この部品が消えるときは null を知らせる。
+
+// 選んでいる箇所。注の語句を選んだときは `phrase` に語句を入れ、文を選んだときは入れない。
+export type ReadingSelection = {
+  phrase?: string;
+  sentence: string;
+  paragraphIndex: number;
+  sentenceIndex: number;
+};
 
 // 注の種類の名前と色（sharpen の read.html と同じ見せ方。画面の試作 `prototype/` に合わせる）。
 const NOTE_KINDS: Record<string, { label: string; color: string }> = {
@@ -72,11 +88,24 @@ function pressable(onPress: () => void) {
   };
 }
 
-export function EnglishReading({ reading }: { reading: Reading }) {
+export function EnglishReading({
+  reading,
+  onSelect,
+}: {
+  reading: Reading;
+  /** 選んでいる箇所が替わったとき。選んでいなければ null */
+  onSelect?: (selection: ReadingSelection | null) => void;
+}) {
   const [plain, setPlain] = useState(false);
   // 開いている注（段落、文、注の番号）と、和訳を出している文（段落、文の番号）。
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [openSentence, setOpenSentence] = useState<string | null>(null);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+  // 部品が消える（教材の段を離れる）ときは、選んでいる箇所も無くなる。
+  useEffect(() => () => onSelectRef.current?.(null), []);
 
   return (
     <section aria-label="読む教材" className="mt-6 border-t pt-4">
@@ -128,9 +157,18 @@ export function EnglishReading({ reading }: { reading: Reading }) {
                           : "rounded"
                       }
                       {...pressable(() => {
+                        const next =
+                          openSentence === sentenceKey ? null : sentenceKey;
                         setOpenNote(null);
-                        setOpenSentence((current) =>
-                          current === sentenceKey ? null : sentenceKey,
+                        setOpenSentence(next);
+                        onSelect?.(
+                          next === null
+                            ? null
+                            : {
+                                sentence: sentence.en,
+                                paragraphIndex: p,
+                                sentenceIndex: s,
+                              },
                         );
                       })}
                     >
@@ -155,9 +193,19 @@ export function EnglishReading({ reading }: { reading: Reading }) {
                                     }
                               }
                               {...pressable(() => {
+                                const next =
+                                  openNote === noteKey ? null : noteKey;
                                 setOpenSentence(null);
-                                setOpenNote((current) =>
-                                  current === noteKey ? null : noteKey,
+                                setOpenNote(next);
+                                onSelect?.(
+                                  next === null
+                                    ? null
+                                    : {
+                                        phrase: part.text,
+                                        sentence: sentence.en,
+                                        paragraphIndex: p,
+                                        sentenceIndex: s,
+                                      },
                                 );
                               })}
                             >
