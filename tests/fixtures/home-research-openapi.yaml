@@ -1,0 +1,48 @@
+# DD-04 の `Home`（`research` を足した形。CR-020、CR-021。コミット 1bf26ef の docs/api/openapi.yaml を正とする）。
+# tests/11-home-research.test.ts の TC102 が、docs/api/openapi.yaml の `Home` と形（description と summary を除く）を照らす。
+schemas:
+  Home:
+    type: object
+    required: [newCount, unreadCount, learning, ai, picks, notices, research]
+    properties:
+      research:
+        type: object
+        required: [unreadCount]
+        description: Research のカードに出す値（FN-020。CR-020）。週報の未着は出さない
+        properties:
+          unreadCount:
+            { type: integer, minimum: 0, description: 既読でない週報の数 }
+      newCount: { type: integer, minimum: 0 }
+      unreadCount: { type: integer, minimum: 0 }
+      learning:
+        description: 対象日が一番新しい英語の教材。無ければ null
+        oneOf:
+          - type: object
+            required: [contentId, learningTheme, isCompleted]
+            properties:
+              contentId: { $ref: "#/components/schemas/Id" }
+              learningTheme: { type: string }
+              isCompleted: { type: boolean }
+          - { type: "null" }
+      ai:
+        type: object
+        required: [writingCount, hasFailure]
+        properties:
+          writingCount: { type: integer, minimum: 0 }
+          hasFailure: { type: boolean }
+      picks:
+        type: array
+        maxItems: 3
+        items:
+          type: object
+          required: [contentId, title, theme, imageUrl]
+          properties:
+            contentId: { $ref: "#/components/schemas/Id" }
+            title: { type: string }
+            theme: { type: string }
+            imageUrl:
+              oneOf: [{ $ref: "#/components/schemas/Url" }, { type: "null" }]
+      notices:
+        type: array
+        description: ホームのカードに出す知らせ（MSG-015、MSG-016、MSG-017）
+        items: { type: string, enum: [MSG-015, MSG-016, MSG-017] }

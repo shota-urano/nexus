@@ -26,6 +26,7 @@ import {
 
 // 11-home の実装単位1: ホームの表示 `getHome`（FN-020、DD-01 M19、DD-02 FN-020、BD-11 M01・M02）。
 // 受け入れ基準は DD-10 TC80、TC81、TC82、TC83、TC73。
+// 実装単位5（CR-020）で、TC80 と TC83 に `research.unreadCount`（既読でない週報の数）を足した。
 // 日本時間の今は 2026-12-01 08:00（DD-10 2章の共通）。端末 `ipad` の鍵 K1 を Cookie に持つ。
 // データはテストごとに空の DB に、そのテストの前提の分だけを入れる。
 
@@ -240,6 +241,8 @@ describe("ホームの表示 getHome（FN-020）", () => {
       isCompleted: false,
     });
     expect(result.ai).toEqual({ writingCount: 0, hasFailure: false });
+    // 週報は無いので、既読でない週報の数は 0（CR-020。11-home の実装単位5）。
+    expect(result).toHaveProperty("research", { unreadCount: 0 });
   });
 
   it("関係の数が同じ記事は届いた日時の古い順。一番新しい教材が完了していれば isCompleted が真。作成中の AI の発言を数える", async () => {
@@ -384,6 +387,7 @@ describe("ホームの表示 getHome（FN-020）", () => {
       ai: { writingCount: 0, hasFailure: false },
       picks: [],
       notices: ["MSG-015", "MSG-016"],
+      research: { unreadCount: 0 },
     });
   });
 
