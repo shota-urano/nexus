@@ -57,3 +57,5 @@ MSG-015、MSG-016、MSG-017、MSG-019。
   - 受け入れ基準: DD-10 TC28 が通る
 - [x] [Frontend] ホームのカードの機能のアイコン（ニュース、英語など）を、BD-13 の試作 `prototype/app/page.tsx` の同じ機能のアイコンと同じ絵にする（SCR-001、BD-13 P01、DD-01 M02）（se/11-home）
   - 受け入れ基準: DD-10 TC114 が通る; 機能ごとのアイコンの SVG の path が、試作の同じ機能のアイコンの path と同じである
+- [ ] [Backend] `getHome` に `research.unreadCount`（既読でない週報の数）を足す。週報の未着は出さない（FN-020、DD-01 M19、DD-02 FN-020、DD-04 `Home`、RD-03 R21、CR-020）
+  - 受け入れ基準: DD-10 TC142、DD-10 TC80、DD-10 TC83、DD-10 TC102 が通る

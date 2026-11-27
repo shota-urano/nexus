@@ -2,12 +2,13 @@
 id: X-05
 name: レビュー記録・工程完了判定記録
 phase: 横断
-version: 1.2
-updated: 2026-11-24
+version: 1.3
+updated: 2026-11-27
 ---
 
 # X-05 レビュー記録・工程完了判定記録（NEXUS）
 
+- 1.3: CR-020 の仕様書の確定（2026-11-27 本人）を 3章 PG03 の後に足した。それまでの記録は変えていない。
 - 1.2: 詳細設計の RV16〜RV19 と、詳細設計の完了判定 PG03 を足した（2026-11-25）。それまでの記録は変えていない。
 
 ## 1. 記録の決まり
@@ -1010,6 +1011,7 @@ Codex（GPT-6系）。書いたClaude（Opus 5.5）とは別モデルによる�
 - confirmed にしてよい仕様書: docs/specs/01-foundation.md、docs/specs/02-data-model.md、docs/specs/03-auth-and-admin.md、docs/specs/04-ai-runner.md、docs/specs/05-ingest.md、docs/specs/06-app-shell.md、docs/specs/07-contents.md、docs/specs/08-news.md、docs/specs/09-english.md、docs/specs/10-chat.md、docs/specs/11-home.md、docs/specs/12-batch.md、docs/specs/13-release.md
 - 判定の後、対象の詳細設計の書類の版を 1.0 にした。
 - 仕様書の確定: 2026-11-25、RD-01 SH01（本人）の指示で、上の一覧の13本を `confirmed` にした（frontmatter の status は書いた AI が本人の指示で書き換えた）。
+- CR-020 の仕様書の確定: 2026-11-27、RD-01 SH01（本人）の指示で、CR-020 で足した実装単位（docs/specs/02-data-model.md、03-auth-and-admin.md、05-ingest.md、06-app-shell.md、07-contents.md、10-chat.md、11-home.md、13-release.md の `- [ ]` の行）を確定し、新しい docs/specs/14-research.md を `confirmed` にした（frontmatter の status は書いた AI が本人の指示で書き換えた）。確定の前に Q-095（2026-11-27 本人）と、帯の色の優先順（反対の意見あり → 今週足した → 出典が増えた。BD-03 SCR-011。2026-11-27 本人が推奨どおりに確定）が決まり、14本とも dscheck spec-gate を通った。
 
 ## 4. テストの判定
 

@@ -2,8 +2,8 @@
 id: DD-03
 name: DB 物理設計書
 phase: 詳細設計
-version: 1.0
-updated: 2026-11-25
+version: 1.1
+updated: 2026-11-27
 ---
 
 # DD-03 DB 物理設計書（NEXUS）
@@ -13,6 +13,7 @@ updated: 2026-11-25
 - 0.1: 初めて書いた（2026-11-24）。
 - 0.2: X-05 RV16 の指摘で直した（2026-11-25）。`content.kind` の値の検査制約を外し（RV16-05）、多重起動の印の `job_lock` を足した（RV16-03）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
+- 1.1: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`research_topic`（ENT-014）と `research_report`（ENT-015）と索引を足し、`delivery` と `sender_key` の `sender` の検査制約に `brain-research` を足した。外部キーの検査を止めて当てるマイグレーションの決まりと、`0002-research-report.sql` の中身を5章に足した（Q-088、Q-090、Q-096 の答え）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 物理設計の前提
@@ -49,7 +50,9 @@ updated: 2026-11-25
 | `device` | ENT-011 端末 | なし | BD-07 2章 ENT-011 |
 | `registration_code` | ENT-012 登録コード | なし | BD-07 2章 ENT-012 |
 | `sender_key` | ENT-013 配信元の鍵 | なし | BD-07 2章 ENT-013 |
-| `search_index` | 物理のみ（ENT-001、ENT-002、ENT-003 の検索の写し） | FN-018 の検索（大文字と小文字、全角と半角を区別せず、空白で区切った言葉を全て含む。Q-081 の答え）を、NFR-001 の時間に収めるため。FTS5 の仮想のテーブルにする（3章） | `content` と同じ数 |
+| `research_topic` | ENT-014 研究課題（CR-020） | なし | BD-07 2章 ENT-014 |
+| `research_report` | ENT-015 週報（CR-020） | なし | BD-07 2章 ENT-015 |
+| `search_index` | 物理のみ（ENT-001、ENT-002、ENT-003、ENT-015 の検索の写し） | FN-018 の検索（大文字と小文字、全角と半角を区別せず、空白で区切った言葉を全て含む。Q-081 の答え）を、NFR-001 の時間に収めるため。FTS5 の仮想のテーブルにする（3章） | `content` と同じ数 |
 | `schema_migration` | 物理のみ | 当てたマイグレーションを残すため（5章） | マイグレーションの数 |
 | `job_lock` | 物理のみ | 定期ジョブの多重起動を防ぐ印（DD-05 4章。RV16-03） | 動いているジョブの数（0〜2 行） |
 
@@ -175,7 +178,7 @@ updated: 2026-11-25
 | カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
 |---|---|---|---|---|---|
 | `delivery_id` | 記録ID | INTEGER | 不可 | なし | 主キー（AUTOINCREMENT） |
-| `sender` | 配信元 | TEXT | 不可 | なし | 検査制約 `brain-harness` か `sharpen`（BD-07 4.2） |
+| `sender` | 配信元 | TEXT | 不可 | なし | 検査制約 `brain-harness`、`sharpen`、`brain-research` のどれか（BD-07 4.2。`brain-research` は CR-020） |
 | `target_date` | 対象日 | TEXT | 可 | なし | 空でなければ日付の検査。検査制約 `result` が `accepted` なら空でない |
 | `received_at` | 受け取った日時 | TEXT | 不可 | なし | 日時の検査 |
 | `item_count` | 件数 | INTEGER | 不可 | なし | 検査制約 0以上 |
@@ -205,9 +208,36 @@ updated: 2026-11-25
 
 | カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
 |---|---|---|---|---|---|
-| `sender` | 配信元 | TEXT | 不可 | なし | 主キー。検査制約 `brain-harness` か `sharpen` |
+| `sender` | 配信元 | TEXT | 不可 | なし | 主キー。検査制約 `brain-harness`、`sharpen`、`brain-research` のどれか（`brain-research` は CR-020） |
 | `key_hash` | 鍵の照合値 | TEXT | 不可 | なし | 一意。検査制約 空でない。作り方は DD-02 |
 | `issued_at` | 用意した日時 | TEXT | 不可 | なし | 日時の検査 |
+
+#### `research_topic`（ENT-014。CR-020）
+
+| カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
+|---|---|---|---|---|---|
+| `topic_id` | 課題番号 | INTEGER | 不可 | なし | 主キー（AUTOINCREMENT） |
+| `topic_key` | 課題の ID | TEXT | 不可 | なし | 一意。検査制約 1〜64文字で、a〜z、0〜9、`-` だけ（Q-096 の答え） |
+| `title` | 課題名 | TEXT | 不可 | なし | 検査制約 空でなく、改行を含まない。200文字までは受け取りで確かめる |
+| `status` | 状態 | TEXT | 不可 | なし | 検査制約 `active` か `ended`（BD-07 4.2 課題の状態） |
+| `last_week` | 最後に届いた週 | INTEGER | 不可 | なし | 検査制約 1以上 |
+| `last_received_at` | 最後に届いた日時 | TEXT | 不可 | なし | 日時の検査 |
+
+#### `research_report`（ENT-015。CR-020）
+
+| カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
+|---|---|---|---|---|---|
+| `content_id` | 内容ID | INTEGER | 不可 | なし | 主キー。外部キー `content`。削除と更新は拒否する |
+| `topic_id` | 課題番号 | INTEGER | 不可 | なし | 外部キー `research_topic`。削除と更新は拒否する。`topic_id` と `week` の組で一意（3章 `research_report_week_uq`。RD-03 R23） |
+| `week` | 何週目か | INTEGER | 不可 | なし | 検査制約 1以上 |
+| `sent_on` | 送った日 | TEXT | 不可 | なし | 日付の検査 |
+| `status` | 状態 | TEXT | 不可 | なし | 検査制約 `active` か `ended` |
+| `answer_md` | 現時点の答え | TEXT | 不可 | なし | 検査制約 空でない |
+| `approaches_json` | 方法の一覧 | TEXT | 不可 | なし | JSON の検査（1章）。検査制約 JSON の配列で、0〜15件（Q-088 の答え） |
+| `unknowns_md` | まだ分かっていないこと | TEXT | 不可 | `''` | なし（空の文字を許す） |
+| `changes_md` | 今週の変化 | TEXT | 不可 | なし | 検査制約 空でない |
+
+- `approaches_json` の1件は `{ "title", "howToMd", "sourceUrls", "marks", "counterMd" }`（BD-06 IF-005 3.2 の名前のまま）。出典の数は持たず、読むときに `sourceUrls` の数で数える（Q-088 の答え）。
 
 #### `search_index`（物理のみ）
 
@@ -216,7 +246,7 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
 |---|---|---|---|---|---|
 | `content_id` | 物理のみ（`content` の内容ID。索引にしない列） | 文字か数（FTS5 は型を持たない） | - | なし | なし（外部キーは FTS5 に付けられない。2.3） |
-| `body` | 物理のみ（ENT-001 見出し、ENT-002 案内、ENT-003 教材の本文を、改行でつないで NFKC で正規化し、小文字にした文） | 同上 | - | なし | なし |
+| `body` | 物理のみ（ENT-001 見出し、ENT-002 案内、ENT-003 教材の本文、ENT-015 現時点の答えと方法の見出し（CR-020）を、改行でつないで NFKC で正規化し、小文字にした文） | 同上 | - | なし | なし |
 
 - NFKC の正規化は、全角と半角を区別しないため（Q-081 の答え）に、業務層が入れる前に行う。SQLite の関数では行えないので、トリガーにしない（3章）。
 
@@ -240,7 +270,7 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 
 | 規則 | どこで守るか | 制約で表さない理由 |
 |---|---|---|
-| `content` の種類がニュースなら `article` が1件、英語なら `english_set` が1件あり、両方は無い（BD-07 ENT-001、ENT-002、ENT-003） | DD-02 の FN-001、FN-007 の手順（M13、M15、M16。内容と中身を1つのトランザクションで作る。DD-05） | 別のテーブルの行の有無は、検査制約で書けないため |
+| `content` の種類がニュースなら `article` が1件、英語なら `english_set` が1件、週報なら `research_report` が1件あり、2つ以上は無い（BD-07 ENT-001、ENT-002、ENT-003、ENT-015） | DD-02 の FN-001、FN-007、FN-025 の手順（M13、M15、M16。内容と中身を1つのトランザクションで作る。DD-05） | 別のテーブルの行の有無は、検査制約で書けないため |
 | 同じ対象日の同じ slug の記事は1つ（BD-07 ENT-002 の一意。RD-03 R01） | DD-02 の FN-001 の手順（置き換えるか作るかを、トランザクションの中で対象日と slug で探して決める）と、DD-05 の書き込みの排他 | 対象日は `content`、slug は `article` にあり、テーブルをまたぐ一意は制約で書けないため。対象日を `article` にも写すと、2か所の値がずれ得るので写さない |
 | 問題の一覧の問題番号が重ならない。答えの形が「選ぶ」なら、正解が選択肢のどれかと同じ（BD-07 ENT-003） | M16 の受け取りの形の確かめ（zod。ADR-019） | JSON の中の項目どうしの関係は、検査制約で書くと読めなくなるため |
 | 完了したときに、答えの問題番号は問題の一覧にある番号だけで、全ての問題に採点がある（BD-07 ENT-005） | DD-02 の FN-012 の手順 | 別のテーブルの JSON との比べは、検査制約で書けないため |
@@ -277,6 +307,8 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | `delivery_date_ix` | `delivery` | `target_date`、`sender`、`result` | - | FN-020（未着。BD-11 M01） |
 | `delivery_received_ix` | `delivery` | `received_at` | - | FN-022 |
 | `registration_code_expires_ix` | `registration_code` | `expires_at` | - | FN-023（有効な期限を過ぎたコードを消す） |
+| `research_report_week_uq` | `research_report` | `topic_id`、`week` | 一意 | BD-07 ENT-015 の一意（RD-03 R23）。FN-025 の置き換え、FN-027 の週の一覧（CR-020） |
+| `research_topic_received_ix` | `research_topic` | `last_received_at` | - | FN-026 の新しい順（CR-020） |
 | FTS5 の索引 | `search_index` | `body`（trigram） | - | FN-018 |
 
 - 検索の言葉の扱い（FN-018）: 業務層は、言葉を `body` と同じく NFKC で正規化して小文字にし、空白で区切る。3文字以上の言葉は FTS5 の一致で、2文字以下の言葉は `body` の部分の一致（`LIKE`）で探し、全ての言葉を AND でつなぐ。trigram は3文字より短い言葉を索引で探せないためである。2文字以下の言葉は表の全体を読むので、件数が増えると遅くなる。4章の量では1年目は NFR-001 の時間に収まる見込みだが、確かめていない。DD-10 の性能の試験で確かめる。
@@ -303,6 +335,8 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | `ai_run` | 約4,500（1年で消す） | 約0.3 KB | 約1.4 MB（増えない） | BD-07 2章 ENT-009 |
 | `delivery` | 約730（1年で消す） | 約0.2 KB | 約0.2 MB（増えない） | BD-07 2章 ENT-010 |
 | `device`、`registration_code`、`sender_key` | 数件 | 約0.2 KB | 1 MB 未満 | BD-07 2章 |
+| `research_topic` | 年に十数件 | 約0.3 KB | 1 MB 未満 | BD-07 2章 ENT-014（CR-020） |
+| `research_report` | 年に最大 約160 | 最大 256 KiB（ふだんは約30 KB と置いた。確かめていない見積り） | 最大 約40 MB（ふだんは約5 MB） | BD-07 2章 ENT-015、BD-06 IF-005（CR-020） |
 | `search_index` | 最大 約18,000 | 元の文の約3.7倍 | 最大 約150 MB | 元の文は `article` と `english_set` の文で約40 MB。倍率は、日本語と英語の混じった文 2,000件（約2.9 MB）を trigram で入れて測った（2026-11-24。DB は約10.9 MB で約3.7倍） |
 | 索引（主キー以外） | - | - | 約10 MB | 上の表の合計の数%と置いた |
 
@@ -319,8 +353,10 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | 当てる時機 | Web サーバが起動したときに、まだ当てていないファイルを全て当ててから要求を受け付ける。AI Runner、定期ジョブ、管理のコマンドは、起動したときに `schema_migration` の最後の番号が自分の知る番号と同じかを確かめ、違えば何もせずに終わり、ログに残す（AI Runner は launchd が起動し直す。BD-01 4章）。2つのプロセスが同時に当てないよう、当てるのは Web サーバだけにする |
 | 全ての環境で同じ手順 | 本番、試験、開発（BD-01 4章）で、同じファイルを同じ仕組みで当てる。試験の DB は空から全てのファイルを当てて作る |
 | 稼働中に変えるときの手順 | 止めて変える。利用者は本人1人で、短い時間止めてよい（BD-11 6章 リリース）。順は、OP08 でバックアップを取る → OP02 で Web サーバと AI Runner を止める → 新しいコードに替える → Web サーバを起動する（ファイルが当たる）→ AI Runner を起動する。列を足すときは、既定値を付けるか空を許して足す。型を変える、列を消す、制約を変えるときは、SQLite が表を直接変えられないので、同じファイルの中で新しい表を作り、行を写し、古い表を消して名前を替える。そのあいだは外部キーの検査を止め、終わりに `PRAGMA foreign_key_check` で確かめる |
+| 外部キーの検査を止めて当てるファイル（CR-020） | 検査制約を変えるために表を作り直すファイル（`0002-research-report.sql` の `delivery`、`sender_key`）は、1行目に `-- nexus:foreign-keys-off` と書く。M21 は、その印のあるファイルだけ、トランザクションの外で `PRAGMA foreign_keys = OFF` にしてから、トランザクションの中で当て、確定の前に `PRAGMA foreign_key_check` を読み、1行でも返れば戻して E17 で止める。終わったら（失敗しても）`PRAGMA foreign_keys = ON` に戻す。`PRAGMA foreign_keys` はトランザクションの中では変えられない（SQLite の文書）ため、トランザクションの外で変える |
+| `0002-research-report.sql` の中身（CR-020） | (1) `delivery` と `sender_key` を、`sender` の検査制約に `brain-research` を足した形で作り直す（新しい表を作り、行を写し、古い表を消し、名前を替える。索引 `delivery_date_ix`、`delivery_received_ix` も作り直す）。(2) `research_topic`、`research_report` と、3章の索引を作る。既存の行の値は変えない。件数は `delivery` が最大で約730件、`sender_key` が2件で、当てる時間は1秒未満の見込み（ファイルの先頭のコメントに書く） |
 | 戻すとき | 戻すためのファイルは書かない。変える前に取ったバックアップを OP07 で戻す（利用者が1人で、戻す時点のデータの差を本人が判断できるため） |
-| 既存データの変換 | 該当なし（最初の版）。これまでのニュースと教材は取り込まない（Q-011 の答え）。後の版でデータの値を変えるときは、そのマイグレーションの中に変換の SQL を書き、件数と時間の見込みをそのファイルの先頭のコメントに書く |
+| 既存データの変換 | `0002-research-report.sql`（CR-020）は表を作り直して行を写すだけで、値は変えない。それより前は該当なし（最初の版）。これまでのニュースと教材は取り込まない（Q-011 の答え）。後の版でデータの値を変えるときは、そのマイグレーションの中に変換の SQL を書き、件数と時間の見込みをそのファイルの先頭のコメントに書く |
 
 ## 6. 上流との対応
 
@@ -339,11 +375,13 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | ENT-011 | `device` | なし |
 | ENT-012 | `registration_code` | なし |
 | ENT-013 | `sender_key` | なし |
+| ENT-014 | `research_topic` | なし（CR-020） |
+| ENT-015 | `research_report` | なし（CR-020） |
 | 物理のみ | `search_index` | FN-018 の検索のための写し（2.1） |
 | 物理のみ | `schema_migration` | マイグレーションの記録（5章。NFR-005、NFR-023） |
 | 物理のみ | `job_lock` | 多重起動を防ぐ印（NFR-023、NFR-024。DD-05 4章） |
 
-- BD-07 の ENT-001〜ENT-013 は、全てこの表にある。
+- BD-07 の ENT-001〜ENT-015 は、全てこの表にある。
 - BD-07 3章の全ての属性は、2.2 の「対応する属性」の列にある。
 - BD-07 の一貫性の規則（ENT-001、ENT-002、ENT-003、ENT-004、ENT-005、ENT-006、ENT-008、ENT-009）と BD-02 3章の状態の遷移は、2.2 の制約か 2.3 にある。
 - エンティティに対応しないテーブル（`search_index`、`schema_migration`、`job_lock`）は、2.1 に理由を書いた。

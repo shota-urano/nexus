@@ -2,8 +2,8 @@
 id: BD-01
 name: 方式設計書
 phase: 基本設計
-version: 1.4
-updated: 2026-11-26
+version: 1.5
+updated: 2026-11-27
 ---
 
 # BD-01 方式設計書（NEXUS）
@@ -19,6 +19,7 @@ updated: 2026-11-26
 - 1.2: X-04 CR-009（2026-11-24 RD-01 SH01 が承認。Q-083 の答え）で、3章の構成要素に「管理のコマンド」を足し、Web サーバの担当する範囲に FN-023 の登録の URL を開くことを足した。
 - 1.3: X-04 CR-013（2026-11-24 RD-01 SH01 が承認）で、6章 ログのアクセスとエラーのログの出力先を、各プロセスが日ごとのファイルに書く形に直した。
 - 1.4: X-04 CR-016（2026-11-26 RD-01 SH01 が承認）で、NFR-005 の扱いを、再起動の後は本人がログインする形に直した（2章、5章、7章）。
+- 1.5: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、外部との接点と構成要素に、brain-harness の研究ループ（IF-005）と送信のコマンド（FN-028）を足した。DB の範囲に ENT-014、ENT-015 を足した（Q-087、Q-090、Q-092 の答え）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 前提と制約
@@ -67,6 +68,7 @@ flowchart LR
   BH[brain-harness] -- IF-001 ニュースの記事 --> SYS
   SP[sharpen] -- IF-002 英語のセット --> SYS
   SYS -- IF-003 英語のセットと答え --> SP
+  BR[brain-harness の研究ループ] -- IF-005 調査の週報 --> SYS
   SYS -- IF-004 質問と渡す内容 --> AI[Claude Code の CLI<br/>claude -p]
   AI -- IF-004 応答 --> SYS
   P -. 記事の画像と元の記事を直に読む .-> WEB[記事のサイト]
@@ -83,6 +85,7 @@ flowchart LR
 | brain-harness | 受信 | API（HTTP。Mac mini の中から送る） | IF-001 |
 | sharpen | 受信 | API（HTTP。Mac mini の中から送る） | IF-002 |
 | sharpen | 送信（sharpen が取りに来る） | API（HTTP。Mac mini の中から読む） | IF-003 |
+| brain-harness の研究ループ（配信元 brain-research。CR-020） | 受信 | API（HTTP。Mac mini の中から、NEXUS が配る送信のコマンドで送る） | IF-005 |
 | Claude Code の CLI | 双方向 | 同じ Mac mini の上でコマンドとして起動し、引数と標準入力で渡し、標準出力で受ける | IF-004（Q-066） |
 | 記事のサイト | 端末が直に読む | 端末のブラウザ | 該当なし（NEXUS の接点ではない。T12） |
 
@@ -105,12 +108,15 @@ flowchart LR
     CLI[claude -p]
     BH[brain-harness]
     SP[sharpen]
+    BR[brain-harness の研究ループ]
+    SEND[送信のコマンド<br/>nexus-send]
   end
   EXT[(別のディスク)]
   PWA -- HTTPS --> TS -- HTTP --> WEB
   WEB -- SSE --> TS -- SSE --> PWA
   BH -- IF-001 HTTP --> WEB
   SP -- IF-002・IF-003 HTTP --> WEB
+  BR -- 呼ぶ --> SEND -- IF-005 HTTP --> WEB
   WEB -- 読み書き --> DB
   RUN -- 読み書き --> DB
   RUN -- 起動・標準入力 --> CLI
@@ -124,12 +130,13 @@ flowchart LR
 
 | 名前 | 責務 | 主な技術 | 担当する範囲 |
 |---|---|---|---|
-| 画面（PWA） | 本人の端末で画面を見せ、操作を Web サーバの API に送る | Next.js と React、TypeScript、Tailwind CSS、Motion、PWA の manifest と service worker（5章） | FN-003〜FN-006、FN-008〜FN-012、FN-014〜FN-020 の画面 |
-| Web サーバ | 画面を配り、端末と配信元からの API を受け、DB を読み書きし、AI の実行を DB の待ち行列に入れ、応答を SSE で端末へ流す | Next.js の Route Handlers（Node.js の上で動かす） | FN-001、FN-003〜FN-014、FN-015 と FN-016 の受け付けと応答の中継、FN-017〜FN-020、FN-023 の登録の URL を開くこと（CR-009）。IF-001〜IF-003 |
+| 画面（PWA） | 本人の端末で画面を見せ、操作を Web サーバの API に送る | Next.js と React、TypeScript、Tailwind CSS、Motion、PWA の manifest と service worker（5章） | FN-003〜FN-006、FN-008〜FN-012、FN-014〜FN-020、FN-026、FN-027 の画面 |
+| Web サーバ | 画面を配り、端末と配信元からの API を受け、DB を読み書きし、AI の実行を DB の待ち行列に入れ、応答を SSE で端末へ流す | Next.js の Route Handlers（Node.js の上で動かす） | FN-001、FN-003〜FN-014、FN-015 と FN-016 の受け付けと応答の中継、FN-017〜FN-020、FN-023 の登録の URL を開くこと（CR-009）、FN-025〜FN-027（CR-020）。IF-001〜IF-003、IF-005 |
 | AI Runner | DB の待ち行列から AI の実行を1件ずつ拾い、`claude -p` を起動し、応答を DB に書く。同時に動かす数、時間の上限、取り消し、送り直しを受け持つ | Node.js の常駐のプロセス（Web サーバと同じリポジトリの TypeScript） | FN-002、FN-015 と FN-016 の AI の実行。IF-004（Q-066） |
-| DB | 全てのデータを1つのファイルに残す | SQLite（5章） | ENT-001〜ENT-010 |
+| DB | 全てのデータを1つのファイルに残す | SQLite（5章） | ENT-001〜ENT-010、ENT-014、ENT-015（CR-020） |
 | 定期ジョブ | 毎日深夜のバックアップと、月に1回の古い記録の削除を行う | launchd の定期実行で起動する TypeScript のコマンド | FN-021、FN-022（バッチの番号は BD-02 のバッチの節で振る） |
 | 管理のコマンド | 本人が Mac mini の本人のユーザで打ち、端末の登録の URL を出し、端末と配信元の鍵を用意し、一覧を出し、取り消す（BD-10 2章）。バッチを手で動かすときは、定期ジョブの入口を使う（CR-009） | 定期ジョブと同じリポジトリの TypeScript のコマンド | FN-023（登録の URL を出す、一覧、取り消し）、FN-024 |
+| 送信のコマンド（CR-020） | 送り手（brain-harness の研究ループ）が Mac mini の送り手のユーザで打ち、週報のファイルの形を確かめてから、環境変数の鍵を付けて IF-005 に送る（Q-092 の答え）。NEXUS の DB を直接読み書きしない | Web サーバと同じリポジトリの TypeScript のコマンド。受け取りの形の確かめは Web サーバと同じ定義を使う（DD-01） | FN-028。IF-005 |
 | Tailscale Serve | Tailscale の中だけに HTTPS の入口を開き、Web サーバへ渡す | Tailscale Serve と Tailscale Service（専用の名前） | NFR-012、NFR-021 |
 
 - 構成の決め方（Web サーバと AI Runner を別のプロセスにする）は ADR-008、受け渡しを DB の待ち行列にする判断は ADR-012 に記録した。
@@ -274,7 +281,7 @@ flowchart TB
 ### 認証・認可
 
 - 端末の認証: 本人が Mac mini でコマンドを打つと、1回だけ使える登録コードを含む URL が出る。端末でその URL を開くと、Web サーバがその端末に長く使える端末の鍵を渡し、端末は Cookie に持つ。コードを入れる画面は作らない（用意と取り消しは画面を持たない。Q-034 の答え）。取り消しは Mac mini のコマンドで、その端末の鍵を消す。消した鍵は次の利用から通らない（NFR-013、Q-034 の答え、ADR-010）。登録コードの有効な時間、Cookie の属性、鍵の持ち方は BD-10 と DD-02 で決める（X-06 で DD-07 を省いた）。
-- 配信元の認証: 配信元ごとに別の鍵を持たせ、鍵ごとに使える API を限る（brain-harness は IF-001、sharpen は IF-002 と IF-003）。鍵は Mac mini のコマンドで用意し、取り消す（NFR-014）。端末の鍵と配信元の鍵は別のものにする（依頼 5章）。
+- 配信元の認証: 配信元ごとに別の鍵を持たせ、鍵ごとに使える API を限る（brain-harness は IF-001、sharpen は IF-002 と IF-003、brain-research は IF-005。CR-020）。鍵は Mac mini のコマンドで用意し、取り消す（NFR-014）。端末の鍵と配信元の鍵は別のものにする（依頼 5章）。
 - 認可を判定する層: Web サーバの API の入口で、全ての要求について、端末の鍵か配信元の鍵かを見て、使ってよい API かを判定する。ロールは本人1つなので、データの範囲で絞らない（X-06 で BD-08 と DD-07 を省いた）。
 - Tailscale は網の境界で、アプリの認証を代わりにしない（依頼 9章）。
 

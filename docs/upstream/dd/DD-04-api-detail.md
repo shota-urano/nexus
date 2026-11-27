@@ -2,7 +2,7 @@
 id: DD-04
 name: API 詳細設計書
 phase: 詳細設計
-version: 1.3
+version: 1.4
 updated: 2026-11-27
 ---
 
@@ -17,6 +17,7 @@ updated: 2026-11-27
 - 1.1: CR-015 で、`openapi.yaml` の `openRegistration`（`/register`）に 500 の応答を足した（2026-11-26 RD-01 SH01）。
 - 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、`openapi.yaml` の `Conversation` に `firstQuestionText` を足した（`listConversations` と `createConversation` の応答）。
 - 1.3: X-04 CR-018（2026-11-27 RD-01 SH01 が承認）で、`createConversation` の画面の欄から SCR-002-A05 を外した。API は変えない。
+- 1.4: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`postResearchReport`（IF-005）、`listResearchTopics`、`getResearchReport` を足し、`Home` に `research` を足した。IF-005 の各欄の上限は Q-096 の答え（2026-11-27）による。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル
@@ -58,8 +59,11 @@ updated: 2026-11-27
 | `postEnglishSet` | POST `/api/learning/sets` | 配信元に公開（同上） | Create（同上。同じ日付は置き換える） | E01、E02、E03、E08、E16 |
 | `getEnglishSetForSender` | GET `/api/learning/sets/{date}?lane=en` | 配信元に公開（同上） | Get（同上） | E01、E03、E05、E08、E16 |
 | `getEnglishResult` | GET `/api/learning/sets/{date}/result?lane=en` | 配信元に公開（同上） | Get（同上） | E01、E03、E05、E08、E16 |
+| `postResearchReport` | POST `/api/research/reports` | 配信元に公開（同上。CR-020） | Create（同じ課題の同じ週は置き換える。NEXUS が決めた道で、cerebellum に元の形は無い） | E01、E02、E03、E08、E16 |
+| `listResearchTopics` | GET `/api/app/research/topics` | 端末に公開（CR-020） | List（続きを持たない。課題は年に十数件） | E03、E08、E16 |
+| `getResearchReport` | GET `/api/app/research/reports/{contentId}` | 端末に公開（CR-020） | Get（その週の週報と、同じ課題の週の一覧） | E03、E05、E08、E16 |
 
-- 端末の API の道は `/api/app/` で始め、今の cerebellum の形に合わせた配信元の道（`/api/inbox/`、`/api/learning/`）と重ならないようにした。
+- 端末の API の道は `/api/app/` で始め、今の cerebellum の形に合わせた配信元の道（`/api/inbox/`、`/api/learning/`）と重ならないようにした。IF-005 の道（`/api/research/`）は NEXUS が新しく決めた配信元の道で、`/api/app/` と重ならない（CR-020）。
 - 構成要素の間だけの API は無い（1章）。
 
 ## 3. 共通の決まり
@@ -76,6 +80,7 @@ updated: 2026-11-27
 | `openRegistration` | 鍵を求めない。登録コード（ENT-012）が有効な期限の前で、まだ使っていないこと | 303 で `/?notice=MSG-021` へ移す（端末の鍵を渡さない） |
 | `postNewsBatch` | 配信元の鍵が brain-harness のもの（BD-07 4.2 配信元。IF-001） | 401 `unauthorized`、MSG-032 |
 | `postEnglishSet`、`getEnglishSetForSender`、`getEnglishResult` | 配信元の鍵が sharpen のもの（IF-002、IF-003） | 401 `unauthorized`、MSG-032（DD-06 E03） |
+| `postResearchReport` | 配信元の鍵が brain-research のもの（IF-005。Q-090 の答え。CR-020）。brain-harness と sharpen の鍵では通らない | 401 `unauthorized`、MSG-032（DD-06 E03） |
 | `getHealth` | 鍵を求めない（Q-084 の答え、BD-10 2章。CR-011）。返すのは待ちの数と処理中の数と一番古い待ちの日時だけにし、内容と鍵は返さない | - |
 
 - 鍵が無い、正しくない、取り消した、その連携を使えない、を応答で分けない。どれも 401 と MSG-032（配信元）か MSG-020（端末）にする。どの鍵が生きているかを外から分からなくするためである（BD-06 4.2、BD-10 T02）。
@@ -95,6 +100,7 @@ updated: 2026-11-27
 | `retryReply`、`stopReply`、`dismissReply` | 冪等（DD-06 E06）。事前条件（BD-02 FN-016）に合わないときは、何もせずに今の AI の発言を 200 で返す。2台から続けて送り直したら、先の1回だけを受ける |
 | `postNewsBatch` | 記事は冪等。同じ対象日の同じ slug は置き換え、記事は増えない（NFR-015、RD-03 R01）。受け取りの記録（ENT-010）は送られるたびに1件増える（送られた事実の記録のため） |
 | `postEnglishSet` | セットは冪等。同じ日付は置き換える（RD-03 R06）。受け取りの記録は1件増える |
+| `postResearchReport` | 週報は冪等。同じ課題の同じ週は置き換え、既読と保存は残す（RD-03 R23。CR-020）。応答の `replaced` が真になる。受け取りの記録は1件増える。過去の週を送り直しても、研究課題の課題名と状態は最新の週のまま（DD-02 FN-025 手順 6.2） |
 | `openRegistration` | 冪等でない。登録コードは1回だけ使え、2回目は MSG-021 になる（BD-02 FN-023） |
 
 再送してよい応答:
@@ -110,7 +116,7 @@ updated: 2026-11-27
 | ページング | 続きを表すトークン（`cursor`）。トークンは、並べる値と ID の組を base64url にした文字で、画面は中身を読まない。1ページの件数は既定 30、上限 50（`limit`）。30 は一覧の画面を2画面ほど埋める数で、NFR-001 の2秒に収まるかは DD-10 の性能の試験で確かめる（BD-09 5章 一覧の決まり） |
 | データが変わったとき | トークンは並べる値と ID の後から読むので、後から届いた内容は次のページに混ざらない（一覧を開き直すと出る）。保存し直して保存した日時が変わった内容は、別の位置に移ることがある |
 | フィルタと並び順（フィルタ） | `searchContents` の `q`（BD-02 FN-018、DD-03 3章の探し方）と、`listConversations` の `targetContentId`（省くと対象の無い会話）だけ。ほかに絞り込みと並べ替えの切り替えは受けない（BD-09 5章） |
-| フィルタと並び順（並び順） | `listInbox`、`searchContents` は届いた日時の新しい順。`listSaved` は保存した日時の新しい順。`listEnglishSets` は対象日の新しい順。`listConversations` は最後に話した日時の新しい順。同じ値のときは ID の大きい順 |
+| フィルタと並び順（並び順） | `listInbox`、`searchContents` は届いた日時の新しい順。`listSaved` は保存した日時の新しい順。`listEnglishSets` は対象日の新しい順。`listConversations` は最後に話した日時の新しい順。同じ値のときは ID の大きい順。`listResearchTopics` は最後に届いた日時の新しい順で、続きを持たない（課題は同時に1〜3個。CR-020）。`getResearchReport` の `weeks` は週の大きい順 |
 
 ### 3.4 エラー
 
@@ -123,10 +129,10 @@ updated: 2026-11-27
 | 400 | `bad_request` | 入力の形が定義ファイルと違う | `putEnglishAnswer` で ○△× の無い問題か、セットに無い問題番号があるときは MSG-005。ほかは MSG-019（画面が形を守るので、ふだんは起きない） | E01、E07 |
 | 401 | `unauthorized` | 3.1 の鍵が通らない | MSG-020（端末）。配信元には MSG-032 | E03 |
 | 403 | `forbidden_origin` | 3.1 のオリジンが違う | MSG-019 | E04 |
-| 404 | `not_found` | 指した内容、会話、発言が無い | `getArticle` は MSG-002。`getEnglishSet`、`getConversation` は MSG-019。`createConversation` は 404 を返さず、対象の無い会話を作って MSG-011 を返す（BD-02 FN-014） | E05 |
+| 404 | `not_found` | 指した内容、会話、発言が無い | `getResearchReport` は MSG-048（CR-020）。`getArticle` は MSG-002。`getEnglishSet`、`getConversation` は MSG-019。`createConversation` は 404 を返さず、対象の無い会話を作って MSG-011 を返す（BD-02 FN-014） | E05 |
 | 409 | `reply_in_progress` | 3.2 の `postQuestion` | 画面は質問の文を入力の欄に残し、作成中の応答を見せる | E06 |
 | 413 | `payload_too_large` | 配信元の送った全体が上限を超えた（BD-06 3.2） | MSG-034（配信元） | E02 |
-| 500 | `internal` | 予期しない失敗 | `setRead`、`setSaved` は MSG-003。`putEnglishAnswer` は MSG-007。`postQuestion` は MSG-019。読むだけの操作は MSG-019。`postNewsBatch` は MSG-045 | E08、E16 |
+| 500 | `internal` | 予期しない失敗 | `setRead`、`setSaved` は MSG-003。`putEnglishAnswer` は MSG-007。`postQuestion` は MSG-019。読むだけの操作は MSG-019。`postNewsBatch` は MSG-045。`postResearchReport` は MSG-046（CR-020） | E08、E16 |
 
 - 配信元への 400 は MSG-033（差し込む値は外れた項目の名前）、404 は MSG-035 か MSG-036 にする（BD-06 IF-003）。
 - `postNewsBatch` で一部の記事だけ形が正しくないときは、200 で返し、`rejected` に slug と MSG-033 の文言を入れる（BD-06 IF-001）。全体の形か鍵か大きさが正しくないときは、何も残さず 400、401、413 を返す。
@@ -178,6 +184,8 @@ updated: 2026-11-27
 | `postNewsBatch` | `delivery`（1件作る）、`content`、`article`、`search_index`（作るか置き換える）、`ai_run`（1件以上残したら記事の関係の判定を待ちに入れる） | - |
 | `postEnglishSet` | `delivery`、`content`、`english_set`、`search_index` | - |
 | `getEnglishSetForSender`、`getEnglishResult` | なし（DD-06 E05、E08） | - |
+| `postResearchReport` | `delivery`（1件作る）、`research_topic`（作るか、最新の週なら変える）、`content`、`research_report`、`search_index`（作るか置き換える）。AI の実行は作らない（CR-020） | - |
+| `listResearchTopics`、`getResearchReport` | なし（DD-06 E05、E08。CR-020） | NFR-001 |
 
 - 端末の鍵が通るたびに `device` の `last_used_at` を変える。この更新は全ての `/api/app/` の操作に共通で、表の各行には書かない（BD-02 1章）。
 - 監査ログは残さない（Q-059 の答え）。AI の実行と受け取りの記録は表の `ai_run` と `delivery` に残す（NFR-020）。
@@ -204,12 +212,12 @@ IF-004 は HTTP の API ではないが、BD-06 3.2 で「出来事の項目の�
 
 | operationId | IF・FN・SCR アクション | 呼べるロール | 主な ENT |
 |---|---|---|---|
-| `getHome` | FN-020、SCR-001-A01 | 本人（端末の鍵） | ENT-001、ENT-002、ENT-003、ENT-004、ENT-005、ENT-006、ENT-008、ENT-009、ENT-010 |
+| `getHome` | FN-020、SCR-001-A01 | 本人（端末の鍵） | ENT-001、ENT-002、ENT-003、ENT-004、ENT-005、ENT-006、ENT-008、ENT-009、ENT-010（週報の未読は ENT-001 と ENT-006 で数える） |
 | `getGalaxy` | FN-003、SCR-002-A01、SCR-002-A02、SCR-002-A03 | 本人 | ENT-001、ENT-002、ENT-004、ENT-006 |
 | `getArticle` | FN-004、SCR-002-A04、SCR-003-A01、SCR-003-A06、SCR-001-A04 | 本人 | ENT-001、ENT-002、ENT-004、ENT-006 |
-| `markOpened` | FN-004、FN-009、SCR-003-A01、SCR-005-A01 | 本人 | ENT-006 |
-| `setRead` | FN-005、SCR-003-A02、SCR-003-A03、SCR-005-A12 | 本人 | ENT-006 |
-| `setSaved` | FN-006、SCR-003-A04、SCR-005-A08 | 本人 | ENT-006 |
+| `markOpened` | FN-004、FN-009、FN-027、SCR-003-A01、SCR-005-A01、SCR-011-A01 | 本人 | ENT-006 |
+| `setRead` | FN-005、SCR-003-A02、SCR-003-A03、SCR-005-A12、SCR-011-A04、SCR-011-A05 | 本人 | ENT-006 |
+| `setSaved` | FN-006、SCR-003-A04、SCR-005-A08、SCR-011-A06 | 本人 | ENT-006 |
 | `listEnglishSets` | FN-008、SCR-004-A01、SCR-004-A03 | 本人 | ENT-001、ENT-003、ENT-005、ENT-006 |
 | `getEnglishSet` | FN-009、SCR-004-A02、SCR-005-A01、SCR-005-A11 | 本人 | ENT-001、ENT-003、ENT-005、ENT-006 |
 | `putEnglishAnswer` | FN-012、SCR-005-A07 | 本人 | ENT-005、ENT-006 |
@@ -217,7 +225,7 @@ IF-004 は HTTP の API ではないが、BD-06 3.2 で「出来事の項目の�
 | `searchContents` | FN-018、SCR-008-A01、SCR-008-A02、SCR-008-A04 | 本人 | ENT-001、ENT-002、ENT-003 |
 | `listSaved` | FN-019、SCR-009-A01、SCR-009-A03 | 本人 | ENT-001、ENT-006 |
 | `listConversations` | FN-014、SCR-006-A01 | 本人 | ENT-007 |
-| `createConversation` | FN-014、SCR-006-A03、SCR-001-A05、SCR-003-A05、SCR-005-A09 | 本人 | ENT-001、ENT-007 |
+| `createConversation` | FN-014、SCR-006-A03、SCR-001-A05、SCR-003-A05、SCR-005-A09、SCR-011-A07 | 本人 | ENT-001、ENT-007 |
 | `getConversation` | FN-014、SCR-006-A02 | 本人 | ENT-007、ENT-008 |
 | `postQuestion` | FN-015、SCR-006-A04 | 本人 | ENT-007、ENT-008、ENT-009 |
 | `streamReply` | FN-015、FN-016、SCR-006-A04、SCR-006-A05 | 本人 | ENT-008 |
@@ -230,11 +238,14 @@ IF-004 は HTTP の API ではないが、BD-06 3.2 で「出来事の項目の�
 | `postEnglishSet` | IF-002、FN-007 | 配信元 sharpen | ENT-001、ENT-003、ENT-010、ENT-013 |
 | `getEnglishSetForSender` | IF-003、FN-013 | 配信元 sharpen | ENT-001、ENT-003、ENT-013 |
 | `getEnglishResult` | IF-003、FN-013 | 配信元 sharpen | ENT-005、ENT-013 |
+| `postResearchReport` | IF-005、FN-025 | 配信元 brain-research | ENT-001、ENT-010、ENT-013、ENT-014、ENT-015 |
+| `listResearchTopics` | FN-026、SCR-010-A01 | 本人 | ENT-001、ENT-006、ENT-014、ENT-015 |
+| `getResearchReport` | FN-027、SCR-010-A02、SCR-011-A01、SCR-011-A03、SCR-007-A02、SCR-008-A03、SCR-009-A02 | 本人 | ENT-001、ENT-006、ENT-014、ENT-015 |
 
-- BD-06 の API の連携 IF-001〜IF-003 は、全てこの表にある。IF-004 は API でないので 4.2 に書いた。
-- BD-03 のデータを変えるアクション（SCR-003-A01〜A04、SCR-005-A01、A07、A08、A12、SCR-006-A03〜A07）は、全てこの表にある。SCR-005-A04〜A06、A10、A11 は答えと採点を画面の中に預けるだけで、API を呼ばない（BD-02 FN-010、FN-011。A11 は `getEnglishSet` の前の答えを初めの値にする）。SCR-001-A02、A03、SCR-003-A07、SCR-005-A02、A03 は画面の中の動きか遷移だけである。
+- BD-06 の API の連携 IF-001〜IF-003、IF-005 は、全てこの表にある。IF-004 は API でないので 4.2 に書いた。
+- BD-03 のデータを変えるアクション（SCR-003-A01〜A04、SCR-005-A01、A07、A08、A12、SCR-006-A03〜A07、SCR-011-A01、A04〜A07）は、全てこの表にある。SCR-011-A02 と A08 は画面の中の動きとブラウザで開くだけである（CR-020）。SCR-005-A04〜A06、A10、A11 は答えと採点を画面の中に預けるだけで、API を呼ばない（BD-02 FN-010、FN-011。A11 は `getEnglishSet` の前の答えを初めの値にする）。SCR-001-A02、A03、SCR-003-A07、SCR-005-A02、A03 は画面の中の動きか遷移だけである。
 - `getHealth` は BD-01 6章 監視の「状態を返す API」で、FN に対応しない。
-- BD-02 の FN-002、FN-021、FN-022、FN-024 は API を持たない（AI Runner、定期ジョブ、管理のコマンド。DD-01）。FN-010、FN-011 は画面の中だけで動く。
+- BD-02 の FN-002、FN-021、FN-022、FN-024、FN-028 は API を持たない（AI Runner、定期ジョブ、管理のコマンド、送信のコマンド。DD-01。FN-028 は IF-005 を呼ぶ側）。FN-010、FN-011 は画面の中だけで動く。
 
 ## 6. 未決事項
 

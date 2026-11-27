@@ -1,0 +1,51 @@
+/* Q-095 の試作（CR-020）。SCR-010 課題の一覧と SCR-011 課題の週報。値は試作用で、本番の値はデザインシステムで決める。 */
+.r-page { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 0 60px; }
+.r-top { display: flex; align-items: center; gap: 10px; padding: max(24px, env(safe-area-inset-top)) 14px 10px; }
+.r-top img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 0 8px #ef9e4c88); }
+.r-top h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 750; letter-spacing: .5px; }
+.r-top h1 b { color: #ffb85e; }
+.r-ai { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ffb85c; border-radius: 12px; background: linear-gradient(100deg, #503421, #2c2524); color: #fff; font-size: 13px; }
+.r-card { margin: 10px 14px; border: 1px solid #d0c1b12f; border-radius: 18px; background: linear-gradient(140deg, rgba(44,43,45,.75), rgba(16,22,30,.92)); box-shadow: inset 0 1px rgba(255,255,255,.06), 0 14px 30px #0006; padding: 14px; }
+.r-topic { display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit; min-height: 64px; }
+.r-topic h2 { font-size: 15px; margin: 0 0 6px; line-height: 1.45; }
+.r-meta { font-size: 12px; color: #aab0c1; display: flex; gap: 10px; flex-wrap: wrap; }
+.r-status { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 1px solid #ffb85e88; color: #ffc077; }
+.r-status.ended { border-color: #8a90a066; color: #9aa0ae; }
+.r-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff7a2f; box-shadow: 0 0 8px #ff7a2f; flex: 0 0 9px; }
+.r-dot.off { visibility: hidden; }
+.r-head { padding: 0 14px; }
+.r-head .r-q { font-size: 17px; font-weight: 750; line-height: 1.45; margin: 4px 0 8px; }
+.r-weekbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #aab0c1; }
+.r-weekbar select { background: #1b212d; color: #ffd08a; border: 1px solid #ffb85e88; border-radius: 10px; min-height: 44px; padding: 0 10px; font-size: 14px; }
+.r-actions { display: flex; gap: 8px; margin-top: 10px; }
+.r-actions button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.r-section-title { font-size: 12px; letter-spacing: 1.5px; color: #ffb85e; margin: 0 0 8px; font-weight: 700; }
+.r-change { border-color: #ffb85e99; background: linear-gradient(120deg, #4a3423e6, #232530f2 70%); }
+.r-md p { margin: 4px 0; line-height: 1.7; font-size: 14px; }
+.r-md ul { margin: 4px 0; padding-left: 20px; line-height: 1.7; font-size: 14px; }
+/* 方法の行 */
+.r-ap { border-top: 1px solid #ffffff14; }
+.r-ap:first-of-type { border-top: 0; }
+.r-ap-row { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; border: 0; border-radius: 12px; padding: 10px 6px; min-height: 56px; }
+.r-ap-row[aria-expanded="true"] { background: #ffffff08; }
+.r-ap-title { flex: 1; font-size: 14px; line-height: 1.5; font-weight: 600; }
+.r-ap-count { font-size: 11px; color: #aab0c1; white-space: nowrap; margin-top: 3px; }
+.r-chev { color: #ffb85e; transition: transform .2s; margin-top: 2px; }
+.r-ap-row[aria-expanded="true"] .r-chev { transform: rotate(90deg); }
+.r-ap-body { padding: 0 8px 12px 8px; }
+.r-sources { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.r-sources a { font-size: 13px; color: #8eb5fa; min-height: 32px; display: flex; align-items: center; }
+.r-counter { border-left: 3px solid #ff7f8e; background: #ff7f8e14; padding: 6px 10px; border-radius: 0 8px 8px 0; margin-top: 8px; font-size: 13px; line-height: 1.6; }
+.r-counter b { color: #ff9aa6; }
+/* 印。案 A: 色を塗った丸いタグに記号と文字 */
+.r-marks { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.mk { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 2px 8px 2px 6px; border-radius: 99px; color: #10131a; background: var(--c); line-height: 1.5; }
+.mk i { font-style: normal; font-weight: 900; }
+/* 案 B: 行の左に色の帯、タグは枠だけ（文字の色で区別） */
+.marks-b .mk { background: transparent; color: var(--c); border: 1px solid var(--c); }
+.marks-b .r-ap-row { border-left: 4px solid var(--lead, transparent); border-radius: 4px 12px 12px 4px; }
+/* iPad で右に並べる案 */
+.r-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; align-items: start; }
+.r-split .r-detail { position: sticky; top: 12px; }
+.r-legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: #aab0c1; margin-top: 8px; }
+.r-variant { position: fixed; left: 8px; bottom: 8px; z-index: 80; font-size: 10px; color: #000; background: #ffb040cc; padding: 2px 6px; border-radius: 6px; pointer-events: none; }

@@ -1,41 +1,41 @@
 ---
 status: confirmed
-範囲: ニュースと英語のセットの受け取り（IF-001、IF-002）、sharpen が読む API（IF-003）、配信元の鍵の入口（P02）
+範囲: ニュースと英語のセットの受け取り（IF-001、IF-002）、sharpen が読む API（IF-003）、配信元の鍵の入口（P02）、週報の受け取り（IF-005）と送信のコマンド（FN-028）
 ---
 
 # 05. 配信の受け取りと答えの提供 仕様
 
-**親**: [`00-overview.md`](./00-overview.md) ｜ **担当**: Backend ｜ **範囲**: ニュースと英語のセットの受け取り（IF-001、IF-002）、sharpen が読む API（IF-003）、配信元の鍵の入口（P02）
+**親**: [`00-overview.md`](./00-overview.md) ｜ **担当**: Backend ｜ **範囲**: ニュースと英語のセットの受け取り（IF-001、IF-002）、sharpen が読む API（IF-003）、配信元の鍵の入口（P02）、週報の受け取り（IF-005）と送信のコマンド（FN-028）
 
 設計の正本は `docs/upstream/` の上流工程の書類である。この仕様書は、DD-11 実装単位一覧が書き出した実装への引き渡しで、設計の中身を書き写さず、書類と節で指す。
 
 ## 1. 目的
 
-brain-harness と sharpen から届く内容を受け取って残し（FN-001、FN-007）、sharpen に答えを返す（FN-013）。
+brain-harness と sharpen から届く内容を受け取って残し（FN-001、FN-007）、sharpen に答えを返す（FN-013）。brain-harness の研究ループ（配信元 brain-research）が送る調査の週報を受け取り（FN-025）、送り手が使う送信のコマンドを配る（FN-028。CR-020）。
 
 ## 2. 入出力
 
-入力: IF-001、IF-002 の本文と配信元の鍵。出力: DD-04 `postNewsBatch`、`postEnglishSet`、`getEnglishSetForSender`、`getEnglishResult` の応答。
+入力: IF-001、IF-002、IF-005 の本文と配信元の鍵。送信のコマンドの引数とファイル。出力: DD-04 `postNewsBatch`、`postEnglishSet`、`getEnglishSetForSender`、`getEnglishResult`、`postResearchReport` の応答。送信のコマンドの出力と終了コード。
 
 ## 3. 処理詳細
 
-- DD-02 FN-001、FN-007、FN-013、3章 P02、P08。
+- DD-02 FN-001、FN-007、FN-013、FN-025、FN-028、3章 P02、P08。送信のコマンドの置き場所と環境変数: DD-09 2.7。
 - 受け取りの共通の部分と種類ごとの部分: DD-01 M13〜M16（NFR-004）。
 - 排他と冪等性: DD-05 3章、4章。
 
 ## 4. 設定値・確定値
 
-- IF-001 は 1 MiB、100 件まで。IF-002 は 256 KiB、問題 60 問まで（BD-06 3.2）。
+- IF-001 は 1 MiB、100 件まで。IF-002 は 256 KiB、問題 60 問まで（BD-06 3.2）。IF-005 は 256 KiB、方法 15 件まで、欄ごとの上限は Q-096 の答え（BD-06 IF-005 3.2）。
 - 同じ対象日の同じ slug、同じ日付のセットは置き換える（NFR-015）。
 - 道と応答の形は今の cerebellum に合わせる（Q-039 の答え。DD-04 2章）。
 
 ## 5. インターフェース
 
-DD-04 `postNewsBatch`、`postEnglishSet`、`getEnglishSetForSender`、`getEnglishResult`（`docs/api/openapi.yaml`）。
+DD-04 `postNewsBatch`、`postEnglishSet`、`getEnglishSetForSender`、`getEnglishResult`、`postResearchReport`（`docs/api/openapi.yaml`）。送信のコマンド `nexus-send`（DD-09 2.7）。
 
 ## 6. エラー処理
 
-DD-06 E01、E02、E03、E05、E08、E16。
+DD-06 E01、E02、E03、E05、E08、E16、E18。MSG-046、MSG-049、MSG-050（CR-020）。
 
 ## 7. スコープ外
 
@@ -56,3 +56,7 @@ DD-06 E01、E02、E03、E05、E08、E16。
   - 受け入れ基準: DD-10 TC30、DD-10 TC31、DD-10 TC32、DD-10 TC33、DD-10 TC34、DD-10 TC119、DD-10 TC121 が通る
 - [x] [Backend] sharpen が読む `getEnglishSetForSender` と `getEnglishResult` を作る（FN-013、IF-003、DD-01 M16、DD-02 FN-013）（se/05-ingest）
   - 受け入れ基準: DD-10 TC35、DD-10 TC36、DD-10 TC37 が通る
+- [ ] [Backend] 週報の受け取り `postResearchReport` を作る。M10 に IF-005 の本文の形 `ResearchReportPayload`（Q-096 の答えの上限）を置き、M14 の種類の一覧に research（M33）を登録し、M33 で形の確かめ、研究課題と週報の作成と置き換え、検索の本文（課題名、現時点の答え、方法の見出し）を作る（FN-025、IF-005、DD-01 M10・M13・M14・M33、DD-02 FN-025・3章 P02・P08、DD-05 3章、CR-020）
+  - 受け入れ基準: DD-10 TC130、DD-10 TC131、DD-10 TC132、DD-10 TC133、DD-10 TC134、DD-10 TC135、DD-10 TC136、DD-10 TC137、DD-10 TC102 が通る
+- [ ] [Backend] 送信のコマンド M34 `nexus-send`（引数とファイルと環境変数の確かめ、M10 の `ResearchReportPayload` での形の確かめ、IF-005 への送信、終了コード）と、`npm run build` で `dist/cli/send/main.js` を作ることと、`deploy/nexus-send` の雛形を作る（FN-028、DD-01 M34、DD-02 FN-028、DD-06 E18、DD-09 2.7、CR-020）
+  - 受け入れ基準: DD-10 TC146、DD-10 TC147、DD-10 TC148 が通る; `deploy/nexus-send` の雛形に、Node.js の道と `dist/cli/send/main.js` の道を書き込む場所がある

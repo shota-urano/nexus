@@ -17,11 +17,16 @@ const I = {
   inbox: <><path d="m4 20 3-12h18l3 12v7H4Z" /><path d="M4 20h7l2 3h6l2-3h7M12 13h8M16 10v6" /></>,
   explore: <><circle cx="16" cy="16" r="11" /><path d="m21 10-3 9-8 3 3-9Z" /><path d="M16 2v3M16 27v3M2 16h3M27 16h3" /></>,
   library: <><path d="M5 7v20h22M9 6h5v17H9ZM17 5h5v18h-5ZM25 7l4 15" /><path d="M10 11h3M18 10h3" /></>,
+  // Q-095 の Research のアイコンの案（CR-020）。?icon=a|b|c で切り替える。既定は b（Q-095 の答え。虫眼鏡と折れ線）
+  researchA: <><path d="M12 4h8M13 4v8L6 25a2 2 0 0 0 2 3h16a2 2 0 0 0 2-3L19 12V4" /><path d="M9 20h14" /><circle cx="14" cy="23.5" r="1.2" /><circle cx="18.5" cy="22" r="1" /></>,
+  researchB: <><circle cx="13" cy="13" r="8.5" /><path d="m19.5 19.5 8 8" /><path d="m8 15.5 3-3 3 2 4-5" /></>,
+  researchC: <><path d="M10 6H8a2 2 0 0 0-2 2v19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2" /><rect x="11" y="3" width="10" height="5" rx="1.5" /><path d="M10 14h12M10 19h8M10 24h5" /><path d="m19 23 2.5 2.5L26 20" /></>,
   chat: <><path d="M7 7h18a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H15l-7 5v-5H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3Z" /><path d="M9 16h3l2-4 4 8 2-4h3" /></>,
 };
 const MODULES: { key: string; name: string; icon: ReactNode; href: string; sub: string; count?: string; color: string }[] = [
   { key: "galaxy", name: "News Galaxy", icon: I.news, href: "/galaxy", sub: "今日のニュース", count: "10件", color: "#ffb85e" },
   { key: "english", name: "English", icon: I.english, href: "/english", sub: "学習の続き・文型", color: "#8eb5fa" },
+  { key: "research", name: "Research", icon: I.researchB, href: "/research", sub: "未読の週報", count: "1件", color: "#5fd3a2" },
   { key: "inbox", name: "Inbox", icon: I.inbox, href: "/inbox", sub: "新着", count: "3件", color: "#ffb85e" },
   { key: "explore", name: "Explore", icon: I.explore, href: "/inbox?view=explore", sub: "言葉で探す", color: "#c3a2fb" },
   { key: "library", name: "Library", icon: I.library, href: "/inbox?view=library", sub: "保存", count: "5件", color: "#8ed2bc" },
@@ -48,6 +53,16 @@ function useNarrow() {
 
 export default function Home() {
   const narrow = useNarrow();
+  // Q-095 の見比べ: ?icon=a|b|c で Research のアイコン、?sel=<番号> で初めに選ぶ機能（撮るため）
+  const [iconKey, setIconKey] = useState<"a" | "b" | "c">("b");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const ic = q.get("icon");
+    if (ic === "a" || ic === "c") setIconKey(ic);
+    const s0 = Number(q.get("sel"));
+    if (s0 > 0 && s0 < N) { setSel(s0); setTurn(-s0 * STEP); }
+  }, []);
+  MODULES[2].icon = iconKey === "a" ? I.researchA : iconKey === "c" ? I.researchC : I.researchB;
   const router = useRouter();
   const reduce = useReducedMotion();
   const [sel, setSel] = useState(0);
