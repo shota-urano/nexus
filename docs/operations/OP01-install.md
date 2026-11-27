@@ -1,6 +1,6 @@
 # OP01 NEXUS を入れて、自動で動き出すようにする
 
-launchd、Tailscale Service、別のディスクの置き場所を用意し、本人のログインで NEXUS が動き出すようにする。Mac mini は FileVault をオンにするので、再起動の後は本人がログインする（BD-11 7章、DD-09 2.6・4章、NFR-005、NFR-027、CR-016）。
+launchd、Tailscale Service、別のディスクの置き場所、送り手が呼ぶ送信のコマンド（`nexus-send`）を用意し、本人のログインで NEXUS が動き出すようにする。Mac mini は FileVault をオンにするので、再起動の後は本人がログインする（BD-11 7章、DD-09 2.6・2.7・4章、NFR-005、NFR-027、CR-016、CR-020）。
 
 ## きっかけ
 
@@ -34,7 +34,7 @@ launchd、Tailscale Service、別のディスクの置き場所を用意し、�
    npm run build
    ```
 
-4. 構築のスクリプトを動かす（DD-09 4章 手順 3）。データの置き場所、AI の作業の場所、ログの置き場所を権限 `0700` で作り、`env`、`claude-settings.json`、launchd の設定4つを置く。
+4. 構築のスクリプトを動かす（DD-09 4章 手順 3）。データの置き場所、AI の作業の場所、ログの置き場所を権限 `0700` で作り、`env`、`claude-settings.json`、launchd の設定4つと、送信のコマンド `bin/nexus-send` を置く。
 
    ```sh
    sh deploy/setup.sh
@@ -44,6 +44,12 @@ launchd、Tailscale Service、別のディスクの置き場所を用意し、�
 
    ```sh
    NEXUS_NODE_BIN=/opt/homebrew/opt/node@<番号>/bin/node sh deploy/setup.sh
+   ```
+
+   送信のコマンドの置き場所は、リポジトリの `bin/nexus-send` である（DD-09 2.7。本番では `~/apps/nexus/bin/nexus-send`）。構築のスクリプトが `deploy/nexus-send` の雛形に、Node.js の絶対の道と `dist/cli/send/main.js` の絶対の道を書き込み、実行の権限を付けて置く。Git では管理しない。研究ループ（brain-research の送り手）は、この絶対の道で呼ぶ。`PATH` は変えない。Node.js を替えたときやリポジトリを置き直したときは、構築のスクリプトをもう一度動かして置き直す。
+
+   ```sh
+   ls -l <リポジトリ>/bin/nexus-send
    ```
 
 5. 別のディスクを Mac mini につなぎ、`nexus-backup` のフォルダを権限 `0700` で作る（DD-09 4章 手順 4）。ディスクの扱いは OP11 に従う。
@@ -90,7 +96,7 @@ launchd、Tailscale Service、別のディスクの置き場所を用意し、�
    sudo fdesetup authrestart
    ```
 
-10. 端末を登録し、配信元の鍵を用意する（OP03）。
+10. 端末を登録し、配信元の鍵を用意する（OP03）。brain-research の鍵は、研究ループの `NEXUS_SENDER_KEY` に入れる（DD-09 4章 手順 7）。
 
 ## 確かめ方
 
@@ -108,5 +114,6 @@ DD-09 4章の構築後の確認を、上から順に行う。
 | 定期ジョブ | OP08 の手順で、バックアップを手で1回取る | 別のディスクに今日の写しがあり、権限が `0600`。ログに MSG-038 |
 | 再起動からの戻り | Mac mini を再起動し、本人がログインする | ログインから 5 分以内に `/api/health` が 200 |
 | ログ | `ls ~/Library/Logs/nexus/` | プロセスごとの今日のファイルがある |
+| 送信のコマンド | 研究ループが最初の本物の週報（手で作る最初の週）を `~/apps/nexus/bin/nexus-send` で送る。本番に試験の週報は送らない | 終了コード 0 で、課題の一覧（SCR-010）にその課題が出る |
 
 どれかが期待どおりでなければ、OP04 で確かめる。値を変えたとき（ポートが使われていた、など）は、先に `deploy/` の雛形を直し、同じ変更の中で DD-09 2章の表を直す（DD-09 4章）。
