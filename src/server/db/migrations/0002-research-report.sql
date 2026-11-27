@@ -37,6 +37,13 @@ SELECT
   delivery_id, sender, target_date, received_at, item_count, result, rejection_reason
 FROM delivery;
 
+-- 採番の履歴を引き継ぐ（DD-03 1章「消した番号を使い回さない」）。
+-- 行を写しただけでは `sqlite_sequence` が写した行の最大の番号になり、末尾で消した番号を使い回すため、
+-- 古い表の値をそのまま新しい表へ移す（全件を消してあっても引き継ぐ）。
+DELETE FROM sqlite_sequence WHERE name = 'delivery_new';
+INSERT INTO sqlite_sequence (name, seq)
+SELECT 'delivery_new', seq FROM sqlite_sequence WHERE name = 'delivery';
+
 DROP TABLE delivery;
 ALTER TABLE delivery_new RENAME TO delivery;
 
