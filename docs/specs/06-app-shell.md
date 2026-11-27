@@ -57,3 +57,5 @@ MSG-018、MSG-019、MSG-020、MSG-021（BD-09 1.1）。
   - 受け入れ基準: `/img/home/planet_001.png` の応答の `Cache-Control` が `public, max-age=31536000, immutable` である; `public/img/` の画像の名前が全て版の番号（`_001` など）で終わる; service worker の保存の対象が `/_next/static/` の中だけのままである
 - [x] [Frontend] ページ全体（`html` と `body`）の背景を BD-13 の試作 `prototype/app/globals.css` と同じ暗い色にし、画面の高さに満たないときも白を見せない。端末の上の帯の色（`theme-color`）と、ホーム画面に追加したときの上の帯の見え方を、暗い背景に合わせる（DD-01 M01、DD-01 3章 Tailwind CSS の決まり、BD-13）（se/06-app-shell-3）
   - 受け入れ基準: `html` と `body` の背景の色が、Tailwind の設定のファイルの背景の色である; ページの `theme-color` がその色である; ホーム画面に追加したときの上の帯の見え方（`apple-mobile-web-app-status-bar-style`）が、暗い背景に合う値である
+- [ ] [Frontend] ページ全体（`html` と `body`）の文字の色を、BD-13 の試作 `prototype/app/globals.css` と同じ明るい色（Tailwind の設定のファイルの文字の色）にし、文字の色を決めていない画面と全面の知らせ（MSG-020、MSG-021）が、暗い背景の上で読めるようにする（DD-01 M01、DD-01 3章 Tailwind CSS の決まり、BD-13）
+  - 受け入れ基準: DD-10 TC116 が通る; `html` と `body` の文字の色が、Tailwind の設定のファイルの文字の色である; 全面の知らせの文の色が、ページ全体の背景の色と同じでない
