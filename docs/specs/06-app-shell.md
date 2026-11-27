@@ -59,3 +59,5 @@ MSG-018、MSG-019、MSG-020、MSG-021（BD-09 1.1）。
   - 受け入れ基準: `html` と `body` の背景の色が、Tailwind の設定のファイルの背景の色である; ページの `theme-color` がその色である; ホーム画面に追加したときの上の帯の見え方（`apple-mobile-web-app-status-bar-style`）が、暗い背景に合う値である
 - [x] [Frontend] ページ全体（`html` と `body`）の文字の色を、BD-13 の試作 `prototype/app/globals.css` と同じ明るい色（Tailwind の設定のファイルの文字の色）にし、文字の色を決めていない画面と全面の知らせ（MSG-020、MSG-021）が、暗い背景の上で読めるようにする（DD-01 M01、DD-01 3章 Tailwind CSS の決まり、BD-13）（se/06-app-shell）
   - 受け入れ基準: DD-10 TC116 が通る; `html` と `body` の文字の色が、Tailwind の設定のファイルの文字の色である; 全面の知らせの文の色が、ページ全体の背景の色と同じでない
+- [ ] [Frontend] `public/img/icon/app-icon_001.png`（1024×1024）から、PWA の manifest のアイコン（192px と 512px）と、iPad のホーム画面のアイコン（`apple-touch-icon`、180px）を作って設定する（DD-01 M01、BD-01 NFR-007）
+  - 受け入れ基準: `/manifest.webmanifest` の `icons` に 192×192 と 512×512 の PNG があり、その道で画像が返る; ページに 180×180 の PNG を指す `apple-touch-icon` があり、その道で画像が返る; アイコンの画像の名前が版の番号（`_001` など）で終わる
