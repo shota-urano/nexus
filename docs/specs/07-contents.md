@@ -58,5 +58,5 @@ DD-06 E01、E03、E04、E05、E06、E08。
   - 受け入れ基準: DD-10 TC77、DD-10 TC78、DD-10 TC79 が通る
 - [x] [Frontend] 端末の API の呼び出し M09 と、Inbox、Explore、Library の画面 M05 を作る（SCR-007、SCR-008、SCR-009、DD-01 M05・M09）（se/07-contents）
   - 受け入れ基準: DD-10 TC84 が通る
-- [ ] [Frontend] Inbox、Explore、Library の行で、種類が research の内容を「週報」の種類の印で出し、押すと課題の週報 `/research/{contentId}`（SCR-011）を開く。API は変えない（SCR-007-A02、SCR-008-A03、SCR-009-A02、DD-01 M05、BD-03 2章 遷移表、CR-020）
+- [x] [Frontend] Inbox、Explore、Library の行で、種類が research の内容を「週報」の種類の印で出し、押すと課題の週報 `/research/{contentId}`（SCR-011）を開く。API は変えない（SCR-007-A02、SCR-008-A03、SCR-009-A02、DD-01 M05、BD-03 2章 遷移表、CR-020）（se/07-contents-2）
   - 受け入れ基準: DD-10 TC144 が通る; 種類が research の行に「週報」と出る; その行を押すと `/research/{その内容ID}` へ移る
