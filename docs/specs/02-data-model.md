@@ -50,3 +50,5 @@ BD-07 のエンティティ ENT-001〜ENT-013 と、検索の索引、マイグ�
 
 - [x] [Backend] マイグレーション 0001 で、DD-03 2.2 の16のテーブル（`search_index` は FTS5 の trigram）と、3章の全ての索引を作る（ENT-001〜ENT-013、DD-03）（se/02-data-model）
   - 受け入れ基準: 空の DB に当てると DD-03 2.1 の16のテーブルと、3章の22の索引（主キーと FTS5 の索引を除く）ができる; `PRAGMA foreign_key_check` が行を返さず、`PRAGMA integrity_check` が ok を返す; `content.kind` に空の文字を入れる、`ai_run` の目的が answer で `reply_message_id` が空、`message` の話し手が owner で `reply_state` がある、のどれも挿入が拒まれる
+- [ ] [Backend] マイグレーション `0002-research-report.sql`（`delivery` と `sender_key` を `sender` の検査制約に `brain-research` を足して作り直し、`research_topic`、`research_report` と `research_report_week_uq`、`research_topic_received_ix` を作る）と、M21 の外部キーの検査を止めて当てる扱い（1行目の `-- nexus:foreign-keys-off`、確定の前の `PRAGMA foreign_key_check`、終わったら ON に戻す）を作る（ENT-014、ENT-015、DD-01 M21、DD-03 2.2・3章・5章、CR-020）
+  - 受け入れ基準: DD-10 TC149 が通る

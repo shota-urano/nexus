@@ -56,3 +56,5 @@ DD-06 E03、E05、E07。
   - 受け入れ基準: DD-10 TC100 が通る
 - [x] [Backend] 管理のコマンドの `device add|list|revoke` と、登録の URL を開く `openRegistration` を作る（FN-023、DD-02 FN-023、DD-05 3章）（se/03-auth-and-admin）
   - 受け入れ基準: DD-10 TC93、DD-10 TC94、DD-10 TC95、DD-10 TC96 が通る
+- [ ] [Backend] 管理のコマンドの `sender-key issue|list|revoke` と M12 の配信元の鍵の確かめに、配信元 `brain-research`（使える連携は IF-005 だけ）を足す（FN-024、DD-01 M12・M30、DD-02 FN-024・3章 P02、BD-07 4.2、CR-020）
+  - 受け入れ基準: DD-10 TC99、DD-10 TC100、DD-10 TC150 が通る

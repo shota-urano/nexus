@@ -2,8 +2,8 @@
 id: DD-09
 name: 環境定義書（基盤詳細設計）
 phase: 詳細設計
-version: 1.2
-updated: 2026-11-26
+version: 1.3
+updated: 2026-11-27
 ---
 
 # DD-09 環境定義書（基盤詳細設計）（NEXUS）
@@ -16,6 +16,7 @@ updated: 2026-11-26
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: X-04 CR-016（2026-11-26 RD-01 SH01 が承認）で、2.6 と構築後の確認の再起動を、FileVault をオンにして本人がログインする形に直した。
 - 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、2.1 の画面（PWA）に、`public/img/` の画像を長く保存させる決まりを足した。
+- 1.3: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、送信のコマンド（2.7）を足し、2.1 の構成要素の表と 4章の構築の手順に入れた。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 環境一覧
@@ -38,6 +39,7 @@ updated: 2026-11-26
 | DB | Mac mini の内蔵のディスクの1つのファイル | SQLite（Node.js に入っている版。ADR-020）。起動のときに M21 が、FTS5 の trigram と `backup` が使えるかを確かめ、使えなければ DD-06 E17 で止まる | `~/Library/Application Support/nexus/nexus.db`。フォルダの権限は本人のユーザだけ（`0700`）。接続の設定は DD-05 1章（WAL、`busy_timeout` 5,000 ミリ秒、外部キー）。容量は 1 年に最大 約 390 MB（DD-03 4章） | ファイルなので通信しない |
 | 定期ジョブ | Mac mini。launchd が起動する Node.js のプロセス | Web サーバと同じ | BAT-001 は毎日 3:00、BAT-002 は毎月 1日の 3:30（BD-02 5.1。CR-012）。写しの置き場所は 2.3 の `NEXUS_BACKUP_DIR`。写しは 7 日分（DD-02 FN-021） | 通信しない |
 | 管理のコマンド | Mac mini。本人がターミナルで打つ | Web サーバと同じ | 2.3 の環境変数を、本番の値を書いたファイル（`~/Library/Application Support/nexus/env`。権限 `0600`）から読む | 通信しない |
+| 送信のコマンド（CR-020） | Mac mini。送り手（brain-harness の研究ループ）が送り手のユーザで打つ | Web サーバと同じ Node.js | 2.7 | `127.0.0.1:48400` の IF-005 だけへ送る |
 | Tailscale Serve | Mac mini の Tailscale | 本人の Tailscale の版 | Tailscale Service `svc:nexus` を作り、`https://nexus.<tailnet>.ts.net`（Tailscale の中だけ）を 127.0.0.1:48400 へ渡す（ADR-009。evaloom と同じ形） | Tailscale の中だけ（NFR-012、NFR-021） |
 
 ### 2.2 試験と開発
@@ -132,6 +134,18 @@ AC22 の証拠の残し方（RD-15 AC22、CR-005）:
 - LaunchAgent は本人のユーザのセッションで動く。Mac mini は FileVault をオンにするので自動でログインせず、再起動の後は本人がログインすると動き出す。計画した再起動は `sudo fdesetup authrestart` で行い、次の起動の1回だけログインを飛ばす。OP01 で確かめる（NFR-005、AC26、CR-016）。
 - ログ（CR-013）: 各プロセスは M23 のログの関数で `NEXUS_LOG_DIR/<プロセスの名前>-YYYY-MM-DD.log` に書き、日が替わったら新しいファイルに書き、30 日より古いファイルを消す（NFR-025）。launchd の標準出力と標準エラーのファイルには、ログの関数が使えるようになる前の出力（起動の失敗など）だけが出る。このファイルは Web サーバと AI Runner の起動のときに、1 MB を超えていれば空にする。
 
+### 2.7 送信のコマンド（FN-028、IF-005。CR-020）
+
+| 項目 | 決まり |
+|---|---|
+| 入口 | `src/cli/send/main.ts`（DD-01 M34）。`npm run build` で `dist/cli/send/main.js` にする（管理のコマンドと同じ変換） |
+| 打つ名前 | `nexus-send`。構築のとき（4章 手順 3）に、`deploy/nexus-send` の雛形から、Node.js の絶対の道（2.1 と同じものを `setup.sh` が選ぶ）と `dist/cli/send/main.js` の絶対の道を書き込んだ実行のファイルを、リポジトリの `bin/nexus-send`（Git で管理しない）に置く。本番では `~/apps/nexus/bin/nexus-send` になる。送り手はこの絶対の道で呼ぶ。`PATH` は変えない |
+| 引数 | `nexus-send --source brain-research --kind research-report <ファイル>`。値は今はこの組だけ（DD-02 FN-028） |
+| 送り手の側の環境変数 | `NEXUS_SEND_URL`（NEXUS の配信元の API の根。本番は `http://127.0.0.1:48400`）、`NEXUS_SENDER_KEY`（brain-research の鍵。FN-024 で作り、本人が研究ループの設定に入れる。BD-11 OP03）。NEXUS の `env` のファイルは読まない（送り手のユーザが読めなくてよいようにするため） |
+| 待つ時間 | 30 秒（DD-02 FN-028 手順 5。受け取りは1秒未満の見込みで、Web サーバの起動し直しの間を待てる長さとして置いた） |
+| 終了コード | 0 は受け取られた。1 は NEXUS が断ったか、つながらなかった。2 は送る前に止めた（引数、ファイル、形、環境変数） |
+| 試験と開発 | 試験では `NEXUS_SEND_URL` を試験の Web サーバに向け、試験の鍵を使う（BD-06 4.2 連携テストの進め方） |
+
 ## 3. IaC とパラメータシート
 
 | 項目 | 決まり |
@@ -146,12 +160,12 @@ AC22 の証拠の残し方（RD-15 AC22、CR-005）:
 構築の手順（本番。BD-11 OP01 の中身。OP01 の手順書は実装で書く）:
 
 1. Homebrew で Node.js の長期サポート版を入れる（2.1）。`claude --version` が 2.1.314 以後であることを確かめる（2.5 の設定の下限）。
-2. リポジトリを置き、`npm ci` と `npm run build`（Next.js の画面と、AI Runner、定期ジョブ、管理のコマンドの TypeScript の変換）を行う。
-3. `~/Library/Application Support/nexus/`（`0700`）、`ai-workdir/`、`~/Library/Logs/nexus/` を作り、`deploy/` の雛形から `env`、`claude-settings.json`、launchd の設定を置く。
+2. リポジトリを置き、`npm ci` と `npm run build`（Next.js の画面と、AI Runner、定期ジョブ、管理のコマンド、送信のコマンドの TypeScript の変換）を行う。
+3. `~/Library/Application Support/nexus/`（`0700`）、`ai-workdir/`、`~/Library/Logs/nexus/` を作り、`deploy/` の雛形から `env`、`claude-settings.json`、launchd の設定と、送信のコマンドの `bin/nexus-send`（2.7。CR-020）を置く。
 4. 別のディスクに `nexus-backup` のフォルダ（`0700`）を作る（BD-11 OP11）。
 5. launchd の設定を読み込ませ、Web サーバを起動する（マイグレーションが当たる）。続けて AI Runner を起動する。
 6. Tailscale の管理画面で Tailscale Service `svc:nexus` を用意し、Mac mini で 127.0.0.1:48400 へ渡す設定をする（evaloom と同じ形。ADR-009）。Mac mini の Tailscale の設定を変えるので、本人が行う。
-7. 管理のコマンドで、端末の登録の URL を出して端末を登録し（FN-023）、配信元の鍵を用意して配信元の設定に入れる（FN-024、BD-11 OP03）。
+7. 管理のコマンドで、端末の登録の URL を出して端末を登録し（FN-023）、配信元の鍵を用意して配信元の設定に入れる（FN-024、BD-11 OP03）。brain-research の鍵は、研究ループの `NEXUS_SENDER_KEY` に入れる（CR-020）。
 
 構築後の確認:
 
@@ -167,6 +181,7 @@ AC22 の証拠の残し方（RD-15 AC22、CR-005）:
 | 定期ジョブ | `node dist/jobs/main.js backup` を手で動かす | 別のディスクに今日の写しがあり、権限が `0600`。ログに MSG-038 |
 | 再起動からの戻り | Mac mini を再起動し、本人がログインする | ログインから 5 分以内に `getHealth` が 200（NFR-005。AC26。CR-016） |
 | ログ | `NEXUS_LOG_DIR` | プロセスごとの今日のファイルがある |
+| 送信のコマンド（CR-020） | 研究ループが最初の本物の週報（手で作る最初の週）を `~/apps/nexus/bin/nexus-send` で送る。本番に試験の週報は送らない | 終了コード 0 で、課題の一覧（SCR-010）にその課題が出る |
 
 - 書類の直し方: 構築してみて値を変えたとき（ポートが使われていた、など）は、先に `deploy/` の雛形を直し、同じ変更の中でこの書類の 2章の表を直す。版を上げ、冒頭に直したわけを書く。
 

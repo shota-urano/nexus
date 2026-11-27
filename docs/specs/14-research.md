@@ -1,0 +1,64 @@
+---
+status: draft
+範囲: 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）
+---
+
+# 14. 調査の週報の画面 仕様
+
+**親**: [`00-overview.md`](./00-overview.md) ｜ **担当**: Frontend ｜ **範囲**: 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）
+
+設計の正本は `docs/upstream/` の上流工程の書類である。この仕様書は、DD-11 実装単位一覧が書き出した実装への引き渡しで、設計の中身を書き写さず、書類と節で指す。CR-020（2026-11-27 RD-01 SH01 が承認）で足した。
+
+## 1. 目的
+
+brain-harness の研究ループが送る調査の週報を、課題の一覧から開き、最新の週の全体像と今週の変化を一緒に読み、方法の印を見分け、方法を広げてそのためにはと出典を読み、過去の週をさかのぼれるようにする（REQ-031）。ホームの円形 HUD に Research を足す（REQ-018）。
+
+## 2. 入出力
+
+入力: 内容 ID（週報）。出力: DD-04 `listResearchTopics`、`getResearchReport` の応答と画面（M32）。
+
+## 3. 処理詳細
+
+- DD-02 FN-026、FN-027。
+- 既読と保存と開いた日時は 07-contents の `setRead`、`setSaved`、`markOpened` を使う（DD-02 FN-005、FN-006、3章 P04）。
+- AI に質問は 10-chat の AI チャットの面 M06 を、対象 `page` とその週報の内容 ID で開く（DD-02 3章 P07）。
+- 画面の見た目: BD-03 SCR-010、SCR-011、SCR-001。印の色と形、方法の広げ方、HUD の7分割と Research のアイコンは、試作（`prototype/`。本番のコードに使わない）を本人が見て決める（Q-095）。試作を作るのは仕様書の行ではなく、`/se` の上流の作業として行う（BD-13 と同じ扱い）。Q-095 が決まるまで、この仕様書は `confirmed` にしない（spec-gate が止める）。
+
+## 4. 設定値・確定値
+
+- 課題の一覧は続きを持たない（DD-04 3.3。課題は同時に1〜3個）。
+- 方法は 15 件まで、出典の数は出典の URL の数（Q-088 の答え）。
+- 印は「今週足した」「出典が増えた」「反対の意見あり」で、文字のタグと見た目の両方で見分ける（BD-03 SCR-011。色だけに頼らない）。
+- 一覧に出す日時は日付だけ（BD-09 5章。CR-004）。
+
+## 5. インターフェース
+
+DD-04 `listResearchTopics`、`getResearchReport`（`docs/api/openapi.yaml`）。画面の道 `/research`、`/research/{contentId}`（06-app-shell）。
+
+## 6. エラー処理
+
+MSG-047、MSG-048、MSG-019、MSG-003（BD-09 1.1）。DD-06 E03、E05、E08。
+
+## 7. スコープ外
+
+週報の受け取りと送信のコマンド（05-ingest.md）。ホームの API の `research.unreadCount`（11-home.md）。週報を作ること（brain-harness の作業）。
+
+## 8. 関連仕様
+
+- [`00-overview.md`](./00-overview.md)
+- [`05-ingest.md`](./05-ingest.md)
+- [`06-app-shell.md`](./06-app-shell.md)
+- [`07-contents.md`](./07-contents.md)
+- [`10-chat.md`](./10-chat.md)
+- [`11-home.md`](./11-home.md)
+
+## 9. 実装単位
+
+- [ ] [Backend] 課題の一覧 `listResearchTopics` と週報 `getResearchReport`（週の一覧、出典の数）を M33 で作る（FN-026、FN-027、DD-01 M11・M33、DD-02 FN-026・FN-027、DD-04、CR-020）
+  - 受け入れ基準: DD-10 TC138、DD-10 TC139、DD-10 TC102 が通る
+- [ ] [Frontend] 課題の一覧の画面 SCR-010（M32）を作る（FN-026、DD-01 M32、BD-03 SCR-010、CR-020）
+  - 受け入れ基準: DD-10 TC140 が通る
+- [ ] [Frontend] 課題の週報の画面 SCR-011（M32。今週の変化と全体像、方法の印と広げる操作、週の切り替え、既読と保存、AI に質問、出典のリンク）を、本人が試作（BD-03 SCR-011。仕様書の外の上流の作業）を見て決めた見た目で作る（FN-027、FN-005、FN-006、DD-01 M32・M08、BD-03 SCR-011、Q-095、CR-020）
+  - 受け入れ基準: DD-10 TC141 が通る; 印の色と形、方法の広げ方が X-04 Q-095 の答えと同じである
+- [ ] [Frontend] ホームの円形 HUD（M02）を7つのセグメントにして Research を足し、Research のカードに「未読 {件数}」（`getHome` の `research.unreadCount`。11-home の行で足す）を出し、カードを押すと `/research`（SCR-010）へ移る。HUD の7分割の見た目と Research のアイコンは、本人が試作で決めたものにする（SCR-001-O01・O10、DD-01 M02、BD-03 SCR-001、Q-095、CR-020）
+  - 受け入れ基準: DD-10 TC143、DD-10 TC114 が通る; HUD の7分割の見た目と Research のアイコンが X-04 Q-095 の答えと同じである
