@@ -71,5 +71,5 @@ MSG-011〜MSG-014、MSG-019。DD-06 E01、E05、E06、E09〜E13。
   - 受け入れ基準: DD-10 TC102 が通る; 発言のある会話を `listConversations` で読むと `firstQuestionText` が最初の本人の発言の本文で、発言の無い会話では null である
 - [x] [Frontend] AI チャットの面 M06 で、前の会話の選択肢の書き出しを `listConversations` の `firstQuestionText` から取り、会話ごとに `getConversation` を呼ばない。面の見た目（色、余白、枠、光）を BD-13 の試作 `prototype/components/Chat.tsx` に合わせる（SCR-006、DD-01 M06、DD-01 3章 Tailwind CSS の決まり、CR-017）（se/10-chat）
   - 受け入れ基準: DD-10 TC75 が通る; 面を開いたときの API の呼び出しが `listConversations` 1回と、一番新しい会話の `getConversation` 1回だけである; 面の色の値が Tailwind の設定のファイルの値を使い、部品の中に直に書いていない
-- [ ] [Backend] 質問の応答の渡す内容の組み立て P07 に、週報（M33。対象 `page` のときのその週の週報の全体）を足す（FN-015、DD-01 M25・M33、DD-02 3章 P07、CR-020）
+- [x] [Backend] 質問の応答の渡す内容の組み立て P07 に、週報（M33。対象 `page` のときのその週の週報の全体）を足す（FN-015、DD-01 M25・M33、DD-02 3章 P07、CR-020）（se/10-chat-2）
   - 受け入れ基準: DD-10 TC145 が通る
