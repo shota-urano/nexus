@@ -10,6 +10,7 @@ import { inWriteTransaction } from "./transaction";
 // マイグレーションを番号の順に当てる仕組み（DD-03 5章）。外の道具は使わない。
 // ファイルは `src/server/db/migrations/` に `NNNN-<kebab-case の名前>.sql`（0001 から）で置く。
 // 1つのファイルを1つのトランザクションで当て、当てたら `schema_migration` に番号を書く。
+// 1行目に `-- nexus:foreign-keys-off` のあるファイルは、外部キーの検査を止めて当てる（DD-03 5章。CR-020）。
 // `schema_migration` のテーブルは 0001 のファイルが作る（02-data-model）。
 
 // リポジトリの根からのマイグレーションの置き場所（DD-03 5章）。
@@ -70,15 +71,54 @@ export function applyMigrations(
   const applied: number[] = [];
   for (const migration of migrations) {
     if (migration.version <= current) continue;
-    inWriteTransaction(db, () => {
-      db.exec(migration.sql);
-      db.prepare(
-        "INSERT INTO schema_migration (version, name, applied_at) VALUES (?, ?, ?)",
-      ).run(migration.version, migration.name, formatDateTime(clock.now()));
-    });
+    const apply = () =>
+      inWriteTransaction(db, () => {
+        db.exec(migration.sql);
+        if (hasForeignKeysOffMarker(migration.sql)) {
+          assertNoForeignKeyViolation(db, migration.name);
+        }
+        db.prepare(
+          "INSERT INTO schema_migration (version, name, applied_at) VALUES (?, ?, ?)",
+        ).run(migration.version, migration.name, formatDateTime(clock.now()));
+      });
+    if (hasForeignKeysOffMarker(migration.sql)) {
+      withForeignKeysOff(db, apply);
+    } else {
+      apply();
+    }
     applied.push(migration.version);
   }
   return applied;
+}
+
+// 外部キーの検査を止めて当てるファイルの印（DD-03 5章。CR-020）。ファイルの1行目に書く。
+export const FOREIGN_KEYS_OFF_MARKER = "-- nexus:foreign-keys-off";
+
+function hasForeignKeysOffMarker(sql: string): boolean {
+  const firstLine = sql.split(/\r?\n/, 1)[0] ?? "";
+  return firstLine.trim() === FOREIGN_KEYS_OFF_MARKER;
+}
+
+// `PRAGMA foreign_keys` はトランザクションの中では変えられない（SQLite の文書）ので、
+// トランザクションの外で OFF にし、終わったら（失敗しても）ON に戻す（DD-03 5章）。
+function withForeignKeysOff(db: Database, fn: () => void): void {
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    fn();
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+// 確定の前に外部キーの違反が無いかを確かめる。1行でも返れば投げ、トランザクションを戻させて E17 で止める。
+function assertNoForeignKeyViolation(db: Database, name: string): void {
+  const violations = db.prepare("PRAGMA foreign_key_check").all();
+  if (violations.length > 0) {
+    throw new NexusError(
+      "STARTUP_MISMATCH",
+      `マイグレーション ${name} の後に外部キーの違反が ${violations.length} 件残る`,
+    );
+  }
 }
 
 // このプロセスが知るマイグレーションの置き場所（リポジトリの根に依らない道）。
