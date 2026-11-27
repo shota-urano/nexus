@@ -25,10 +25,12 @@
 }
 
 /*
- * ページ全体の背景（BD-13 の試作 prototype/app/globals.css の html, body）。
+ * ページ全体の背景と文字の色（BD-13 の試作 prototype/app/globals.css の html, body）。
  * 画面の高さに満たないときも、白を見せない。
+ * 文字の色を決めていない画面と全面の知らせ（MSG-020、MSG-021）も、暗い背景の上で読めるようにする。
  */
 html,
 body {
   background-color: var(--color-hud-bg);
+  color: var(--color-hud-text);
 }
