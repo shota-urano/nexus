@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ESLint, type Linter } from "eslint";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { acquireBuildLock, releaseBuildLock } from "./fixtures/build";
 
 // DD-10 TC101: 層の規則（DD-01 1.3）を ESLint の設定で確かめる。
 // import/no-restricted-paths は読み込む先のファイルが無いと確かめず、import/no-cycle は
@@ -32,8 +33,18 @@ function errorsOf(messages: Linter.LintMessage[], ruleId: string) {
   return messages.filter((m) => m.ruleId === ruleId && m.severity === 2);
 }
 
+// 見本には型の確かめで誤りになるもの（読み込みの輪）がある。ほかの試験の `npm run build` が
+// 見本を拾わないよう、見本を置いてから消すまで、build と同じ印を持つ（tests/fixtures/build.ts）。
+beforeAll(async () => {
+  await acquireBuildLock();
+}, 10 * 60_000);
+
 afterAll(() => {
-  for (const path of created) rmSync(path, { recursive: true, force: true });
+  try {
+    for (const path of created) rmSync(path, { recursive: true, force: true });
+  } finally {
+    releaseBuildLock();
+  }
 });
 
 describe("TC101 層の規則（DD-01 1.3）", () => {

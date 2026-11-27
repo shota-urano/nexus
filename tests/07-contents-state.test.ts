@@ -305,8 +305,10 @@ describe("TC126 別の接続が書き込みの権利を持つあいだに setRea
         error: { code: "internal", messageId: "MSG-003" },
       });
       // P01 の last_used_at の更新は待たないので、待つのは setRead の 5 秒の1回だけ。
+      // 2回待てば 10 秒以上になる。上限の 9 秒は、GitHub Actions の macOS のランナーで
+      // 単独で回しても 7.1〜7.9 秒かかった（2026-11-27、PR #34）ことによる余裕で、10 秒とは重ならない。
       expect(elapsed).toBeGreaterThanOrEqual(4_500);
-      expect(elapsed).toBeLessThan(7_000);
+      expect(elapsed).toBeLessThan(9_000);
       const lines = logLines();
       expect(
         lines.find(

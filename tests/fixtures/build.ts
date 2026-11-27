@@ -83,6 +83,20 @@ export async function withBuild<T>(run: () => Promise<T> | T): Promise<T> {
     await npmRunBuild();
     return await run();
   } finally {
-    rmSync(LOCK, { recursive: true, force: true });
+    release();
   }
+}
+
+// `npm run build` と同じ印を取る。リポジトリの `src/` に一時のファイルを置く試験（TC101）が、
+// 置いているあいだに `npm run build` の型の確かめがそのファイルを拾わないようにする。
+export async function acquireBuildLock(): Promise<void> {
+  await acquire();
+}
+
+export function releaseBuildLock(): void {
+  release();
+}
+
+function release(): void {
+  rmSync(LOCK, { recursive: true, force: true });
 }
