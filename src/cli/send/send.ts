@@ -5,6 +5,7 @@ import {
   checkResearchReportPayload,
 } from "../../contracts/research";
 import { type Clock, systemClock } from "../../server/shared/clock";
+import { logLevelOf } from "../../server/shared/errors";
 import { type Logger, createLogger } from "../../server/shared/logger";
 import { formatMessage } from "../../server/shared/messages";
 
@@ -197,7 +198,8 @@ export async function runSendCommand(
       ? `${timeoutMs / 1000} 秒待っても答えがありませんでした`
       : "つながりませんでした";
     logger.log({
-      level: "warn",
+      level: logLevelOf("SEND_UNREACHABLE"),
+      code: "SEND_UNREACHABLE",
       msg: "MSG-050",
       target: SEND_PATH,
       detail: "送り先につながらない（E18）",
