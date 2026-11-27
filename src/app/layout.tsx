@@ -4,8 +4,10 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 // 端末の上の帯の色を、ページ全体の背景（globals.css の --color-hud-bg）に合わせる。
+// 画面を端末の上端まで広げ、上の帯が安全な余白（safe-area-inset-top）を使えるようにする（CR-018）。
 export const viewport = {
   themeColor: "#07080d",
+  viewportFit: "cover",
 } satisfies Viewport;
 
 // ホーム画面に追加したときの上の帯を、暗い背景に合う黒にする。
