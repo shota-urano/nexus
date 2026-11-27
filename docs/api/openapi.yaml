@@ -781,8 +781,14 @@ components:
         nextCursor: { oneOf: [{ type: string }, { type: 'null' }] }
     Home:
       type: object
-      required: [newCount, unreadCount, learning, ai, picks, notices]
+      required: [newCount, unreadCount, learning, ai, picks, notices, research]
       properties:
+        research:
+          type: object
+          required: [unreadCount]
+          description: Research のカードに出す値（FN-020。CR-020）。週報の未着は出さない
+          properties:
+            unreadCount: { type: integer, minimum: 0, description: 既読でない週報の数 }
         newCount: { type: integer, minimum: 0 }
         unreadCount: { type: integer, minimum: 0 }
         learning:

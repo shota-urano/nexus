@@ -27,6 +27,21 @@ export function countNewAndUnread(db: Database): HomeCounts {
   };
 }
 
+// 既読でない週報の数（DD-02 FN-020 の `research.unreadCount`。CR-020）。
+// `kind` research の `content` のうち、`content_state` が無いか `is_read` が 0 の数。
+export function countUnreadResearch(db: Database): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM content AS c
+         LEFT JOIN content_state AS s ON s.content_id = c.content_id
+        WHERE c.kind = 'research'
+          AND (s.content_id IS NULL OR s.is_read = 0)`,
+    )
+    .get();
+  return Number(row?.n ?? 0);
+}
+
 export interface HomeLearningRow {
   contentId: number;
   learningTheme: string;

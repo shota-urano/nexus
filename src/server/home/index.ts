@@ -2,6 +2,7 @@ import type { Database } from "../db/connection";
 import { inReadTransaction } from "../db/transaction";
 import {
   countNewAndUnread,
+  countUnreadResearch,
   countWritingReplies,
   findLatestEnglishForHome,
   hasRecentUnrecoveredFailure,
@@ -44,6 +45,10 @@ export interface Home {
     imageUrl: string | null;
   }[];
   notices: HomeNotice[];
+  // Research のカードに出す値（CR-020）。週報の未着は出さない（RD-03 R21）。
+  research: {
+    unreadCount: number;
+  };
 }
 
 export interface HomeView {
@@ -73,6 +78,7 @@ export function createHomeView(deps: { db: Database; clock: Clock }): HomeView {
         const writingCount = countWritingReplies(db);
         const hasFailure = hasRecentUnrecoveredFailure(db, failureSince);
         const picks = listHomePicks(db, today, HOME_PICKS_LIMIT);
+        const researchUnreadCount = countUnreadResearch(db);
 
         const notices: HomeNotice[] = [];
         if (jstHour(now) >= MISSING_DELIVERY_FROM_HOUR) {
@@ -89,6 +95,7 @@ export function createHomeView(deps: { db: Database; clock: Clock }): HomeView {
           ai: { writingCount, hasFailure },
           picks,
           notices,
+          research: { unreadCount: researchUnreadCount },
         };
       });
     },
