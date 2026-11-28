@@ -1,4 +1,4 @@
-import type { ApproachPayload } from "../../../contracts/research";
+import type { ApproachPayload, StepPayload } from "../../../contracts/research";
 import type { Database } from "../../db/connection";
 import { findChatResearchReport } from "../../repositories/research";
 import { RESEARCH_KIND } from "./ingest";
@@ -7,11 +7,15 @@ import { RESEARCH_KIND } from "./ingest";
 // BD-02 FN-015 業務ルール。CR-020）。課題名、何週目か、状態、現時点の答え、方法の一覧（見出し、
 // そのためには、出典の URL、印、反対の意見）、まだ分かっていないこと、今週の変化を、読む材料の文にする。
 // 対象の種類は `page` だけで、その週の週報の全体を入れる。状態と印は IF-005 の値のまま入れる。
+// 段の欄のある週報は、段の一覧（番号、中身、状態）、方法の番号とぶら下がる段、段の変更の案も入れる
+// （CR-024）。段の欄の無い週報は今のまま（方法の番号は並びの何番目か）。
 // M14 の種類の一覧を読み込まず、同じ形の操作を公開する（DD-01 M14。輪を作らないため）。
 
 function approachLines(approach: ApproachPayload, index: number): string[] {
+  const no = approach.no ?? index + 1;
+  const step = approach.step == null ? "" : `（段${approach.step}）`;
   return [
-    `### 方法${index + 1}: ${approach.title}`,
+    `### 方法${no}${step}: ${approach.title}`,
     "そのためには:",
     approach.howToMd,
     "出典の URL:",
@@ -32,6 +36,24 @@ export function buildResearchAnswerMaterial(
   const report = findChatResearchReport(db, contentId);
   if (report === null) return null;
   const approaches = JSON.parse(report.approachesJson) as ApproachPayload[];
+  const steps =
+    report.stepsJson === null
+      ? null
+      : (JSON.parse(report.stepsJson) as StepPayload[]);
+  const stepLines =
+    steps === null
+      ? []
+      : [
+          "段の一覧:",
+          ...(steps.length === 0
+            ? ["（無い）"]
+            : steps.map((s) => `- 段${s.no} ${s.title}（${s.status}）`)),
+          "",
+        ];
+  const stepChangeLines =
+    report.stepChangesMd === null
+      ? []
+      : ["段の変更の案:", report.stepChangesMd, ""];
   const lines = [
     "種類: 調査の週報",
     `課題名: ${report.topicTitle}`,
@@ -40,6 +62,7 @@ export function buildResearchAnswerMaterial(
     "現時点の答え:",
     report.answerMd,
     "",
+    ...stepLines,
     "方法の一覧:",
     ...(approaches.length === 0
       ? ["（無い）"]
@@ -47,6 +70,7 @@ export function buildResearchAnswerMaterial(
           ...approachLines(approach, index),
           "",
         ])),
+    ...stepChangeLines,
     "まだ分かっていないこと:",
     report.unknownsMd === "" ? "（無い）" : report.unknownsMd,
     "",

@@ -129,6 +129,9 @@ export interface ChatResearchReport {
   approachesJson: string;
   unknownsMd: string;
   changesMd: string;
+  // 段の一覧（JSON）と段の変更の案。段の欄の無い週報は null（CR-024）。
+  stepsJson: string | null;
+  stepChangesMd: string | null;
 }
 
 // 内容ID の週報と、その課題名。無ければ null。
@@ -138,7 +141,7 @@ export function findChatResearchReport(
 ): ChatResearchReport | null {
   const row = db
     .prepare(
-      "SELECT t.title, r.week, r.status, r.answer_md, r.approaches_json, r.unknowns_md, r.changes_md FROM research_report AS r JOIN research_topic AS t ON t.topic_id = r.topic_id WHERE r.content_id = ?",
+      "SELECT t.title, r.week, r.status, r.answer_md, r.approaches_json, r.unknowns_md, r.changes_md, r.steps_json, r.step_changes_md FROM research_report AS r JOIN research_topic AS t ON t.topic_id = r.topic_id WHERE r.content_id = ?",
     )
     .get(contentId);
   if (row === undefined) return null;
@@ -150,6 +153,8 @@ export function findChatResearchReport(
     approachesJson: String(row.approaches_json),
     unknownsMd: String(row.unknowns_md),
     changesMd: String(row.changes_md),
+    stepsJson: (row.steps_json as string | null) ?? null,
+    stepChangesMd: (row.step_changes_md as string | null) ?? null,
   };
 }
 
