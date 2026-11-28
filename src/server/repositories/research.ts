@@ -21,6 +21,9 @@ export interface ResearchReportValues {
   approachesJson: string;
   unknownsMd: string;
   changesMd: string;
+  // 段の一覧（JSON）と段の変更の案。段の欄の無い週報は null（CR-024）。
+  stepsJson: string | null;
+  stepChangesMd: string | null;
 }
 
 // 課題の ID と週の週報の内容ID（`research_report_week_uq` で1つまで）。無ければ null。
@@ -80,7 +83,7 @@ export function insertResearchReportRow(
   values: ResearchReportValues,
 ): void {
   db.prepare(
-    "INSERT INTO research_report (content_id, topic_id, week, sent_on, status, answer_md, approaches_json, unknowns_md, changes_md) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO research_report (content_id, topic_id, week, sent_on, status, answer_md, approaches_json, unknowns_md, changes_md, steps_json, step_changes_md) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     contentId,
     topicId,
@@ -91,6 +94,8 @@ export function insertResearchReportRow(
     values.approachesJson,
     values.unknownsMd,
     values.changesMd,
+    values.stepsJson,
+    values.stepChangesMd,
   );
 }
 
@@ -101,7 +106,7 @@ export function updateResearchReportRow(
   values: ResearchReportValues,
 ): void {
   db.prepare(
-    "UPDATE research_report SET sent_on = ?, status = ?, answer_md = ?, approaches_json = ?, unknowns_md = ?, changes_md = ? WHERE content_id = ?",
+    "UPDATE research_report SET sent_on = ?, status = ?, answer_md = ?, approaches_json = ?, unknowns_md = ?, changes_md = ?, steps_json = ?, step_changes_md = ? WHERE content_id = ?",
   ).run(
     values.sentOn,
     values.status,
@@ -109,6 +114,8 @@ export function updateResearchReportRow(
     values.approachesJson,
     values.unknownsMd,
     values.changesMd,
+    values.stepsJson,
+    values.stepChangesMd,
     contentId,
   );
 }

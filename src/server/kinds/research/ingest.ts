@@ -73,9 +73,7 @@ export function checkResearchReport(payload: unknown): ResearchBatchCheck {
   // 送った日が正しい形なら、断った記録の対象日に入れる（DD-02 FN-025「結果とメッセージ」）。
   const sentOn = isRecord(payload) ? payload.sentOn : undefined;
   const date = typeof sentOn === "string" && isRealDate(sentOn) ? sentOn : null;
-  return checked.msg === "MSG-034"
-    ? { ok: false, msg: "MSG-034", date }
-    : { ok: false, msg: "MSG-033", field: checked.field, date };
+  return { ok: false, msg: "MSG-033", field: checked.field, date };
 }
 
 function valuesOf(report: ResearchReportPayload): ResearchReportValues {
@@ -88,6 +86,9 @@ function valuesOf(report: ResearchReportPayload): ResearchReportValues {
     approachesJson: JSON.stringify(report.approaches),
     unknownsMd: report.unknownsMd,
     changesMd: report.changesMd,
+    // 段の欄（CR-024）。無ければ NULL にする（DD-03 2.2）。
+    stepsJson: report.steps == null ? null : JSON.stringify(report.steps),
+    stepChangesMd: report.stepChangesMd ?? null,
   };
 }
 

@@ -1177,6 +1177,16 @@ components:
         completedAt: { $ref: '#/components/schemas/DateTime' }
     ResearchStatus: { type: string, enum: [active, ended], description: 課題の状態（BD-07 4.2。CR-020） }
     ApproachMark: { type: string, enum: [added, more_sources, disputed], description: 方法の印（BD-07 4.2。CR-020） }
+    ResearchStepStatus: { type: string, enum: [done, doing, current, todo], description: 段の状態（BD-07 4.2。CR-024） }
+    ResearchStep:
+      type: object
+      additionalProperties: false
+      required: [no, title, status]
+      description: 段1件（BD-06 IF-005 3.2。CR-024）
+      properties:
+        no: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+        status: { $ref: '#/components/schemas/ResearchStepStatus' }
     ApproachPayload:
       type: object
       additionalProperties: false
@@ -1197,6 +1207,8 @@ components:
           maxItems: 3
           uniqueItems: true
           items: { $ref: '#/components/schemas/ApproachMark' }
+        no: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: 課題の中の方法の通し番号。週報の中で重ならない（CR-024） }
+        step: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: ぶら下がる段の no。steps にある段だけ（CR-024） }
         counterMd: { oneOf: [{ type: string, description: 2 KiB まで（UTF-8 のバイト数） }, { type: 'null' }] }
     ResearchReportPayload:
       type: object
@@ -1214,8 +1226,21 @@ components:
         approaches:
           type: array
           minItems: 0
-          maxItems: 15
+          description: 件数の上限は無い（CR-024。全体の 256 KiB で止める）
           items: { $ref: '#/components/schemas/ApproachPayload' }
+        steps:
+          description: ゴールまでの段（CR-024）。current は1つまで。無ければ省くか null
+          oneOf:
+            - type: array
+              minItems: 0
+              maxItems: 30
+              items: { $ref: '#/components/schemas/ResearchStep' }
+            - type: 'null'
+        stepChangesMd:
+          description: 段の変更の案（CR-024）。無ければ省くか null
+          oneOf:
+            - { type: string, description: 4 KiB まで（UTF-8 のバイト数） }
+            - type: 'null'
         unknownsMd: { type: string, description: 8 KiB まで（UTF-8 のバイト数）。空の文字も受ける }
         changesMd: { type: string, minLength: 1, description: 8 KiB まで（UTF-8 のバイト数）。変化が無ければ「変化なし」 }
     ResearchReportResult:
