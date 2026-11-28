@@ -97,7 +97,7 @@ export function createWebContext(
     const english = createEnglishLearning({ db, clock });
     const chat = createChat({ db, clock });
     const home = createHomeView({ db, clock });
-    const research = createResearchView({ db });
+    const research = createResearchView({ db, clock });
     return {
       logger,
       devices,

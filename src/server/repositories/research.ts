@@ -207,6 +207,9 @@ export interface ResearchReportViewRow {
   approachesJson: string;
   unknownsMd: string;
   changesMd: string;
+  // 段の一覧（JSON）と段の変更の案。段の欄の無い週報は null（CR-024）。
+  stepsJson: string | null;
+  stepChangesMd: string | null;
   receivedAt: string;
   openedAt: string | null;
   isRead: boolean;
@@ -223,6 +226,7 @@ export function findResearchReportView(
     .prepare(
       `SELECT c.content_id, c.received_at, t.topic_id, t.topic_key, t.title,
               r.week, r.sent_on, r.status, r.answer_md, r.approaches_json, r.unknowns_md, r.changes_md,
+              r.steps_json, r.step_changes_md,
               s.opened_at, COALESCE(s.is_read, 0) AS is_read,
               COALESCE(s.is_saved, 0) AS is_saved, s.saved_at
          FROM content AS c
@@ -245,6 +249,8 @@ export function findResearchReportView(
     approachesJson: String(row.approaches_json),
     unknownsMd: String(row.unknowns_md),
     changesMd: String(row.changes_md),
+    stepsJson: (row.steps_json as string | null) ?? null,
+    stepChangesMd: (row.step_changes_md as string | null) ?? null,
     receivedAt: String(row.received_at),
     openedAt: (row.opened_at as string | null) ?? null,
     isRead: Number(row.is_read) === 1,
@@ -281,4 +287,46 @@ export function listResearchWeeks(
       sentOn: String(row.sent_on),
       isRead: Number(row.is_read) === 1,
     }));
+}
+
+// 週報の確かめた方法の番号（ENT-006 の確かめた方法。DD-03 `research_approach_seen`。CR-024）。
+export function listSeenApproachNos(db: Database, contentId: number): number[] {
+  return db
+    .prepare(
+      "SELECT approach_no FROM research_approach_seen WHERE content_id = ? ORDER BY approach_no",
+    )
+    .all(contentId)
+    .map((row) => Number(row.approach_no));
+}
+
+// 週報の方法の一覧（JSON）。週報が無いか週報でなければ null（DD-02 FN-027 手順 8）。
+export function findResearchApproachesJson(
+  db: Database,
+  contentId: number,
+): string | null {
+  const row = db
+    .prepare(
+      "SELECT r.approaches_json FROM research_report AS r JOIN content AS c ON c.content_id = r.content_id WHERE r.content_id = ? AND c.kind = 'research'",
+    )
+    .get(contentId);
+  return row === undefined ? null : String(row.approaches_json);
+}
+
+// 方法を確かめた日時を残す。行が既にあれば変えない（最初の日時を残す）。残っている日時を返す
+// （DD-02 FN-027 手順 8。RD-03 R26）。
+export function insertApproachSeen(
+  db: Database,
+  contentId: number,
+  approachNo: number,
+  seenAt: string,
+): string {
+  db.prepare(
+    "INSERT INTO research_approach_seen (content_id, approach_no, seen_at) VALUES (?, ?, ?) ON CONFLICT (content_id, approach_no) DO NOTHING",
+  ).run(contentId, approachNo, seenAt);
+  const row = db
+    .prepare(
+      "SELECT seen_at FROM research_approach_seen WHERE content_id = ? AND approach_no = ?",
+    )
+    .get(contentId, approachNo);
+  return String(row?.seen_at);
 }

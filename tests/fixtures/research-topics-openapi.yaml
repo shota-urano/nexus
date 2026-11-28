@@ -1,4 +1,5 @@
 # DD-04 の listResearchTopics と getResearchReport と、その応答の schema（CR-020、CR-021。コミット 1bf26ef の docs/api/openapi.yaml を正とする）。
+# CR-024 で markApproachSeen と ApproachSeen を足し、Approach に no、step、seen、ResearchReportDetail に steps、stepChangesMd を足した。
 # tests/14-research-api.test.ts の TC102 が、docs/api/openapi.yaml と形（description と summary を除く）を照らす。
 paths:
   /api/app/research/topics:
@@ -30,6 +31,24 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ResearchReportDetail" }
         "401": { $ref: "#/components/responses/DeviceUnauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/Internal" }
+  /api/app/research/reports/{contentId}/approaches/{no}/seen:
+    post:
+      operationId: markApproachSeen
+      tags: [app]
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+        - $ref: "#/components/parameters/ApproachNo"
+      responses:
+        "200":
+          description: 確かめた方法
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApproachSeen" }
+        "401": { $ref: "#/components/responses/DeviceUnauthorized" }
+        "403": { $ref: "#/components/responses/ForbiddenOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/Internal" }
 schemas:
@@ -78,6 +97,16 @@ schemas:
       marks:
         { type: array, items: { $ref: "#/components/schemas/ApproachMark" } }
       counterMd: { oneOf: [{ type: string }, { type: "null" }] }
+      no: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
+      step: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
+      seen: { type: boolean }
+  ApproachSeen:
+    type: object
+    required: [contentId, no, seenAt]
+    properties:
+      contentId: { $ref: "#/components/schemas/Id" }
+      no: { type: integer, minimum: 1 }
+      seenAt: { $ref: "#/components/schemas/DateTime" }
   ResearchReportDetail:
     type: object
     required:
@@ -95,6 +124,8 @@ schemas:
         receivedAt,
         state,
         weeks,
+        steps,
+        stepChangesMd,
       ]
     properties:
       contentId: { $ref: "#/components/schemas/Id" }
@@ -121,3 +152,7 @@ schemas:
             week: { type: integer, minimum: 1 }
             sentOn: { $ref: "#/components/schemas/Date" }
             isRead: { type: boolean }
+      steps:
+        type: array
+        items: { $ref: "#/components/schemas/ResearchStep" }
+      stepChangesMd: { oneOf: [{ type: string }, { type: "null" }] }
