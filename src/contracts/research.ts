@@ -273,6 +273,24 @@ export const approachSchema = z.object({
   sourceCount: z.number().int().min(0),
   marks: z.array(z.enum(APPROACH_MARKS)),
   counterMd: z.string().nullable(),
+  // 方法の番号、ぶら下がる段、確かめたか（CR-024）。無い応答は番号と段が無く、確かめていないとして読む。
+  no: z.number().int().min(1).nullable().default(null),
+  step: z.number().int().min(1).nullable().default(null),
+  seen: z.boolean().default(false),
+});
+
+// 段1件（`openapi.yaml` の `ResearchStep`。CR-024）。
+export const stepSchema = z.object({
+  no: z.number().int().min(1),
+  title: z.string(),
+  status: z.enum(RESEARCH_STEP_STATUSES),
+});
+
+// `markApproachSeen` の応答（`openapi.yaml` の `ApproachSeen`。CR-024）。
+export const approachSeenSchema = z.object({
+  contentId: z.number().int().min(1),
+  no: z.number().int().min(1),
+  seenAt: z.string(),
 });
 
 export const researchWeekSchema = z.object({
@@ -296,9 +314,14 @@ export const researchReportDetailSchema = z.object({
   receivedAt: z.string(),
   state: contentStateSchema,
   weeks: z.array(researchWeekSchema),
+  // 段の一覧と段の変更の案（CR-024）。無い応答は段の欄の無い週報として読む。
+  steps: z.array(stepSchema).default([]),
+  stepChangesMd: z.string().nullable().default(null),
 });
 
 export type ApproachView = z.infer<typeof approachSchema>;
+export type StepView = z.infer<typeof stepSchema>;
+export type ApproachSeenView = z.infer<typeof approachSeenSchema>;
 export type ResearchWeekView = z.infer<typeof researchWeekSchema>;
 export type ResearchReportDetailView = z.infer<
   typeof researchReportDetailSchema

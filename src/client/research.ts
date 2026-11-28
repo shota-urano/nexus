@@ -1,6 +1,7 @@
 import {
   type ResearchReportDetailView,
   type ResearchTopicListView,
+  approachSeenSchema,
   researchReportDetailSchema,
   researchTopicListSchema,
 } from "../contracts/research";
@@ -81,4 +82,22 @@ export async function fetchResearchReport(
   return parsed.success
     ? { status: "ok", value: parsed.data }
     : { status: "failed" };
+}
+
+// `markApproachSeen`（FN-027 手順 8。CR-024）。方法を確かめた日時を残す。画面は結果を待たずに NEW を
+// 消し、失敗しても知らせを出さない（`markOpened` と同じ扱い）ので、成功したかだけを返す。
+export async function markApproachSeen(
+  contentId: number,
+  no: number,
+): Promise<boolean> {
+  try {
+    const response = await deviceFetch(
+      `/api/app/research/reports/${contentId}/approaches/${no}/seen`,
+      { method: "POST" },
+    );
+    if (!response.ok) return false;
+    return approachSeenSchema.safeParse(await response.json()).success;
+  } catch {
+    return false;
+  }
 }

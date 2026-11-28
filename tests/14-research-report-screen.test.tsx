@@ -566,8 +566,9 @@ function asRgb(color: ColorValue | null, what: string): Rgb {
 
 // ---- 画面の読み方 ----
 
+// 今週足した（added）のタグは CR-024 で「NEW」にした（Q-101、Q-102 の答え。BD-03 SCR-011 3.2 道のり）。
 const MARK_TAGS: Record<Mark, { symbol: string; label: string }> = {
-  added: { symbol: "+", label: "今週足した" },
+  added: { symbol: "", label: "NEW" },
   more_sources: { symbol: "↑", label: "出典が増えた" },
   disputed: { symbol: "!", label: "反対の意見あり" },
 };
