@@ -14,7 +14,7 @@ updated: 2026-11-28
 - 0.2: X-05 RV16 の指摘で直した（2026-11-25）。`content.kind` の値の検査制約を外し（RV16-05）、多重起動の印の `job_lock` を足した（RV16-03）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`research_topic`（ENT-014）と `research_report`（ENT-015）と索引を足し、`delivery` と `sender_key` の `sender` の検査制約に `brain-research` を足した。外部キーの検査を止めて当てるマイグレーションの決まりと、`0002-research-report.sql` の中身を5章に足した（Q-088、Q-090、Q-096 の答え）。
-- 1.2: X-04 CR-024（2026-11-28。本人の承認の前の案）で、`research_report` の方法の件数の検査制約を外して `steps_json` と `step_changes_md` を足し、ENT-006 の確かめた方法の `research_approach_seen` を足した。マイグレーション `0003-research-roadmap.sql` を足した（Q-098〜Q-101 の答え）。
+- 1.2: X-04 CR-024（2026-11-28 RD-01 SH01 が承認）で、`research_report` の方法の件数の検査制約を外して `steps_json` と `step_changes_md` を足し、ENT-006 の確かめた方法の `research_approach_seen` を足した。マイグレーション `0003-research-roadmap.sql` を足した（Q-098〜Q-101 の答え）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 物理設計の前提

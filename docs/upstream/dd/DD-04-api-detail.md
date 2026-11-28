@@ -19,7 +19,7 @@ updated: 2026-11-28
 - 1.3: X-04 CR-018（2026-11-27 RD-01 SH01 が承認）で、`createConversation` の画面の欄から SCR-002-A05 を外した。API は変えない。
 - 1.4: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`postResearchReport`（IF-005）、`listResearchTopics`、`getResearchReport` を足し、`Home` に `research` を足した。IF-005 の各欄の上限は Q-096 の答え（2026-11-27）による。
 - 1.5: X-04 CR-021（2026-11-27 RD-01 SH01 が承認）で、CR-020 の API の定義（`postResearchReport`、`listResearchTopics`、`getResearchReport` と、その schema、`Home` の `research`）を `openapi.yaml` から外し、それぞれを作る実装単位（仕様書 05、11、14）で足すことにした。この書類の CR-020 の表と決定は変えない。
-- 1.6: X-04 CR-024（2026-11-28。本人の承認の前の案）で、`markApproachSeen` を足した。`postResearchReport` の求め（`ResearchReportPayload`、`ApproachPayload`）に任意の `steps`、`stepChangesMd`、`no`、`step` を足し、方法の件数の上限を外す。`getResearchReport` の応答（`ResearchReportDetail`、`Approach`）に `steps`、`stepChangesMd`、`no`、`step`、`seen` を足す。`openapi.yaml` は CR-021 の決まりどおり、実装単位（仕様書 05、14）で直す。
+- 1.6: X-04 CR-024（2026-11-28 RD-01 SH01 が承認）で、`markApproachSeen` を足した。`postResearchReport` の求め（`ResearchReportPayload`、`ApproachPayload`）に任意の `steps`、`stepChangesMd`、`no`、`step` を足し、方法の件数の上限を外す。`getResearchReport` の応答（`ResearchReportDetail`、`Approach`）に `steps`、`stepChangesMd`、`no`、`step`、`seen` を足す。`openapi.yaml` は CR-021 の決まりどおり、実装単位（仕様書 05、14）で直す。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル
