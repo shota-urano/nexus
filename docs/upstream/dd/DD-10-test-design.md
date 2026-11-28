@@ -2,8 +2,8 @@
 id: DD-10
 name: テスト設計書（単体・結合）
 phase: 詳細設計
-version: 1.1
-updated: 2026-11-27
+version: 1.2
+updated: 2026-11-28
 ---
 
 # DD-10 テスト設計書（単体・結合）（NEXUS）
@@ -14,6 +14,7 @@ updated: 2026-11-27
 - 0.3: X-05 RV17 の指摘で直した（2026-11-25）。TC110 の前提に種類ごとの中身の残し方とテスト用のマイグレーションと登録していない種類を足し（RV17-01、RV16-05）、TC129 を足した（RV17-02）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、調査の週報のテストケース TC130〜TC150 と、データの組 D2 を足した。上限は Q-096 の答え（2026-11-27）による。 TC141、TC143 の期待結果を Q-095 の答え（2026-11-27）に合わせた。
+- 1.2: X-04 CR-024（2026-11-28 RD-01 SH01 が承認）で、TC134（方法の件数の上限を外した）と TC145（段を渡す）を直し、TC151〜TC155（段の欄、段と確かめた印の読み出し、`markApproachSeen`、マイグレーション 0003、道のりの画面）を足した。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. テストの範囲と方針
@@ -203,7 +204,7 @@ updated: 2026-11-27
 | TC131 | 結合 | FN-025 業務ルール（置き換え）、RD-03 R23 | 正常 | TC130 の後。その週報を既読にし、保存した | 同じ課題の1週目を、方法を4件にして送る | 200、`replaced` 真。`content` の内容ID は変わらず、方法が4件。`content_state` の既読と保存は残る。`delivery` は2件 | RD-15 AC37 | 自動 |
 | TC132 | 結合 | DD-02 FN-025 手順 6.2（過去の週の送り直し） | 正常 | TC130 の後に2週目（状態 ended）を送った | 1週目を課題名と状態（active）を変えて送り直す | 1週目の週報は新しい値になる。`research_topic` の `title`、`status`（ended）、`last_week`（2）は変わらない。週報は2件 | RD-15 AC37 | 自動 |
 | TC133 | 結合 | DD-02 3章 P02、DD-04 3.1、BD-10 T02 | 権限 | 共通。KB、KS、KR | brain-harness の鍵、sharpen の鍵、鍵なしで `postResearchReport`。KR で `postNewsBatch` | どれも 401 と MSG-032。`research_topic`、`research_report`、`content` は変わらない。`postResearchReport` の3回は `delivery` に rejected（`sender` brain-research）が3件 | RD-15 AC37、AC21 | 自動 |
-| TC134 | 結合 | DD-02 2章 入力チェック C10（数と全体の大きさ） | 境界値 | 共通。KR | 方法 15 件と 16 件。全体が 256 KiB ちょうどと 256 KiB＋1 バイト | 15 件と 256 KiB は 200。16 件は 400 と MSG-034。256 KiB＋1 は 413 と MSG-034。断ったものは何も残らない | RD-15 AC37、AC30 | 自動 |
+| TC134 | 結合 | DD-02 2章 入力チェック C10（数と全体の大きさ） | 境界値 | 共通。KR | 方法 15 件、16 件、100 件（CR-024 で件数の上限を外した）。全体が 256 KiB ちょうどと 256 KiB＋1 バイト | 15 件、16 件、100 件と 256 KiB は 200。256 KiB＋1 は 413 と MSG-034。断ったものは何も残らない | RD-15 AC37、AC30 | 自動 |
 | TC135 | 結合 | DD-02 2章 入力チェック C10（欄ごとの上限。Q-096 の答え） | 境界値 | 共通。KR | 各欄を上限ちょうどと上限＋1 にした週報（`topicId` 64・65 文字と大文字を含むもの、`topicTitle` と方法の `title` 200・201 文字、`answerMd` 4 KiB、`howToMd` 8 KiB、`counterMd` 2 KiB、`unknownsMd` と `changesMd` 8 KiB、出典の URL 50・51 件と 1件 2,048・2,049 文字）。ほかに、出典の URL の重なり、印の重なり、知らない印、`javascript:` の URL、必須の項目が無いもの | 上限ちょうどは 200。上限＋1 とほかの崩れは 400 と MSG-033（外れた項目の名前。方法なら番号付き）。何も残らない | RD-15 AC37、AC30 | 自動 |
 | TC136 | 結合 | FN-025 異常系（残す途中で失敗）、DD-06 E08・E16 | 例外 | 共通。KR。`research_report` を書くところで失敗を差し込む | `postResearchReport` | 500 と MSG-046。`research_topic`、`research_report`、`content`、`search_index` は何も増えない。`delivery` に rejected が1件 | RD-15 AC37 | 自動 |
 | TC137 | 結合 | DD-05 3章 ENT-014・ENT-015（同じ課題の同じ週） | 同時実行 | 共通。KR | 同じ課題の同じ週を、2つの接続から同時に `postResearchReport` | 両方 200。その課題の `research_topic` は1行、その週の `research_report` は1行で、後に確定した送信の値 | RD-15 AC37 | 自動 |
@@ -214,12 +215,17 @@ updated: 2026-11-27
 | TC142 | 結合 | FN-020、DD-02 FN-020 手順 6 の後（未読の週報）、RD-03 R21 | 正常 | 共通＋D2 に、課題 B の2週目（2026-11-30 送り、未読）を足した DB。今日（2026-12-01）の 7:00 以後で、今日は週報の受け取りが無い | `getHome` | `research.unreadCount` 2。`notices` に週報の未着が無い（MSG-015、MSG-016、MSG-017 のほかが出ない） | RD-15 AC17 | 自動 |
 | TC143 | 単体 | M02 HUD、BD-03 SCR-001（O01、O10） | 正常 | M02 の部品に `research.unreadCount` 2 の `Home` を渡す | ホームを描き、Research のセグメントを選ぶ | HUD のセグメントが7つで、Research がある。Research のアイコンが虫眼鏡と折れ線（Q-095 の答え）で、Explore のアイコンと path が違う。Research のカードに「未読 2」が出る。カードを押すと `/research` へ移る | RD-15 AC17 | 自動 |
 | TC144 | 結合 | FN-017、FN-018、FN-019 と週報、DD-02 3章 P08 | 正常 | 共通＋D2。課題 A の2週目の方法の見出しに「ノート」、そのためにはだけに「索引」を含める。2週目を保存した | `listInbox`、`searchContents` を「ノート」「索引」で、`listSaved` | Inbox に未読の週報が `kind` research で出る。「ノート」で2週目が見つかり、「索引」では見つからない（そのためにはは探さない。RD-03 R19）。Library に2週目が出る | RD-15 AC38 | 自動 |
-| TC145 | 結合 | FN-015、DD-02 3章 P07（週報） | 正常 | 共通＋D2。課題 A の2週目を対象 `page` にした会話 | 質問を送り、偽の AI が受けた標準入力を読む | `material` の中に、課題名、何週目か、状態、現時点の答え、方法の見出しとそのためにはと出典の URL と印と反対の意見、まだ分かっていないこと、今週の変化がある | RD-15 AC38、AC11 | 自動 |
+| TC145 | 結合 | FN-015、DD-02 3章 P07（週報） | 正常 | 共通＋D2。課題 A の2週目を対象 `page` にした会話 | 質問を送り、偽の AI が受けた標準入力を読む | `material` の中に、課題名、何週目か、状態、現時点の答え、方法の見出しとそのためにはと出典の URL と印と反対の意見、まだ分かっていないこと、今週の変化がある。段の欄のある週報（CR-024）では、段の番号と中身と状態、方法の番号とぶら下がる段、段の変更の案もある | RD-15 AC38、AC11 | 自動 |
 | TC146 | 結合 | FN-028、DD-02 FN-028、DD-09 2.7 | 正常 | 試験の Web サーバ。送り手の環境変数に KR と送り先 | 形の正しい週報のファイルで `nexus-send --source brain-research --kind research-report <ファイル>` | 終了コード 0。標準出力に MSG-031 と `topicId`、`week`。NEXUS に週報が残る。標準出力、標準エラー出力、ログに KR が出ない | RD-15 AC39 | 自動 |
 | TC147 | 単体 | FN-028 異常系、DD-02 2章 入力チェック C11 | 異常 | 送り先を、呼ばれたら記録する偽のサーバにする | 必須の項目の無いファイル、256 KiB を超えるファイル、JSON でないファイル、無いファイル、`--source brain-harness`、`--kind news`、`NEXUS_SENDER_KEY` の無い環境 | どれも MSG-049（外れた項目か引数か環境変数の名前）と終了コード 2。偽のサーバは1回も呼ばれない | RD-15 AC39 | 自動 |
 | TC148 | 単体 | FN-028 異常系、DD-06 E18 | 異常 | 偽のサーバが 401、413、500 を返すもの。止まっている送り先。30 秒を超えて答えない送り先（時計は偽） | `nexus-send` で形の正しいファイルを送る | 401、413、500 は応答の MSG（MSG-032、MSG-034、MSG-046）を出し、終了コード 1。止まっている送り先と 30 秒を超えたものは MSG-050 と終了コード 1。自動で送り直さない（偽のサーバの呼ばれた回数が1） | RD-15 AC39 | 自動 |
 | TC149 | 結合 | DD-03 5章（外部キーの検査を止めて当てるファイル）、`0002-research-report.sql` | 正常、異常 | `0001` だけを当て、`delivery` と、それを指す `content` と `ai_run` の行を入れた DB | Web サーバの起動の処理で `0002` を当てる。別に、外部キーの違反が残るテスト用のファイルを当てる | `0002` の後、`delivery` と `sender_key` の行と、`content`、`ai_run` からの参照がそのまま残る。`PRAGMA foreign_key_check` が空。`sender` に `brain-research` を入れられ、ほかの値は検査制約で断られる。`PRAGMA foreign_keys` が ON に戻る。違反の残るファイルは戻され、E17 で止まり、`schema_migration` に番号が入らない | - | 自動 |
 | TC150 | 結合 | FN-024（brain-research。CR-020） | 正常 | 共通 | `sender-key issue brain-research`。出た鍵で `postResearchReport` と `postNewsBatch` | 鍵が1回出る。`postResearchReport` は 200、`postNewsBatch` は 401 と MSG-032 | RD-15 AC21、AC37 | 自動 |
+| TC151 | 結合 | DD-02 2章 入力チェック C10（段の欄。CR-024）、FN-025 手順 5 | 正常、境界値、異常 | 共通。KR | 段の欄のある週報（`steps` 3件で段2が `current`、方法の `no` と `step`、`stepChangesMd`）。段の欄の無い週報。`steps` 30件と31件。段の `title` 200・201 文字。`stepChangesMd` 4 KiB と 4 KiB＋1 バイト。段の `no` の重なり。`current` が2つ。`status` が決まった値でない。方法の `no` の重なり。`steps` に無い段を指す `step`。`steps` が無いのに `step` がある。見出しの先頭が `段2｜` の方法 | 段の欄のある週報、無い週報、30件、200文字、4 KiB は 200 で、`research_report` の `steps_json` と `step_changes_md` に送った値が残る（無い週報は NULL）。`段2｜` は見出しのまま残る。ほかは 400 と MSG-033 で、項目の名前（`steps`、`steps[番号].no`、`steps[番号].title`、`stepChangesMd`、`approaches[番号].no`、`approaches[番号].step`）が出て、何も残らない | RD-15 AC37 | 自動 |
+| TC152 | 結合 | FN-027、DD-02 FN-027 手順 4（段と確かめた印。CR-024） | 正常 | 共通＋D2。課題 A の2週目を段の欄のある週報で送り直し、方法 `no` 2 を確かめた（`research_approach_seen` に1行） | 課題 A の2週目と1週目（段の欄の無い週報）の内容ID で `getResearchReport` | 2週目は `steps` が送った順、`stepChangesMd` が送った値、方法ごとの `no`、`step` が送った値で、`seen` は `no` 2 だけ真。1週目は `steps` が空、`stepChangesMd` が null、方法の `no`、`step` が null、`seen` が偽 | RD-15 AC38 | 自動 |
+| TC153 | 結合 | FN-027 手順 8（`markApproachSeen`。CR-024）、RD-03 R26、DD-04 3.2、DD-06 E04・E05 | 正常、異常 | 共通＋D2（TC152 と同じ2週目） | `markApproachSeen` で `no` 1 を2回。その後に2週目を同じ形で送り直す。無い番号の `no` 99、記事 A1 の内容ID、無い内容ID、`Origin` の違う求め | 1回目は 200 で `seenAt` が入る。2回目は 200 で `seenAt` が1回目と同じ。送り直しの後も `getResearchReport` の `no` 1 の `seen` が真。`no` 99、A1、無い ID は 404 と MSG-048。`Origin` の違う求めは 403 で、行が増えない | RD-15 AC38 | 自動 |
+| TC154 | 結合 | DD-03 5章 `0003-research-roadmap.sql`（CR-024） | 正常 | `0001` と `0002` だけを当て、週報（方法3件）と、それを指す `content`、`content_state`、`conversation` の行を入れた DB | Web サーバの起動の処理で `0003` を当てる | 週報の行と参照がそのまま残り、`steps_json` と `step_changes_md` は NULL。`PRAGMA foreign_key_check` が空。方法16件の `approaches_json` と、`steps_json` を入れられる。`research_approach_seen` に行を入れられ、同じ（内容ID、番号）は断られる。`PRAGMA foreign_keys` が ON に戻る | - | 自動 |
+| TC155 | 単体 | M32 SCR-011、M08 道のりの木、BD-03 SCR-011（3.2 道のり、O12〜O14、A02。CR-024、Q-101、Q-102 の答え） | 正常 | M32 の部品に `getResearchReport` の応答（段3件。段1 できた、段2 今ここ、段3 まだ。段2 に今週足した方法2件（`no` 1、2。`no` 2 は確かめ済み）と出典が増えた方法1件、段1 に方法1件、段の無い方法1件。`stepChangesMd` あり）を渡す。`markApproachSeen` は偽の関数 | 週報を描き、`no` 1 の節を押し、もう一度押し、`no` 2 の節を押す。幅 390 ピクセルと 1180 ピクセルで描く | 先頭に「今ここ: 段2 {中身}」。節の順が 今ここ → 今週の変化 → 現時点の答え → 道のり → 段に入らない方法 → 段の変更の案 → まだ分かっていないこと。木は上から ゴール、段3、段2、段1、根元の順で、段ごとに「できた」「今ここ」「まだ」の文字と点の形（`data-state`）が出る。段2 に「NEW 1」、`no` 1 の節に「NEW」のタグ、`no` 2 の節には NEW が無い。節の見出しの前に「方法1」など。`no` 1 を押すと詳細が広がり、`markApproachSeen`（内容ID、1）が1回だけ呼ばれ、`no` 1 の NEW と段2 の「NEW 1」が消える。もう一度押すと閉じ、呼ばれない。`no` 2 を押しても呼ばれない。390 ピクセルでは全ての節が幹の右に、1180 ピクセルでは段2 の節が右、左の順に出る。段の欄の無い週報（TC141 の応答）は今の方法の一覧のまま出る | RD-15 AC38 | 自動 |
 
 ### 横断
 

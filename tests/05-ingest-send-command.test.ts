@@ -462,6 +462,38 @@ describe("TC147 送る前の確かめに外れたら MSG-049 と終了コード 
     );
   }, 60_000);
 
+  // 05-ingest の CR-024 の行: 段の欄のある週報は送る前の確かめを通る。無い段を指す方法は止める。
+  it("段の欄（steps、stepChangesMd、方法の no と step）のある週報は送る（CR-024）", async () => {
+    const body = report({
+      steps: [
+        { no: 1, title: "材料を残す", status: "done" },
+        { no: 2, title: "つながりを見分ける", status: "current" },
+      ],
+      stepChangesMd: "段2を分ける案。",
+    });
+    const approaches = body.approaches as Record<string, unknown>[];
+    approaches.forEach((a, i) => Object.assign(a, { no: i + 1, step: 2 }));
+    const result = await nexusSend(
+      sendArgs(writeReport("roadmap.json", body)),
+      env(),
+    );
+    expect(result.code, result.stdout + result.stderr).toBe(0);
+    expect(target.calls).toHaveLength(1);
+  }, 60_000);
+
+  it("steps に無い段を指す方法は、項目 approaches[1].step（CR-024）", async () => {
+    const body = report({
+      steps: [{ no: 1, title: "材料を残す", status: "current" }],
+    });
+    const approaches = body.approaches as Record<string, unknown>[];
+    approaches[0].step = 9;
+    await expectRefused(
+      sendArgs(writeReport("bad-step.json", body)),
+      env(),
+      "approaches[1].step",
+    );
+  }, 60_000);
+
   it("ちょうど 256 KiB の形の正しいファイルは送る（超えたときだけ止める）", async () => {
     const file = writeReportOfBytes("just.json", REPORT_MAX_BYTES);
     const result = await nexusSend(sendArgs(file), env());

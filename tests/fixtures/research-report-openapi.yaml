@@ -1,4 +1,5 @@
 # DD-04 の postResearchReport と、その求めと応答の schema（CR-021。コミット 1bf26ef の docs/api/openapi.yaml を正とする）。
+# CR-024 で、段の欄（steps、stepChangesMd、方法の no と step）と ResearchStep、ResearchStepStatus を足し、approaches の maxItems を外した。
 # tests/05-ingest-research-report.test.ts の TC102 が、docs/api/openapi.yaml と形（description と summary を除く）を照らす。
 paths:
   /api/research/reports:
@@ -60,6 +61,8 @@ schemas:
         maxItems: 3
         uniqueItems: true
         items: { $ref: "#/components/schemas/ApproachMark" }
+      no: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
+      step: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
       counterMd:
         {
           oneOf:
@@ -102,8 +105,18 @@ schemas:
       approaches:
         type: array
         minItems: 0
-        maxItems: 15
         items: { $ref: "#/components/schemas/ApproachPayload" }
+      steps:
+        oneOf:
+          - type: array
+            minItems: 0
+            maxItems: 30
+            items: { $ref: "#/components/schemas/ResearchStep" }
+          - type: "null"
+      stepChangesMd:
+        oneOf:
+          - { type: string, description: 4 KiB まで（UTF-8 のバイト数） }
+          - type: "null"
       unknownsMd:
         {
           type: string,
@@ -124,3 +137,16 @@ schemas:
       week: { type: integer, minimum: 1 }
       receivedAt: { $ref: "#/components/schemas/DateTime" }
       replaced: { type: boolean, description: 同じ課題の同じ週を置き換えたか }
+  ResearchStepStatus:
+    type: string
+    enum: [done, doing, current, todo]
+    description: 段の状態（BD-07 4.2。CR-024）
+  ResearchStep:
+    type: object
+    additionalProperties: false
+    required: [no, title, status]
+    description: 段1件（BD-06 IF-005 3.2。CR-024）
+    properties:
+      no: { type: integer, minimum: 1 }
+      title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+      status: { $ref: "#/components/schemas/ResearchStepStatus" }

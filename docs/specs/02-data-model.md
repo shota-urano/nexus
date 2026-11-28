@@ -52,3 +52,5 @@ BD-07 のエンティティ ENT-001〜ENT-013 と、検索の索引、マイグ�
   - 受け入れ基準: 空の DB に当てると DD-03 2.1 の16のテーブルと、3章の22の索引（主キーと FTS5 の索引を除く）ができる; `PRAGMA foreign_key_check` が行を返さず、`PRAGMA integrity_check` が ok を返す; `content.kind` に空の文字を入れる、`ai_run` の目的が answer で `reply_message_id` が空、`message` の話し手が owner で `reply_state` がある、のどれも挿入が拒まれる
 - [x] [Backend] マイグレーション `0002-research-report.sql`（`delivery` と `sender_key` を `sender` の検査制約に `brain-research` を足して作り直し、`research_topic`、`research_report` と `research_report_week_uq`、`research_topic_received_ix` を作る）と、M21 の外部キーの検査を止めて当てる扱い（1行目の `-- nexus:foreign-keys-off`、確定の前の `PRAGMA foreign_key_check`、終わったら ON に戻す）を作る（ENT-014、ENT-015、DD-01 M21、DD-03 2.2・3章・5章、CR-020）（se/02-data-model-2）
   - 受け入れ基準: DD-10 TC149 が通る
+- [ ] [Backend] マイグレーション `0003-research-roadmap.sql`（1行目に `-- nexus:foreign-keys-off`。`research_report` を `approaches_json` の件数の検査制約を外し `steps_json`、`step_changes_md` を足した形で作り直し、`research_report_week_uq` を作り直す。`research_approach_seen` を作る）を作る（ENT-006、ENT-015、DD-01 M21、DD-03 2.1・2.2・3章・5章、Q-099、Q-101、CR-024）
+  - 受け入れ基準: DD-10 TC154 が通る; DD-10 TC149 が通るまま

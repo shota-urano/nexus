@@ -2,8 +2,8 @@
 id: DD-02
 name: 処理設計書（処理ロジック）
 phase: 詳細設計
-version: 1.3
-updated: 2026-11-27
+version: 1.4
+updated: 2026-11-28
 ---
 
 # DD-02 処理設計書（処理ロジック）（NEXUS）
@@ -16,6 +16,7 @@ updated: 2026-11-27
 - 1.1: CR-014 で、FN-022 の手順2に2月29日の境の日時を足した（2026-11-25 RD-01 SH01）。
 - 1.2: X-04 CR-017（2026-11-26 RD-01 SH01 が承認）で、FN-014 の `listConversations` に、最初の質問の本文を添えることを足した。
 - 1.3: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、FN-025〜FN-028（調査の週報）の処理を足した。FN-015 の渡す内容（3章 P07）、FN-018 と 3章 P08 の検索の本文、FN-020 の未読の週報の数、FN-024 と 3章 P02 の配信元に brain-research を足した。入力チェック C10、C11 を足した。Q-096 の答え（2026-11-27）の上限を使う。
+- 1.4: X-04 CR-024（2026-11-28 RD-01 SH01 が承認）で、FN-025 に段の欄の確かめと残す列を足して方法の数の上限を外し、FN-027 に段と確かめた印（`markApproachSeen`）を、C10 と P07 に段の欄を足した（Q-098〜Q-101、Q-103 の答え）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 - この書類でトランザクションと書いたところの境界と方式は DD-05、例外の分類と再試行の中身は DD-06 で決める。この書類は、どこで何を当てるかだけを書く。
 
@@ -49,7 +50,7 @@ updated: 2026-11-27
 | FN-024 配信元の鍵の用意と取り消し | 書く | DD-01 M30 |
 | FN-025 週報の受信（IF-005。CR-020） | 書く | DD-01 M11（`postResearchReport`） |
 | FN-026 課題の一覧の表示（CR-020） | 書く（読む条件だけ） | DD-01 M11（`listResearchTopics`） |
-| FN-027 週報の表示（CR-020） | 書く | DD-01 M11（`getResearchReport`、`markOpened`） |
+| FN-027 週報の表示（CR-020） | 書く | DD-01 M11（`getResearchReport`、`markOpened`、`markApproachSeen`。CR-024） |
 | FN-028 週報の送信のコマンド（CR-020） | 書く | DD-01 M34 |
 | IF-001、IF-002、IF-003、IF-005 | FN-001、FN-007、FN-013、FN-025 の節に書く | DD-01 M11 |
 | IF-004 | 3章 P06、P07 と FN-002、FN-015 の節に書く | DD-01 M26 |
@@ -440,8 +441,8 @@ sequenceDiagram
 1. M11 は本文の大きさを読む。256 KiB を超えたら 413 と MSG-034 を返す（BD-06 IF-005 3.2）。
 2. M11 は 3章 P02 で鍵を確かめる（使う連携 IF-005。使えるのは brain-research だけ）。
 3. M11 は本文を JSON として読む。読めなければ 400 と MSG-033（項目「本文」）。
-4. M13 は M14 から research の操作を引き、M33 で形（`openapi.yaml` の `ResearchReportPayload`。Q-096 の答えの上限を含む）を確かめる。方法が 15 件を超えたら MSG-034、ほかの外れは MSG-033（外れた項目の名前。方法なら `approaches[番号]` を添える）。1つでも外れたら何も残さない（BD-02 FN-025。記事と違い、一部だけは残さない）。
-5. M33 は方法ごとに、出典の URL の重なりと印の重なりを確かめる（外れたら MSG-033）。
+4. M13 は M14 から research の操作を引き、M33 で形（`openapi.yaml` の `ResearchReportPayload`。Q-096 の答えの上限を含む）を確かめる。方法の件数の上限は無い（CR-024 で外した。全体の大きさは手順 1 で止める）。外れは MSG-033（外れた項目の名前。方法なら `approaches[番号]`、段なら `steps[番号]` を添える）。1つでも外れたら何も残さない（BD-02 FN-025。記事と違い、一部だけは残さない）。
+5. M33 は方法ごとに、出典の URL の重なりと印の重なりを確かめる（外れたら MSG-033）。段の欄があれば（CR-024）、`steps` の `no` の重なり（項目 `steps[番号].no`）、`current` が2つ以上（項目 `steps`）、方法の `no` の重なり（項目 `approaches[番号].no`）、方法の `step` が `steps` に無い段を指すか `steps` が無いのに書いてある（項目 `approaches[番号].step`）を確かめ、外れたら MSG-033。方法の見出しの先頭の `段N｜` は読み解かない（Q-103 の答え）。
 6. M13 は1つのトランザクションで次を行う（DD-05）。
    1. `delivery` に1行を作る（`sender` は brain-research、`target_date` は `sentOn`、`received_at` は今、`item_count` は 1、`result` は accepted）。
    2. M33 は `research_topic` を `topic_key`（`topicId`）で探す。無ければ作る（`title`、`status`、`last_week`、`last_received_at` は届いた値と今）。あって、届いた `week` が `last_week` 以上なら、`title`、`status`、`last_week`、`last_received_at` を届いた値と今にする。`week` が `last_week` より小さいときは変えない（BD-02 FN-025 手順 5）。
@@ -449,13 +450,15 @@ sequenceDiagram
    4. 3章 P08 で、その週報の `search_index` を作り直す（検索の本文は課題名、現時点の答え、方法の見出しを改行でつないだもの。RD-03 R19）。
 7. M11 は 200 で `source`、`topicId`、`week`、`receivedAt`、`replaced`（手順 6.3 で置き換えたか）を返し、M23 でログに MSG-031（件数 1）を出す。
 
+- 手順 6.3 で残す `research_report` の中身の列には、`steps_json`（`steps` が無いか null なら NULL）と `step_changes_md`（無いか null なら NULL）を含める（CR-024）。置き換えても `research_approach_seen` は消さない（RD-03 R26）。
+
 #### 結果とメッセージ
 
 | 結果 | 返す値 | データ |
 |---|---|---|
 | 正常 | 200、`replaced` が偽（新しい週）か真（同じ週を置き換えた） | 手順 6 のとおり |
 | 鍵が通らない（brain-harness、sharpen の鍵を含む） | 401、MSG-032 | 別のトランザクションで `delivery` に rejected の行を作る（`sender` は brain-research。この道を使えるのは brain-research だけなので） |
-| 全体の形、方法の形、方法の数、大きさ | 400 MSG-033、400 MSG-034、413 MSG-034 | 同上（`rejection_reason` に MSG の番号と差し込んだ値。`target_date` は分かれば入れる） |
+| 全体の形、方法の形、段の形（CR-024）、大きさ | 400 MSG-033、413 MSG-034 | 同上（`rejection_reason` に MSG の番号と差し込んだ値。`target_date` は分かれば入れる） |
 | 手順 6 の途中で失敗した | 500、MSG-046 | トランザクションを戻し、何も残さない。別のトランザクションで rejected の行を作る（作れなくても応答は変えない）。DD-06 の分類で扱う |
 
 ### FN-026 課題の一覧の表示（CR-020）
@@ -470,9 +473,11 @@ sequenceDiagram
 1. M11 は 3章 P01 で端末の鍵を確かめる。
 2. M33 は `content`（`kind` が research）と `research_report`、`research_topic`、`content_state` を内容ID で読む。無いか research でなければ 404 と MSG-048。
 3. M33 は同じ課題の全ての週の `research_report`（`week`、`sent_on`、`content_id`）と、それぞれの `content_state` の既読を、`week` の大きい順に読み、`weeks` にする。
-4. M33 は方法ごとに、出典の数を `sourceUrls` の数として添える（Q-088 の答え。数は残さない）。
+4. M33 は方法ごとに、出典の数を `sourceUrls` の数として添える（Q-088 の答え。数は残さない）。方法の `no` と `step` を返し（無ければ null）、`research_approach_seen` にその内容ID と `no` の行があれば `seen` を真にする（`no` が無ければ偽。CR-024）。`steps_json` を `steps`（無ければ空の並び）、`step_changes_md` を `stepChangesMd`（無ければ null）として返す。
 5. 画面（M32）は、週報を出した後に `markOpened` を呼ぶ（FN-004 の手順 4 と同じ。失敗しても知らせを出さない）。
-6. 方法を広げる（SCR-011-A02）、週を選ぶ（SCR-011-A03）のうち、週を選ぶときは、その週の `content_id` で手順 1 から呼び直す。方法を広げるのは画面の中だけで、サーバを呼ばない。
+6. 方法を広げる（SCR-011-A02）、週を選ぶ（SCR-011-A03）のうち、週を選ぶときは、その週の `content_id` で手順 1 から呼び直す。方法を広げるのは画面の中だけで行う。
+7. 方法を広げたとき、その方法に `no` があり、`marks` に `added` があり、`seen` が偽なら、画面（M32）は `markApproachSeen`（内容ID、`no`）を呼び、応答を待たずに NEW と段の NEW の数を減らす。同じ方法は応答が返るまでもう一度呼ばない。失敗しても知らせを出さない（`markOpened` と同じ扱い。CR-024、RD-03 R26）。
+8. `markApproachSeen` では、M11 が 3章 P01 で端末の鍵とオリジンを確かめ、M33 が `research_report` を内容ID で読み（無ければ 404 MSG-048）、`approaches_json` にその `no` の方法が無ければ 404 MSG-048。あれば `research_approach_seen` に（内容ID、`no`、今）を入れる。行が既にあれば変えない（最初の日時を残す。冪等）。M11 は 200 で `contentId`、`no`、`seenAt` を返す。
 
 ### FN-028 週報の送信のコマンド（CR-020）
 
@@ -497,7 +502,7 @@ sequenceDiagram
 | C07 | `QuestionTarget` | `phrase` なら語句、文、位置がある | 入口層 M11（形）、 業務層 M18（FN-014 の手順 3） | 400 |
 | C08 | 配信元の本文 | 大きさ → 鍵 → JSON → 全体の形 → 記事ごとの形 | 入口層 M11、 業務層 M13、M15、M16（FN-001、FN-007） | 413 MSG-034、401 MSG-032、400 MSG-033 |
 | C09 | 端末の API の全て | 鍵 → オリジン（POST と PUT）→ 本文の形 | 入口層 M11（3章 P01）、 共有の型層 M10 | 401 MSG-020、403、400 |
-| C10 | IF-005 の本文（CR-020） | 大きさ（256 KiB）→ 鍵 → JSON → 全体の形と各欄の上限（Q-096 の答え）→ 方法ごとの形（15件まで。出典の URL は50件まで、1件 2,048 文字まで、重ならない。印は重ならない） | 入口層 M11、 業務層 M13、M33（FN-025） | 413 MSG-034、401 MSG-032、400 MSG-033、400 MSG-034（方法の数） |
+| C10 | IF-005 の本文（CR-020） | 大きさ（256 KiB）→ 鍵 → JSON → 全体の形と各欄の上限（Q-096 の答え。CR-024 の `steps` は30件まで、段の `title` は200文字まで、`stepChangesMd` は 4 KiB まで）→ 方法ごとの形（件数の上限は無い。CR-024。出典の URL は50件まで、1件 2,048 文字まで、重ならない。印は重ならない）→ 段の欄のつながり（段と方法の番号が重ならない、`current` は1つまで、`step` は `steps` にある段。CR-024） | 入口層 M11、 業務層 M13、M33（FN-025） | 413 MSG-034、401 MSG-032、400 MSG-033 |
 | C11 | 送信のコマンドの引数とファイル（CR-020） | 引数 → ファイルの大きさ → JSON → 形（C10 と同じ M10 の定義）→ 環境変数 | 入口層 M34（FN-028） | MSG-049、終了コード 2 |
 
 - チェックの順序: 表の C08、C09、C10、C11 の矢印の順に確かめ、最初の違反で止めて返す。ただし FN-001 の記事ごとの形は、全ての記事を確かめて、外れた記事を全て `rejected` に集める（BD-02 FN-001）。
@@ -584,7 +589,7 @@ sequenceDiagram
    - summarize: 前の要約と発言を、後の質問で使えるように日本語でまとめること。
 3. answer の読む材料: 対象の内容（M14 から対象の種類の操作を引き、M15 か M16 が組み立てる。BD-02 FN-015 業務ルール）、会話の要約（あれば）、要約に含めていない発言（今の質問より前のもの。新しい方から足し、本文の合計が 20,000 文字を超えるまで足すが、直近の 6 発言は必ず入れる。Q-085 の答え）、今の質問。
    - ニュース（M15）: 記事の見出し、テーマ、案内の全体、元の記事の URL と、有効な関係のある記事の見出しと関係の種類。
-   - 週報（M33。CR-020）: 課題名、何週目か、状態、現時点の答え、方法の一覧（見出し、そのためには、出典の URL、印、反対の意見）、まだ分かっていないこと、今週の変化。対象の種類は `page` だけ（その週の週報の全体）。
+   - 週報（M33。CR-020）: 課題名、何週目か、状態、現時点の答え、段の一覧（番号、中身、状態。CR-024）、方法の一覧（番号とぶら下がる段（CR-024）、見出し、そのためには、出典の URL、印、反対の意見）、段の変更の案（CR-024）、まだ分かっていないこと、今週の変化。段の欄が無い週報は今と同じ。対象の種類は `page` だけ（その週の週報の全体）。
    - 英語（M16）: 学習テーマと、対象の種類が `phrase` なら対象の文とその文の注と語句、`page` なら教材の本文と読む教材の英文と和訳。
    - 対象の無い会話: 対象の内容を入れない。
 4. relate と summarize の読む材料: FN-002 の手順 3、FN-015 の会話の要約の手順 2。
@@ -631,7 +636,7 @@ sequenceDiagram
 | FN-024 | BD-02 FN-024 | DD-01 M30 | `sender_key` | 書く |
 | FN-025 | BD-02 FN-025、BD-06 IF-005 | DD-01 M11 | `delivery`、`research_topic`、`content`、`research_report`、`search_index`、`sender_key` | 書く |
 | FN-026 | BD-02 FN-026 | DD-01 M11 | `research_topic`、`research_report`、`content_state`、`device` | 書く |
-| FN-027 | BD-02 FN-027 | DD-01 M11 | `content`、`research_report`、`research_topic`、`content_state`、`device` | 書く |
+| FN-027 | BD-02 FN-027 | DD-01 M11 | `content`、`research_report`、`research_topic`、`content_state`、`research_approach_seen`（CR-024）、`device` | 書く |
 | FN-028 | BD-02 FN-028、BD-06 IF-005 | DD-01 M34 | なし（IF-005 を呼ぶだけ） | 書く |
 | IF-001 | BD-06 IF-001 | DD-01 M11 | FN-001 と同じ | FN-001 に書いた |
 | IF-002 | BD-06 IF-002 | DD-01 M11 | FN-007 と同じ | FN-007 に書いた |

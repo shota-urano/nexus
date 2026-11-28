@@ -25,7 +25,9 @@ import { NOW, insertD1News, migrate } from "./fixtures/news";
 // `getResearchReport`（FN-027。週の一覧、出典の数）を M33 で作り、`docs/api/openapi.yaml` に
 // 2つの operation（`/api/app/research/topics`、`/api/app/research/reports/{contentId}`）と応答の schema
 // （`ResearchTopicList`、`ResearchTopicSummary`、`ResearchReportDetail`、`Approach`）を足す。
-// 受け入れ基準は DD-10 TC138、TC139、TC102。TC102 の全ての operation の照合（正常、4xx、500）は
+// 受け入れ基準は DD-10 TC138、TC139、TC102。
+// CR-024 の行: `getResearchReport` の応答に段（`steps`、`stepChangesMd`）と方法の `no`、`step`、`seen` を足し、
+// `markApproachSeen` を作る。受け入れ基準は DD-10 TC152、TC153。TC102 の全ての operation の照合（正常、4xx、500）は
 // tests/13-release-contract.test.ts でも確かめる。
 // 前提は「共通＋D2」（DD-10 3章）。D2 は受け取りの関数（`postResearchReport`）で入れる。
 // 呼ぶのは本物の道（src/app/api/app/research/**/route.ts）で、Web サーバと同じ部品
@@ -557,7 +559,8 @@ describe("TC102 openapi.yaml の listResearchTopics、getResearchReport と sche
   it.each([
     "/api/app/research/topics",
     "/api/app/research/reports/{contentId}",
-  ])("TC102 %s の get が DD-04 の定義どおり", (path) => {
+    "/api/app/research/reports/{contentId}/approaches/{no}/seen",
+  ])("TC102 %s が DD-04 の定義どおり", (path) => {
     const paths = openapi.paths as JsonObject;
     const want = expected.paths as JsonObject;
     expect(paths[path]).toBeDefined();
@@ -569,6 +572,7 @@ describe("TC102 openapi.yaml の listResearchTopics、getResearchReport と sche
     "ResearchTopicSummary",
     "ResearchReportDetail",
     "Approach",
+    "ApproachSeen",
   ])("TC102 schema %s が DD-04 の定義どおり", (name) => {
     const want = expected.schemas as JsonObject;
     expect(schemas[name]).toBeDefined();
@@ -587,5 +591,186 @@ describe("TC102 openapi.yaml の listResearchTopics、getResearchReport と sche
     expect(validate(body)).toBe(false);
     expect(validate({ ...body, sourceCount: -1 })).toBe(false);
     expect(validate({ ...body, sourceCount: 1 })).toBe(true);
+  });
+});
+
+// ---- CR-024（段と確かめた印） ----
+
+// 課題 A の2週目を、段の欄のある週報で送り直したもの（段3件。段2が今ここ）。
+const A_WEEK2_ROADMAP = {
+  ...A_WEEK2,
+  steps: [
+    { no: 1, title: "材料を残す", status: "done" },
+    { no: 2, title: "つながりを見分ける", status: "current" },
+    { no: 3, title: "アイデアを出す", status: "todo" },
+  ],
+  stepChangesMd: "段3を2つに分ける案。",
+  approaches: A_WEEK2.approaches.map((a, i) => ({
+    ...a,
+    no: [1, 2, 3, 4][i],
+    step: [2, 2, 1, null][i],
+  })),
+};
+
+async function callSeen(
+  contentId: number,
+  no: number | string,
+  init: { cookie?: string | null; origin?: string } = {},
+): Promise<Response> {
+  const route =
+    await import("../src/app/api/app/research/reports/[contentId]/approaches/[no]/seen/route");
+  const cookie = init.cookie === undefined ? `nexus_device=${K1}` : init.cookie;
+  return route.POST(
+    new Request(
+      `${ORIGIN}/api/app/research/reports/${contentId}/approaches/${no}/seen`,
+      {
+        method: "POST",
+        headers: {
+          ...(cookie === null ? {} : { cookie }),
+          origin: init.origin ?? ORIGIN,
+        },
+      },
+    ),
+    {
+      params: Promise.resolve({
+        contentId: String(contentId),
+        no: String(no),
+      }),
+    },
+  );
+}
+
+const seenRows = () =>
+  db
+    .prepare(
+      "SELECT content_id, approach_no, seen_at FROM research_approach_seen ORDER BY content_id, approach_no",
+    )
+    .all();
+
+interface RoadmapDetail extends ReportDetail {
+  steps: { no: number; title: string; status: string }[];
+  stepChangesMd: string | null;
+  approaches: (ReportDetail["approaches"][number] & {
+    no: number | null;
+    step: number | null;
+    seen: boolean;
+  })[];
+}
+
+describe("TC152 週報 getResearchReport の段と確かめた印（FN-027 手順 4。CR-024）", () => {
+  it("TC152 段の欄のある2週目は steps、stepChangesMd、方法の no と step を送った値で返し、確かめた no 2 だけ seen が真", async () => {
+    const d2 = await insertD2();
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+    db.prepare(
+      "INSERT INTO research_approach_seen (content_id, approach_no, seen_at) VALUES (?, 2, ?)",
+    ).run(d2.a2, NOW);
+
+    const response = await callReport(d2.a2);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as RoadmapDetail;
+    expectSchema("ResearchReportDetail", body);
+    expect(body.steps).toEqual(A_WEEK2_ROADMAP.steps);
+    expect(body.stepChangesMd).toBe(A_WEEK2_ROADMAP.stepChangesMd);
+    expect(body.approaches.map((a) => [a.no, a.step, a.seen])).toEqual([
+      [1, 2, false],
+      [2, 2, true],
+      [3, 1, false],
+      [4, null, false],
+    ]);
+  });
+
+  it("TC152 段の欄の無い1週目は steps が空、stepChangesMd が null、方法の no と step が null、seen が偽", async () => {
+    const d2 = await insertD2();
+    const response = await callReport(d2.a1);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as RoadmapDetail;
+    expectSchema("ResearchReportDetail", body);
+    expect(body.steps).toEqual([]);
+    expect(body.stepChangesMd).toBeNull();
+    for (const a of body.approaches) {
+      expect(a).toMatchObject({ no: null, step: null, seen: false });
+    }
+  });
+});
+
+describe("TC153 markApproachSeen（FN-027 手順 8、RD-03 R26、DD-04 3.2、DD-06 E04・E05。CR-024）", () => {
+  it("TC153 no 1 を2回確かめると、どちらも 200 で seenAt は1回目のまま。送り直しの後も seen が真", async () => {
+    const d2 = await insertD2();
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+
+    const first = await callSeen(d2.a2, 1);
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as {
+      contentId: number;
+      no: number;
+      seenAt: string;
+    };
+    expectSchema("ApproachSeen", firstBody);
+    expect(firstBody).toMatchObject({ contentId: d2.a2, no: 1 });
+    expect(Date.parse(firstBody.seenAt)).toBe(Date.parse(NOW));
+
+    vi.setSystemTime(new Date(Date.parse(NOW) + 60_000));
+    const second = await callSeen(d2.a2, 1);
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as { seenAt: string };
+    expect(secondBody.seenAt).toBe(firstBody.seenAt);
+    expect(seenRows()).toHaveLength(1);
+
+    // 同じ週を送り直しても、確かめたことは残る（RD-03 R23、R26）。
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+    const report = (await (await callReport(d2.a2)).json()) as RoadmapDetail;
+    expect(report.approaches.find((a) => a.no === 1)?.seen).toBe(true);
+  });
+
+  it.each([
+    ["無い番号 no 99", "a2", 99],
+    ["週報でない内容（記事 A1）", "A1", 1],
+    ["無い内容ID", "missing", 1],
+  ] as const)(
+    "TC153 %s は 404 と MSG-048 で、行が増えない",
+    async (_label, target, no) => {
+      const d2 = await insertD2();
+      await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+      const id = target === "a2" ? d2.a2 : target === "A1" ? A1 : MISSING_ID;
+      const response = await callSeen(id, no);
+      expect(response.status).toBe(404);
+      const body = (await response.json()) as {
+        error: { code: string; messageId: string };
+      };
+      expectSchema("Error", body);
+      expect(body.error).toMatchObject({
+        code: "not_found",
+        messageId: "MSG-048",
+      });
+      expect(seenRows()).toEqual([]);
+    },
+  );
+
+  it("TC153 番号の形が違う（0、文字）は 404 と MSG-048", async () => {
+    const d2 = await insertD2();
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+    for (const no of ["0", "abc"]) {
+      const response = await callSeen(d2.a2, no);
+      expect(response.status, no).toBe(404);
+    }
+    expect(seenRows()).toEqual([]);
+  });
+
+  it("TC153 Origin の違う求めは 403 で、行が増えない", async () => {
+    const d2 = await insertD2();
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+    const response = await callSeen(d2.a2, 1, {
+      origin: "http://evil.example",
+    });
+    expect(response.status).toBe(403);
+    expect(seenRows()).toEqual([]);
+  });
+
+  it("TC153 端末の鍵が無いと 401 で、行が増えない", async () => {
+    const d2 = await insertD2();
+    await receive(RECEIVED.a2, A_WEEK2_ROADMAP);
+    const response = await callSeen(d2.a2, 1, { cookie: null });
+    expect(response.status).toBe(401);
+    expect(seenRows()).toEqual([]);
   });
 });

@@ -21,6 +21,8 @@ import { NOW, insertD1News, migrate } from "./fixtures/news";
 // 研究課題と週報の作成と置き換え、検索の本文
 // （FN-025、IF-005、DD-01 M10・M13・M14・M33、DD-02 FN-025・3章 P02・P08、DD-05 3章、CR-020）。
 // 受け入れ基準は TC130〜TC137、TC102。
+// CR-024 の行: 段の欄（`steps`、`stepChangesMd`、方法の `no`、`step`）と、方法の件数の上限を外すこと。
+// 受け入れ基準は TC151、TC134。
 //
 // TC130 の「`getResearchReport` の方法の `sourceCount`」は、`getResearchReport` が 14-research の
 // 実装単位で作る操作なので、ここでは `sourceCount` の数え方の元（DD-03 2章: 出典の数は持たず、
@@ -703,26 +705,17 @@ describe("TC134 方法の数と全体の大きさの境界（DD-02 2章 入力�
     );
   });
 
-  it("TC134 方法 16 件は 400 と MSG-034。何も残らない", async () => {
-    const before = counts();
-    const { status, json } = await send(
-      report({ approaches: manyApproaches(16) }),
-    );
-    expect(status).toBe(400);
-    expect(errorOf(json)).toEqual({
-      code: "bad_request",
-      messageId: "MSG-034",
-      message: formatMessage("MSG-034"),
-    });
-    expectNothingKept(before);
-    expect(rejectedDeliveries()).toMatchObject([
-      {
-        sender: "brain-research",
-        item_count: 0,
-        rejection_reason: "MSG-034",
-      },
-    ]);
-  });
+  // 方法の件数の上限は CR-024 で外した（Q-099 の答え）。全体の大きさだけで止める。
+  it.each([16, 100])(
+    "TC134 方法 %i 件は 200（件数の上限は無い）",
+    async (n) => {
+      const { status } = await send(report({ approaches: manyApproaches(n) }));
+      expect(status).toBe(200);
+      expect(storedApproaches(reportContentId("second-brain", 1))).toHaveLength(
+        n,
+      );
+    },
+  );
 
   it("TC134 全体が 256 KiB ちょうどは 200", async () => {
     const { status } = await send(bodyOfBytes(REPORT_MAX_BYTES));
@@ -1117,6 +1110,8 @@ describe("TC102 openapi.yaml の postResearchReport と schema が DD-04 の定�
     "ResearchReportResult",
     "ResearchStatus",
     "ApproachMark",
+    "ResearchStep",
+    "ResearchStepStatus",
   ])("TC102 schema %s が DD-04 の定義どおり", (name) => {
     const schemas = (openapi.components as { [key: string]: Json }).schemas as {
       [key: string]: Json;
@@ -1125,4 +1120,195 @@ describe("TC102 openapi.yaml の postResearchReport と schema が DD-04 の定�
     expect(schemas[name]).toBeDefined();
     expect(shapeOf(schemas[name])).toEqual(shapeOf(want[name]));
   });
+});
+
+// ---- TC151（段の欄。CR-024） ----
+
+interface Step {
+  no: number;
+  title: string;
+  status: string;
+}
+
+// 段3件（段2が今ここ）と、方法の番号とぶら下がる段と、段の変更の案のある週報。
+function roadmapReport(): Report & {
+  steps: Step[];
+  stepChangesMd: string;
+  approaches: (Approach & { no?: number | null; step?: number | null })[];
+} {
+  const base = report();
+  return {
+    ...base,
+    steps: [
+      { no: 1, title: "材料を残す", status: "done" },
+      { no: 2, title: "つながりを見分ける", status: "current" },
+      { no: 3, title: "アイデアを出す", status: "todo" },
+    ],
+    stepChangesMd: "段3を2つに分ける案。",
+    approaches: base.approaches.map((a, i) => ({
+      ...a,
+      no: [8, 3, 12][i],
+      step: [2, 1, null][i],
+    })),
+  };
+}
+
+const stepsRow = (contentId: number) =>
+  db
+    .prepare(
+      "SELECT steps_json, step_changes_md FROM research_report WHERE content_id = ?",
+    )
+    .get(contentId);
+
+describe("TC151 段の欄（DD-02 2章 入力チェック C10、FN-025 手順 5。CR-024）", () => {
+  it("TC151 段の欄のある週報は 200 で、steps_json と step_changes_md と方法の no、step が残る", async () => {
+    const body = roadmapReport();
+    const { status } = await send(body);
+    expect(status).toBe(200);
+    const id = reportContentId("second-brain", 1);
+    const row = stepsRow(id);
+    expect(JSON.parse(String(row?.steps_json))).toEqual(body.steps);
+    expect(row?.step_changes_md).toBe(body.stepChangesMd);
+    expect(
+      storedApproaches(id).map((a) => {
+        const { no, step } = a as { no?: number | null; step?: number | null };
+        return [no, step];
+      }),
+    ).toEqual([
+      [8, 2],
+      [3, 1],
+      [12, null],
+    ]);
+  });
+
+  it("TC151 段の欄の無い週報は 200 で、steps_json と step_changes_md は NULL", async () => {
+    const { status } = await send(report());
+    expect(status).toBe(200);
+    const row = stepsRow(reportContentId("second-brain", 1));
+    expect(row).toEqual({ steps_json: null, step_changes_md: null });
+  });
+
+  it("TC151 steps と stepChangesMd が null でも受ける", async () => {
+    const { status } = await send({
+      ...report(),
+      steps: null,
+      stepChangesMd: null,
+    });
+    expect(status).toBe(200);
+    expect(stepsRow(reportContentId("second-brain", 1))).toEqual({
+      steps_json: null,
+      step_changes_md: null,
+    });
+  });
+
+  it("TC151 steps 30件、段の title 200 文字、stepChangesMd 4 KiB は 200", async () => {
+    const body = roadmapReport();
+    body.steps = Array.from({ length: 30 }, (_, i) => ({
+      no: i + 1,
+      title: i === 0 ? "段".repeat(200) : `段 ${i + 1}`,
+      status: i === 1 ? "current" : "todo",
+    }));
+    body.stepChangesMd = textOfBytes(4 * KIB);
+    const { status } = await send(body);
+    expect(status).toBe(200);
+  });
+
+  it("TC151 見出しの先頭の「段2｜」は読み解かず、見出しのまま残る（Q-103 の答え）", async () => {
+    const body = report();
+    body.approaches[0].title = "段2｜評価の軸を決める";
+    const { status } = await send(body);
+    expect(status).toBe(200);
+    const id = reportContentId("second-brain", 1);
+    expect(storedApproaches(id)[0].title).toBe("段2｜評価の軸を決める");
+    expect(stepsRow(id)).toEqual({ steps_json: null, step_changes_md: null });
+  });
+
+  const brokenRoadmap: [
+    string,
+    (r: ReturnType<typeof roadmapReport>) => void,
+    string,
+  ][] = [
+    [
+      "steps 31件",
+      (r) => {
+        r.steps = Array.from({ length: 31 }, (_, i) => ({
+          no: i + 1,
+          title: `段 ${i + 1}`,
+          status: "todo",
+        }));
+      },
+      "steps",
+    ],
+    [
+      "段の title 201 文字",
+      (r) => {
+        r.steps[1].title = "段".repeat(201);
+      },
+      "steps[2].title",
+    ],
+    [
+      "stepChangesMd 4 KiB＋1 バイト",
+      (r) => {
+        r.stepChangesMd = textOfBytes(4 * KIB + 1);
+      },
+      "stepChangesMd",
+    ],
+    [
+      "段の no の重なり",
+      (r) => {
+        r.steps[2].no = 2;
+      },
+      "steps[3].no",
+    ],
+    [
+      "current が2つ",
+      (r) => {
+        r.steps[0].status = "current";
+      },
+      "steps",
+    ],
+    [
+      "段の status が決まった値でない",
+      (r) => {
+        r.steps[0].status = "finished";
+      },
+      "steps[1].status",
+    ],
+    [
+      "方法の no の重なり",
+      (r) => {
+        r.approaches[1].no = 8;
+      },
+      "approaches[2].no",
+    ],
+    [
+      "steps に無い段を指す step",
+      (r) => {
+        r.approaches[0].step = 9;
+      },
+      "approaches[1].step",
+    ],
+    [
+      "steps が無いのに step がある",
+      (r) => {
+        delete (r as Partial<typeof r>).steps;
+      },
+      "approaches[1].step",
+    ],
+  ];
+
+  it.each(brokenRoadmap)(
+    "TC151 %s は 400 と MSG-033（項目の名前）。何も残らない",
+    async (_label, patch, item) => {
+      const before = counts();
+      const body = roadmapReport();
+      patch(body);
+      const { status, json } = await send(body);
+      expect(status).toBe(400);
+      const error = errorOf(json);
+      expect(error.messageId).toBe("MSG-033");
+      expect(itemOf(error.message)).toBe(item);
+      expectNothingKept(before);
+    },
+  );
 });

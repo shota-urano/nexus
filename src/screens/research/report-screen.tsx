@@ -1,12 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { markOpened, setRead, setSaved } from "../../client/news";
-import { fetchResearchReport } from "../../client/research";
+import { fetchResearchReport, markApproachSeen } from "../../client/research";
 import type { QuestionTarget } from "../../contracts/chat";
 import type { ContentState } from "../../contracts/news";
-import type { ResearchReportDetailView } from "../../contracts/research";
+import type {
+  ApproachView,
+  ResearchReportDetailView,
+} from "../../contracts/research";
 import { type BottomNotice, BottomNotices } from "../../ui/bottom-notices";
 import { EmptyState } from "../../ui/empty-state";
 import {
@@ -16,6 +25,7 @@ import {
 } from "../../ui/kinds/news/article-icons";
 import { formatListDate } from "../../ui/list-date";
 import { ApproachItem } from "../../ui/kinds/research/approach";
+import { Roadmap, isUnseenNew } from "../../ui/kinds/research/roadmap";
 import { ReceivedText } from "../../ui/received-text";
 import { ChatSheet } from "../chat/chat-sheet";
 import {
@@ -41,6 +51,12 @@ import {
 // - 道（M01）が `topBar` を渡したときは、課題名（O01）と「AI に質問」（A07）を、その上の帯に置く
 //   （BD-03 SCR-011 3.2「[ロゴ] O01 課題名 [AI] A07」、4章）。上の帯は読み込み中も失敗のときも出す（3.5）。
 //   週報を読むまでは課題名が無いので、`title` は null にする。
+// - 段の欄のある週報（`steps` が1件以上。CR-024）は、先頭に「今ここ: 段N 中身」（O12）を出し、方法の一覧の
+//   代わりに道のり（O13。M08 の木）を出し、段に入らない方法、段の変更の案（O14）を続ける（BD-03 SCR-011
+//   3.2 道のり。Q-102 の答え）。段の欄の無い週報は今のまま。
+// - 方法を開いたとき、その方法に番号があり、まだ確かめていない NEW なら `markApproachSeen` を呼び、応答を
+//   待たずにその方法の NEW と段の NEW の数を消す。同じ方法は1回だけ呼び、失敗しても知らせを出さない
+//   （DD-02 FN-027 手順 7。RD-03 R26。Q-101 の答え）。
 
 type Phase = "loading" | "ready" | "notFound" | "failed" | "unauthorized";
 type StateAction = "read" | "saved";
@@ -343,25 +359,93 @@ function Section({
 
 // 週報の本文。週が替わったら作り直し（key を内容ID にする）、方法を全て閉じた状態に戻す。
 function ReportBody({ report }: { report: ResearchReportDetailView }) {
+  // この画面で確かめた方法の番号（応答を待たずに NEW を消すため）。
+  const [seenHere, setSeenHere] = useState<ReadonlySet<number>>(new Set());
+  const requested = useRef(new Set<number>());
+  const approaches = report.approaches.map((approach) =>
+    approach.no !== null && seenHere.has(approach.no)
+      ? { ...approach, seen: true }
+      : approach,
+  );
+
+  function onOpen(approach: ApproachView) {
+    const { no } = approach;
+    if (no === null || !isUnseenNew(approach) || requested.current.has(no)) {
+      return;
+    }
+    requested.current.add(no);
+    setSeenHere((previous) => new Set(previous).add(no));
+    // 失敗しても知らせを出さない。次に開いたときにまた NEW が出る（BD-03 SCR-011-A02）。
+    void markApproachSeen(report.contentId, no);
+  }
+
+  const hasRoadmap = report.steps.length > 0;
+  const current = report.steps.find((step) => step.status === "current");
+  const outside = hasRoadmap
+    ? approaches.filter(
+        (approach) =>
+          approach.step === null ||
+          !report.steps.some((step) => step.no === approach.step),
+      )
+    : [];
+  const list = (items: ApproachView[]) => (
+    <ul className="mt-2 flex flex-col gap-2">
+      {items.map((approach, index) => (
+        <ApproachItem
+          // 見出しは重なりうるため、送られた順番で見分ける。
+          key={index}
+          approach={approach}
+          onOpen={onOpen}
+        />
+      ))}
+    </ul>
+  );
+
   return (
     <>
+      {hasRoadmap && current !== undefined && (
+        <div className="flex items-center gap-2 rounded-hud border border-hud-amber bg-hud-panel px-4 py-2">
+          <span
+            aria-hidden="true"
+            className="block size-3 shrink-0 rounded-full bg-hud-amber"
+          />
+          <p className="text-sm font-bold leading-snug">
+            {`今ここ: 段${current.no} ${current.title}`}
+          </p>
+        </div>
+      )}
       <Section title="今週の変化">
         <ReceivedText markdown={report.changesMd} />
       </Section>
       <Section title="現時点の答え">
         <ReceivedText markdown={report.answerMd} />
       </Section>
-      <Section title={`方法の一覧（${report.approaches.length}）`}>
-        <ul className="mt-2 flex flex-col gap-2">
-          {report.approaches.map((approach, index) => (
-            <ApproachItem
-              // 見出しは重なりうるため、送られた順番で見分ける。
-              key={index}
-              approach={approach}
+      {hasRoadmap ? (
+        <>
+          <Section title="道のり">
+            <Roadmap
+              goal={report.topicTitle}
+              steps={report.steps}
+              approaches={approaches.filter(
+                (approach) => !outside.includes(approach),
+              )}
+              onOpen={onOpen}
             />
-          ))}
-        </ul>
-      </Section>
+          </Section>
+          {outside.length > 0 && (
+            <Section title="段に入らない方法">{list(outside)}</Section>
+          )}
+          {report.stepChangesMd !== null && report.stepChangesMd !== "" && (
+            <Section title="段の変更の案">
+              <ReceivedText markdown={report.stepChangesMd} />
+            </Section>
+          )}
+        </>
+      ) : (
+        <Section title={`方法の一覧（${report.approaches.length}）`}>
+          {list(approaches)}
+        </Section>
+      )}
       {report.unknownsMd !== "" && (
         <Section title="まだ分かっていないこと">
           <ReceivedText markdown={report.unknownsMd} />

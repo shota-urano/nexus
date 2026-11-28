@@ -124,13 +124,7 @@ function check(argv: readonly string[], env: SendCommandDeps["env"]): Checked {
     return { ok: false, item: "本文" };
   }
   const shape = checkResearchReportPayload(payload);
-  if (!shape.ok) {
-    // 方法の数の超え（受け取る側では MSG-034）は、方法の並びの項目の名前で知らせる。
-    return {
-      ok: false,
-      item: shape.msg === "MSG-033" ? shape.field : "approaches",
-    };
-  }
+  if (!shape.ok) return { ok: false, item: shape.field };
 
   const key = nonEmpty(env.NEXUS_SENDER_KEY);
   if (key === null) return { ok: false, item: "NEXUS_SENDER_KEY" };

@@ -639,6 +639,25 @@ paths:
         '401': { $ref: '#/components/responses/DeviceUnauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/Internal' }
+  /api/app/research/reports/{contentId}/approaches/{no}/seen:
+    post:
+      operationId: markApproachSeen
+      tags: [app]
+      summary: 方法を確かめた日時を残す（FN-027、SCR-011-A02。RD-03 R26。CR-024）
+      security: [{ deviceKey: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/ApproachNo'
+      responses:
+        '200':
+          description: 確かめた方法。前に確かめていれば最初の日時のまま
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApproachSeen' }
+        '401': { $ref: '#/components/responses/DeviceUnauthorized' }
+        '403': { $ref: '#/components/responses/ForbiddenOrigin' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
 
 components:
   securitySchemes:
@@ -657,6 +676,12 @@ components:
       in: path
       required: true
       schema: { $ref: '#/components/schemas/Id' }
+    ApproachNo:
+      name: no
+      in: path
+      required: true
+      description: 方法の番号（週報の approaches[].no。CR-024）
+      schema: { type: integer, minimum: 1 }
     ConversationId:
       name: conversationId
       in: path
@@ -1177,6 +1202,16 @@ components:
         completedAt: { $ref: '#/components/schemas/DateTime' }
     ResearchStatus: { type: string, enum: [active, ended], description: 課題の状態（BD-07 4.2。CR-020） }
     ApproachMark: { type: string, enum: [added, more_sources, disputed], description: 方法の印（BD-07 4.2。CR-020） }
+    ResearchStepStatus: { type: string, enum: [done, doing, current, todo], description: 段の状態（BD-07 4.2。CR-024） }
+    ResearchStep:
+      type: object
+      additionalProperties: false
+      required: [no, title, status]
+      description: 段1件（BD-06 IF-005 3.2。CR-024）
+      properties:
+        no: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 200, pattern: '^[^\n]*$' }
+        status: { $ref: '#/components/schemas/ResearchStepStatus' }
     ApproachPayload:
       type: object
       additionalProperties: false
@@ -1197,6 +1232,8 @@ components:
           maxItems: 3
           uniqueItems: true
           items: { $ref: '#/components/schemas/ApproachMark' }
+        no: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: 課題の中の方法の通し番号。週報の中で重ならない（CR-024） }
+        step: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: ぶら下がる段の no。steps にある段だけ（CR-024） }
         counterMd: { oneOf: [{ type: string, description: 2 KiB まで（UTF-8 のバイト数） }, { type: 'null' }] }
     ResearchReportPayload:
       type: object
@@ -1214,8 +1251,21 @@ components:
         approaches:
           type: array
           minItems: 0
-          maxItems: 15
+          description: 件数の上限は無い（CR-024。全体の 256 KiB で止める）
           items: { $ref: '#/components/schemas/ApproachPayload' }
+        steps:
+          description: ゴールまでの段（CR-024）。current は1つまで。無ければ省くか null
+          oneOf:
+            - type: array
+              minItems: 0
+              maxItems: 30
+              items: { $ref: '#/components/schemas/ResearchStep' }
+            - type: 'null'
+        stepChangesMd:
+          description: 段の変更の案（CR-024）。無ければ省くか null
+          oneOf:
+            - { type: string, description: 4 KiB まで（UTF-8 のバイト数） }
+            - type: 'null'
         unknownsMd: { type: string, description: 8 KiB まで（UTF-8 のバイト数）。空の文字も受ける }
         changesMd: { type: string, minLength: 1, description: 8 KiB まで（UTF-8 のバイト数）。変化が無ければ「変化なし」 }
     ResearchReportResult:
@@ -1253,9 +1303,19 @@ components:
         sourceCount: { type: integer, minimum: 0, description: sourceUrls の数（Q-088 の答え） }
         marks: { type: array, items: { $ref: '#/components/schemas/ApproachMark' } }
         counterMd: { oneOf: [{ type: string }, { type: 'null' }] }
+        no: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: 方法の番号。無ければ null（CR-024。getResearchReport は必ず返す） }
+        step: { oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }], description: ぶら下がる段の no。無ければ null（CR-024。getResearchReport は必ず返す） }
+        seen: { type: boolean, description: 本人が確かめたか。no が無ければ偽（RD-03 R26。CR-024。getResearchReport は必ず返す） }
+    ApproachSeen:
+      type: object
+      required: [contentId, no, seenAt]
+      properties:
+        contentId: { $ref: '#/components/schemas/Id' }
+        no: { type: integer, minimum: 1 }
+        seenAt: { $ref: '#/components/schemas/DateTime' }
     ResearchReportDetail:
       type: object
-      required: [contentId, topicId, topicTitle, week, sentOn, status, answerMd, approaches, unknownsMd, changesMd, receivedAt, state, weeks]
+      required: [contentId, topicId, topicTitle, week, sentOn, status, answerMd, approaches, unknownsMd, changesMd, receivedAt, state, weeks, steps, stepChangesMd]
       properties:
         contentId: { $ref: '#/components/schemas/Id' }
         topicId: { type: string }
@@ -1280,3 +1340,8 @@ components:
               week: { type: integer, minimum: 1 }
               sentOn: { $ref: '#/components/schemas/Date' }
               isRead: { type: boolean }
+        steps:
+          type: array
+          description: 段の一覧。送られた順。段の欄の無い週報は空（CR-024）
+          items: { $ref: '#/components/schemas/ResearchStep' }
+        stepChangesMd: { oneOf: [{ type: string }, { type: 'null' }], description: 段の変更の案。無ければ null（CR-024） }

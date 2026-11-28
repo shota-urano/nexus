@@ -2,8 +2,8 @@
 id: DD-04
 name: API 詳細設計書
 phase: 詳細設計
-version: 1.5
-updated: 2026-11-27
+version: 1.6
+updated: 2026-11-28
 ---
 
 # DD-04 API 詳細設計書（NEXUS）
@@ -19,6 +19,7 @@ updated: 2026-11-27
 - 1.3: X-04 CR-018（2026-11-27 RD-01 SH01 が承認）で、`createConversation` の画面の欄から SCR-002-A05 を外した。API は変えない。
 - 1.4: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`postResearchReport`（IF-005）、`listResearchTopics`、`getResearchReport` を足し、`Home` に `research` を足した。IF-005 の各欄の上限は Q-096 の答え（2026-11-27）による。
 - 1.5: X-04 CR-021（2026-11-27 RD-01 SH01 が承認）で、CR-020 の API の定義（`postResearchReport`、`listResearchTopics`、`getResearchReport` と、その schema、`Home` の `research`）を `openapi.yaml` から外し、それぞれを作る実装単位（仕様書 05、11、14）で足すことにした。この書類の CR-020 の表と決定は変えない。
+- 1.6: X-04 CR-024（2026-11-28 RD-01 SH01 が承認）で、`markApproachSeen` を足した。`postResearchReport` の求め（`ResearchReportPayload`、`ApproachPayload`）に任意の `steps`、`stepChangesMd`、`no`、`step` を足し、方法の件数の上限を外す。`getResearchReport` の応答（`ResearchReportDetail`、`Approach`）に `steps`、`stepChangesMd`、`no`、`step`、`seen` を足す。`openapi.yaml` は CR-021 の決まりどおり、実装単位（仕様書 05、14）で直す。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 正本の定義ファイル
@@ -64,6 +65,7 @@ updated: 2026-11-27
 | `postResearchReport` | POST `/api/research/reports` | 配信元に公開（同上。CR-020） | Create（同じ課題の同じ週は置き換える。NEXUS が決めた道で、cerebellum に元の形は無い） | E01、E02、E03、E08、E16 |
 | `listResearchTopics` | GET `/api/app/research/topics` | 端末に公開（CR-020） | List（続きを持たない。課題は年に十数件） | E03、E08、E16 |
 | `getResearchReport` | GET `/api/app/research/reports/{contentId}` | 端末に公開（CR-020） | Get（その週の週報と、同じ課題の週の一覧） | E03、E05、E08、E16 |
+| `markApproachSeen` | POST `/api/app/research/reports/{contentId}/approaches/{no}/seen` | 端末に公開（CR-024） | 独自（方法を確かめた日時を一度だけ入れる。`markOpened` と同じ考え方） | E03、E04、E05、E08、E16 |
 
 - 端末の API の道は `/api/app/` で始め、今の cerebellum の形に合わせた配信元の道（`/api/inbox/`、`/api/learning/`）と重ならないようにした。IF-005 の道（`/api/research/`）は NEXUS が新しく決めた配信元の道で、`/api/app/` と重ならない（CR-020）。
 - 構成要素の間だけの API は無い（1章）。
@@ -95,6 +97,7 @@ updated: 2026-11-27
 | operationId | 同じ要求を2回送ったときの結果 |
 |---|---|
 | `markOpened` | 冪等。開いた日時が入っていれば変えない |
+| `markApproachSeen` | 冪等。確かめた日時が入っていれば変えない（最初の日時を残す。CR-024） |
 | `setRead`、`setSaved` | 冪等（今と同じ値は DD-06 E06 として今の状態を返す）。同じ値にするだけ。2台から逆の値を続けて送ったら、後に届いた値が残る（BD-02 FN-005、BD-01 6章） |
 | `putEnglishAnswer` | 冪等。答えを丸ごと置き換え、完了した日時を新しくする（BD-02 FN-012） |
 | `createConversation` | 冪等でない。2回届くと会話が2つできる。画面が押してから結果が出るまで押せなくして防ぐ（BD-09 5章 誤操作の防止）。要求を見分ける欄は持たない（本人1人で、余分な会話ができても害が無いため） |
@@ -131,7 +134,7 @@ updated: 2026-11-27
 | 400 | `bad_request` | 入力の形が定義ファイルと違う | `putEnglishAnswer` で ○△× の無い問題か、セットに無い問題番号があるときは MSG-005。ほかは MSG-019（画面が形を守るので、ふだんは起きない） | E01、E07 |
 | 401 | `unauthorized` | 3.1 の鍵が通らない | MSG-020（端末）。配信元には MSG-032 | E03 |
 | 403 | `forbidden_origin` | 3.1 のオリジンが違う | MSG-019 | E04 |
-| 404 | `not_found` | 指した内容、会話、発言が無い | `getResearchReport` は MSG-048（CR-020）。`getArticle` は MSG-002。`getEnglishSet`、`getConversation` は MSG-019。`createConversation` は 404 を返さず、対象の無い会話を作って MSG-011 を返す（BD-02 FN-014） | E05 |
+| 404 | `not_found` | 指した内容、会話、発言が無い | `getResearchReport` と `markApproachSeen`（週報か、その番号の方法が無い。CR-024）は MSG-048（CR-020）。`getArticle` は MSG-002。`getEnglishSet`、`getConversation` は MSG-019。`createConversation` は 404 を返さず、対象の無い会話を作って MSG-011 を返す（BD-02 FN-014） | E05 |
 | 409 | `reply_in_progress` | 3.2 の `postQuestion` | 画面は質問の文を入力の欄に残し、作成中の応答を見せる | E06 |
 | 413 | `payload_too_large` | 配信元の送った全体が上限を超えた（BD-06 3.2） | MSG-034（配信元） | E02 |
 | 500 | `internal` | 予期しない失敗 | `setRead`、`setSaved` は MSG-003。`putEnglishAnswer` は MSG-007。`postQuestion` は MSG-019。読むだけの操作は MSG-019。`postNewsBatch` は MSG-045。`postResearchReport` は MSG-046（CR-020） | E08、E16 |
@@ -188,6 +191,7 @@ updated: 2026-11-27
 | `getEnglishSetForSender`、`getEnglishResult` | なし（DD-06 E05、E08） | - |
 | `postResearchReport` | `delivery`（1件作る）、`research_topic`（作るか、最新の週なら変える）、`content`、`research_report`、`search_index`（作るか置き換える）。AI の実行は作らない（CR-020） | - |
 | `listResearchTopics`、`getResearchReport` | なし（DD-06 E05、E08。CR-020） | NFR-001 |
+| `markApproachSeen` | `research_approach_seen`（無ければ1行作る。CR-024） | NFR-001 |
 
 - 端末の鍵が通るたびに `device` の `last_used_at` を変える。この更新は全ての `/api/app/` の操作に共通で、表の各行には書かない（BD-02 1章）。
 - 監査ログは残さない（Q-059 の答え）。AI の実行と受け取りの記録は表の `ai_run` と `delivery` に残す（NFR-020）。
@@ -243,6 +247,7 @@ IF-004 は HTTP の API ではないが、BD-06 3.2 で「出来事の項目の�
 | `postResearchReport` | IF-005、FN-025 | 配信元 brain-research | ENT-001、ENT-010、ENT-013、ENT-014、ENT-015 |
 | `listResearchTopics` | FN-026、SCR-010-A01 | 本人 | ENT-001、ENT-006、ENT-014、ENT-015 |
 | `getResearchReport` | FN-027、SCR-010-A02、SCR-011-A01、SCR-011-A03、SCR-007-A02、SCR-008-A03、SCR-009-A02 | 本人 | ENT-001、ENT-006、ENT-014、ENT-015 |
+| `markApproachSeen` | FN-027、SCR-011-A02（CR-024） | 本人 | ENT-006、ENT-015 |
 
 - BD-06 の API の連携 IF-001〜IF-003、IF-005 は、全てこの表にある。IF-004 は API でないので 4.2 に書いた。
 - BD-03 のデータを変えるアクション（SCR-003-A01〜A04、SCR-005-A01、A07、A08、A12、SCR-006-A03〜A07、SCR-011-A01、A04〜A07）は、全てこの表にある。SCR-011-A02 と A08 は画面の中の動きとブラウザで開くだけである（CR-020）。SCR-005-A04〜A06、A10、A11 は答えと採点を画面の中に預けるだけで、API を呼ばない（BD-02 FN-010、FN-011。A11 は `getEnglishSet` の前の答えを初めの値にする）。SCR-001-A02、A03、SCR-003-A07、SCR-005-A02、A03 は画面の中の動きか遷移だけである。

@@ -338,3 +338,55 @@ describe("TC145 週報を対象 page にした会話の渡す内容（FN-015、D
     expect(copy.ai_input_copy).toBe(stdin);
   });
 });
+
+// ---- 10-chat の CR-024 の行: 渡す内容 P07 の週報に段を足す ----
+
+describe("TC145 段の欄のある週報を対象 page にした会話の渡す内容（DD-02 3章 P07。CR-024）", () => {
+  it("material の中に、段の番号と中身と状態、方法の番号とぶら下がる段、段の変更の案がある", async () => {
+    const d2 = await insertD2();
+    await receive("2026-12-01T07:00:00.000+09:00", {
+      ...A2,
+      steps: [
+        { no: 1, title: "材料を原文のまま残す", status: "done" },
+        { no: 2, title: "つながりの良し悪しを見分ける", status: "current" },
+        { no: 3, title: "アイデアを出す", status: "todo" },
+      ],
+      stepChangesMd: "段3を2つに分ける案。",
+      approaches: A2_APPROACHES.map((a, i) => ({
+        ...a,
+        no: 11 + i,
+        step: i === 0 ? 2 : null,
+      })),
+    });
+    const { conversation } = context.chat.createConversation({
+      kind: "page",
+      contentId: d2.a2,
+    });
+    await ask(conversation.conversationId, "今どの段？");
+    const [stdin] = await runOnceAndReadStdin();
+    const material = materialOf(stdin ?? "", "target") ?? "";
+
+    expect(material).toContain("段の一覧:");
+    expect(material).toContain("段1 材料を原文のまま残す（done）");
+    expect(material).toContain("段2 つながりの良し悪しを見分ける（current）");
+    expect(material).toContain("段3 アイデアを出す（todo）");
+    expect(material).toContain(`### 方法11（段2）: ${A2_APPROACHES[0].title}`);
+    expect(material).toContain(`### 方法12: ${A2_APPROACHES[1].title}`);
+    expect(material).toContain("段の変更の案:");
+    expect(material).toContain("段3を2つに分ける案。");
+  });
+
+  it("段の欄の無い週報は、段の一覧と段の変更の案を入れない（今のまま）", async () => {
+    const d2 = await insertD2();
+    const { conversation } = context.chat.createConversation({
+      kind: "page",
+      contentId: d2.a2,
+    });
+    await ask(conversation.conversationId, "要点は？");
+    const [stdin] = await runOnceAndReadStdin();
+    const material = materialOf(stdin ?? "", "target") ?? "";
+    expect(material).not.toContain("段の一覧:");
+    expect(material).not.toContain("段の変更の案:");
+    expect(material).toContain(`### 方法1: ${A2_APPROACHES[0].title}`);
+  });
+});

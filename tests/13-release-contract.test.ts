@@ -207,6 +207,8 @@ async function loadRoutes() {
     researchTopics: await import("../src/app/api/app/research/topics/route"),
     researchReport:
       await import("../src/app/api/app/research/reports/[contentId]/route"),
+    approachSeen:
+      await import("../src/app/api/app/research/reports/[contentId]/approaches/[no]/seen/route"),
   };
 }
 
@@ -359,6 +361,8 @@ function seedD1(db: Database, logDir: string): Seed {
         ],
         marks: ["added", "disputed"],
         counterMd: "反対の意見。",
+        // 方法の番号（CR-024）。`markApproachSeen` の 200 の確かめに使う。
+        no: 1,
       },
     ],
     unknownsMd: "人の評価との差。",
@@ -742,6 +746,65 @@ const CASES: Record<string, OperationCases> = {
           s.routes.researchReport.GET(
             request(s, "GET", `/api/app/research/reports/${MISSING_ID}`),
             params({ contentId: String(MISSING_ID) }),
+          ),
+      },
+    ],
+  },
+  markApproachSeen: {
+    failure: "afterDeviceKey",
+    cases: [
+      {
+        status: 200,
+        label: "rag-eval の1週目の方法1を確かめる",
+        call: (s) =>
+          s.routes.approachSeen.POST(
+            request(
+              s,
+              "POST",
+              `/api/app/research/reports/${s.seed.R1}/approaches/1/seen`,
+            ),
+            params({ contentId: String(s.seed.R1), no: "1" }),
+          ),
+      },
+      {
+        status: 401,
+        label: "鍵なし",
+        call: (s) =>
+          s.routes.approachSeen.POST(
+            request(
+              s,
+              "POST",
+              `/api/app/research/reports/${s.seed.R1}/approaches/1/seen`,
+              NO_COOKIE,
+            ),
+            params({ contentId: String(s.seed.R1), no: "1" }),
+          ),
+      },
+      {
+        status: 403,
+        label: "オリジンが違う",
+        call: (s) =>
+          s.routes.approachSeen.POST(
+            request(
+              s,
+              "POST",
+              `/api/app/research/reports/${s.seed.R1}/approaches/1/seen`,
+              OTHER_ORIGIN,
+            ),
+            params({ contentId: String(s.seed.R1), no: "1" }),
+          ),
+      },
+      {
+        status: 404,
+        label: "無い番号",
+        call: (s) =>
+          s.routes.approachSeen.POST(
+            request(
+              s,
+              "POST",
+              `/api/app/research/reports/${s.seed.R1}/approaches/99/seen`,
+            ),
+            params({ contentId: String(s.seed.R1), no: "99" }),
           ),
       },
     ],
@@ -1441,7 +1504,7 @@ afterAll(() => {
 describe("TC102 全ての operation の応答が openapi.yaml に合う（DD-04 1章 実装との一致、DD-04 3.4、ADR-021）", () => {
   it("TC102 DD-04 2章の全ての operation（定義ファイルの全ての operationId）を確かめる", () => {
     expect([...OPERATIONS.keys()].sort()).toEqual(Object.keys(CASES).sort());
-    expect(OPERATIONS.size).toBe(29);
+    expect(OPERATIONS.size).toBe(30);
     expect(OPERATIONS.get("postResearchReport")).toMatchObject({
       method: "post",
       path: "/api/research/reports",
