@@ -143,10 +143,14 @@ describe("TC149 0001 だけの DB に、Web サーバの起動の処理で 0002 
     expect(sql.split(/\r?\n/)[0]).toBe(MARKER);
   });
 
+  // 起動の処理は後のマイグレーション（0003。CR-024）も続けて当てるので、1 と 2 の行を確かめる。
   it("0002 が当たり、schema_migration に 2 が残る", () => {
-    expect(appliedVersion(db)).toBe(2);
+    expect(appliedVersion(db)).toBeGreaterThanOrEqual(2);
     expect(
-      rows(db, "SELECT version, name FROM schema_migration ORDER BY version"),
+      rows(
+        db,
+        "SELECT version, name FROM schema_migration WHERE version <= 2 ORDER BY version",
+      ),
     ).toEqual([
       { version: 1, name: "0001-initial-schema.sql" },
       { version: 2, name: "0002-research-report.sql" },
