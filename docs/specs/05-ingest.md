@@ -25,7 +25,7 @@ brain-harness と sharpen から届く内容を受け取って残し（FN-001、
 
 ## 4. 設定値・確定値
 
-- IF-001 は 1 MiB、100 件まで。IF-002 は 256 KiB、問題 60 問まで（BD-06 3.2）。IF-005 は 256 KiB、方法 15 件まで、欄ごとの上限は Q-096 の答え（BD-06 IF-005 3.2）。
+- IF-001 は 1 MiB、100 件まで。IF-002 は 256 KiB、問題 60 問まで（BD-06 3.2）。IF-005 は 256 KiB まで、方法の件数の上限は無い（CR-024 で外した。Q-099 の答え）、欄ごとの上限は Q-096 の答え（BD-06 IF-005 3.2）。段の欄（`steps` 30 件、段の `title` 200 文字、`stepChangesMd` 4 KiB）は Q-098、Q-100 の答え（CR-024）。
 - 同じ対象日の同じ slug、同じ日付のセットは置き換える（NFR-015）。
 - 道と応答の形は今の cerebellum に合わせる（Q-039 の答え。DD-04 2章）。
 
@@ -60,3 +60,5 @@ DD-06 E01、E02、E03、E05、E08、E16、E18。MSG-046、MSG-049、MSG-050（CR
   - 受け入れ基準: DD-10 TC130、DD-10 TC131、DD-10 TC132、DD-10 TC133、DD-10 TC134、DD-10 TC135、DD-10 TC136、DD-10 TC137、DD-10 TC102 が通る
 - [x] [Backend] 送信のコマンド M34 `nexus-send`（引数とファイルと環境変数の確かめ、M10 の `ResearchReportPayload` での形の確かめ、IF-005 への送信、終了コード）と、`npm run build` で `dist/cli/send/main.js` を作ることと、`deploy/nexus-send` の雛形を作る（FN-028、DD-01 M34、DD-02 FN-028、DD-06 E18、DD-09 2.7、CR-020）（se/05-ingest-2）
   - 受け入れ基準: DD-10 TC146、DD-10 TC147、DD-10 TC148 が通る; `deploy/nexus-send` の雛形に、Node.js の道と `dist/cli/send/main.js` の道を書き込む場所がある
+- [ ] [Backend] 週報の受け取りに段の欄を足す。M10 の `ResearchReportPayload` に任意の `steps`（`no`、`title`、`status`）、`stepChangesMd`、方法の任意の `no`、`step` を足し、段の欄のつながり（段と方法の番号の重なり、`current` は1つまで、`step` は `steps` にある段、`steps` が無いのに `step` を書かない）を確かめ、方法の件数の上限を外す。M33 は `steps_json`、`step_changes_md` を残す。`docs/api/openapi.yaml` の `ResearchReportPayload`、`ApproachPayload` に同じ項目を足し、`approaches` の `maxItems` を外す。欄の無い今の形の週報は今までどおり受ける（FN-025、IF-005、DD-01 M10・M33、DD-02 FN-025・2章 C10、DD-03 2.2、DD-04、Q-098〜Q-100、Q-103、CR-024）
+  - 受け入れ基準: DD-10 TC151、DD-10 TC134 が通る; DD-10 TC130、TC131、TC132、TC133、TC135、TC102 が通るまま; `nexus-send` が段の欄のある週報を送る前の確かめで通す（TC146 の形の正しい週報に段の欄を足しても終了コード 0）

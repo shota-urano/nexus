@@ -39,7 +39,7 @@ flowchart LR
 | 11 | [`11-home.md`](./11-home.md) | ホームの表示（FN-020）の API と画面（SCR-001）、端末の API のオリジンの確かめの通し | Frontend | 08、09、10 |
 | 12 | [`12-batch.md`](./12-batch.md) | 定期ジョブの入口（M27）、BAT-001（FN-021）、BAT-002（FN-022） | Backend | 05 |
 | 13 | [`13-release.md`](./13-release.md) | launchd と CLI の設定の雛形、運用の手順書、契約のテスト、総合テスト、受入テスト、配信元の改修 | Backend、（人間） | 11、12 |
-| 14 | [`14-research.md`](./14-research.md) | 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）、道 `/research`（CR-023 で 06 から移した）。CR-020 | Frontend | 05、07、10、11 |
+| 14 | [`14-research.md`](./14-research.md) | 研究課題の一覧（FN-026）と週報（FN-027）の API と画面（SCR-010、SCR-011）、ホームの Research のセグメント（SCR-001）、道 `/research`（CR-023 で 06 から移した）。CR-020。道のり（段と方法の木）と NEW の確かめ（`markApproachSeen`）は CR-024 | Frontend | 05、07、10、11 |
 
 - 「前提」は、先に終わっている必要がある仕様書の番号である（DD-11 1章）。
 
@@ -54,7 +54,7 @@ flowchart LR
 | 記事の関係の判定に渡す案内は先頭 600 文字、合計 200,000 文字まで | Q-086 の答え |
 | BAT-001 は毎日 3:00、BAT-002 は毎月 1日の 3:30 | BD-02 5.1（CR-012） |
 | CLI の引数と設定 | DD-09 2.5（Q-082 の答え） |
-| IF-005 は 256 KiB、方法 15 件、欄ごとの上限（topicId 64 文字、見出し 200 文字、answerMd 4 KiB、howToMd 8 KiB、counterMd 2 KiB、unknownsMd と changesMd 8 KiB、出典の URL は1つの方法に 50 件・1件 2,048 文字） | Q-088、Q-096 の答え（CR-020） |
+| IF-005 は 256 KiB、方法の件数の上限は無い（CR-024）、欄ごとの上限（topicId 64 文字、見出し 200 文字、answerMd 4 KiB、howToMd 8 KiB、counterMd 2 KiB、unknownsMd と changesMd 8 KiB、出典の URL は1つの方法に 50 件・1件 2,048 文字。段の欄は steps 30 件、段の title 200 文字、stepChangesMd 4 KiB） | Q-088、Q-096、Q-098〜Q-100 の答え（CR-020、CR-024） |
 
 ## 5. スコープ外
 

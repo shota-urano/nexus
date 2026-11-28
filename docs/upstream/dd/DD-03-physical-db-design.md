@@ -2,8 +2,8 @@
 id: DD-03
 name: DB 物理設計書
 phase: 詳細設計
-version: 1.1
-updated: 2026-11-27
+version: 1.2
+updated: 2026-11-28
 ---
 
 # DD-03 DB 物理設計書（NEXUS）
@@ -14,6 +14,7 @@ updated: 2026-11-27
 - 0.2: X-05 RV16 の指摘で直した（2026-11-25）。`content.kind` の値の検査制約を外し（RV16-05）、多重起動の印の `job_lock` を足した（RV16-03）。
 - 1.0: 詳細設計の完了判定（X-05 PG03。2026-11-25 RD-01 SH01。進める）で承認した。
 - 1.1: X-04 CR-020（2026-11-27 RD-01 SH01 が承認）で、`research_topic`（ENT-014）と `research_report`（ENT-015）と索引を足し、`delivery` と `sender_key` の `sender` の検査制約に `brain-research` を足した。外部キーの検査を止めて当てるマイグレーションの決まりと、`0002-research-report.sql` の中身を5章に足した（Q-088、Q-090、Q-096 の答え）。
+- 1.2: X-04 CR-024（2026-11-28。本人の承認の前の案）で、`research_report` の方法の件数の検査制約を外して `steps_json` と `step_changes_md` を足し、ENT-006 の確かめた方法の `research_approach_seen` を足した。マイグレーション `0003-research-roadmap.sql` を足した（Q-098〜Q-101 の答え）。
 - 書いた AI: Claude（Opus 5.5）。人の承認の前の案である。
 
 ## 1. 物理設計の前提
@@ -52,6 +53,7 @@ updated: 2026-11-27
 | `sender_key` | ENT-013 配信元の鍵 | なし | BD-07 2章 ENT-013 |
 | `research_topic` | ENT-014 研究課題（CR-020） | なし | BD-07 2章 ENT-014 |
 | `research_report` | ENT-015 週報（CR-020） | なし | BD-07 2章 ENT-015 |
+| `research_approach_seen` | ENT-006 内容の状態の「確かめた方法」（CR-024） | 内容の状態の中の並びを、方法ごとの1行に分けた。方法の番号の重なりと「足すだけ」を制約で守り、週報の置き換えで消えないようにするため。`content_state` は種類によらない表なので、週報だけの列を足さない（NFR-004） | 週報1件に、今週足した方法の数まで（週に数件） |
 | `search_index` | 物理のみ（ENT-001、ENT-002、ENT-003、ENT-015 の検索の写し） | FN-018 の検索（大文字と小文字、全角と半角を区別せず、空白で区切った言葉を全て含む。Q-081 の答え）を、NFR-001 の時間に収めるため。FTS5 の仮想のテーブルにする（3章） | `content` と同じ数 |
 | `schema_migration` | 物理のみ | 当てたマイグレーションを残すため（5章） | マイグレーションの数 |
 | `job_lock` | 物理のみ | 定期ジョブの多重起動を防ぐ印（DD-05 4章。RV16-03） | 動いているジョブの数（0〜2 行） |
@@ -233,11 +235,24 @@ updated: 2026-11-27
 | `sent_on` | 送った日 | TEXT | 不可 | なし | 日付の検査 |
 | `status` | 状態 | TEXT | 不可 | なし | 検査制約 `active` か `ended` |
 | `answer_md` | 現時点の答え | TEXT | 不可 | なし | 検査制約 空でない |
-| `approaches_json` | 方法の一覧 | TEXT | 不可 | なし | JSON の検査（1章）。検査制約 JSON の配列で、0〜15件（Q-088 の答え） |
+| `approaches_json` | 方法の一覧 | TEXT | 不可 | なし | JSON の検査（1章）。検査制約 JSON の配列（件数の上限は CR-024 で外した。`0003` で検査制約を直した） |
+| `steps_json` | 段の一覧（CR-024） | TEXT | 可 | なし | 空でなければ JSON の検査。検査制約 JSON の配列で、0〜30件 |
+| `step_changes_md` | 段の変更の案（CR-024） | TEXT | 可 | なし | なし |
 | `unknowns_md` | まだ分かっていないこと | TEXT | 不可 | `''` | なし（空の文字を許す） |
 | `changes_md` | 今週の変化 | TEXT | 不可 | なし | 検査制約 空でない |
 
-- `approaches_json` の1件は `{ "title", "howToMd", "sourceUrls", "marks", "counterMd" }`（BD-06 IF-005 3.2 の名前のまま）。出典の数は持たず、読むときに `sourceUrls` の数で数える（Q-088 の答え）。
+- `approaches_json` の1件は `{ "title", "howToMd", "sourceUrls", "marks", "counterMd" }` と、あれば `"no"`、`"step"`（CR-024）（BD-06 IF-005 3.2 の名前のまま）。出典の数は持たず、読むときに `sourceUrls` の数で数える（Q-088 の答え）。
+- `steps_json` の1件は `{ "no", "title", "status" }`（BD-06 IF-005 3.2 の名前のまま。送られた順。CR-024）。
+
+#### `research_approach_seen`（ENT-006 の確かめた方法。CR-024）
+
+| カラム名 | 対応する属性 | 型と桁 | NULL | 既定値 | 制約 |
+|---|---|---|---|---|---|
+| `content_id` | 内容ID | INTEGER | 不可 | なし | 外部キー `research_report`。削除と更新は拒否する。`content_id` と `approach_no` の組で主キー |
+| `approach_no` | 方法の番号 | INTEGER | 不可 | なし | 検査制約 1以上 |
+| `seen_at` | 確かめた日時 | TEXT | 不可 | なし | 日時の検査 |
+
+- 方法の番号がその週報の `approaches_json` にあるかは制約で守らず、DD-02 FN-027 の手順 8 で確かめる。週報を置き換えて番号が消えても行は残し、画面に出さないだけにする（RD-03 R26）。
 
 #### `search_index`（物理のみ）
 
@@ -309,6 +324,7 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | `registration_code_expires_ix` | `registration_code` | `expires_at` | - | FN-023（有効な期限を過ぎたコードを消す） |
 | `research_report_week_uq` | `research_report` | `topic_id`、`week` | 一意 | BD-07 ENT-015 の一意（RD-03 R23）。FN-025 の置き換え、FN-027 の週の一覧（CR-020） |
 | `research_topic_received_ix` | `research_topic` | `last_received_at` | - | FN-026 の新しい順（CR-020） |
+| 主キー（`content_id`、`approach_no`） | `research_approach_seen` | `content_id`、`approach_no` | 一意 | FN-027 の確かめた方法を内容ID で読む（CR-024） |
 | FTS5 の索引 | `search_index` | `body`（trigram） | - | FN-018 |
 
 - 検索の言葉の扱い（FN-018）: 業務層は、言葉を `body` と同じく NFKC で正規化して小文字にし、空白で区切る。3文字以上の言葉は FTS5 の一致で、2文字以下の言葉は `body` の部分の一致（`LIKE`）で探し、全ての言葉を AND でつなぐ。trigram は3文字より短い言葉を索引で探せないためである。2文字以下の言葉は表の全体を読むので、件数が増えると遅くなる。4章の量では1年目は NFR-001 の時間に収まる見込みだが、確かめていない。DD-10 の性能の試験で確かめる。
@@ -337,6 +353,7 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | `device`、`registration_code`、`sender_key` | 数件 | 約0.2 KB | 1 MB 未満 | BD-07 2章 |
 | `research_topic` | 年に十数件 | 約0.3 KB | 1 MB 未満 | BD-07 2章 ENT-014（CR-020） |
 | `research_report` | 年に最大 約160 | 最大 256 KiB（ふだんは約30 KB と置いた。確かめていない見積り） | 最大 約40 MB（ふだんは約5 MB） | BD-07 2章 ENT-015、BD-06 IF-005（CR-020） |
+| `research_approach_seen` | 年に最大 約500（課題3個で週に数件） | 約0.1 KB | 1 MB 未満 | BD-07 2章 ENT-006（CR-024） |
 | `search_index` | 最大 約18,000 | 元の文の約3.7倍 | 最大 約150 MB | 元の文は `article` と `english_set` の文で約40 MB。倍率は、日本語と英語の混じった文 2,000件（約2.9 MB）を trigram で入れて測った（2026-11-24。DB は約10.9 MB で約3.7倍） |
 | 索引（主キー以外） | - | - | 約10 MB | 上の表の合計の数%と置いた |
 
@@ -356,7 +373,8 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | 外部キーの検査を止めて当てるファイル（CR-020） | 検査制約を変えるために表を作り直すファイル（`0002-research-report.sql` の `delivery`、`sender_key`）は、1行目に `-- nexus:foreign-keys-off` と書く。M21 は、その印のあるファイルだけ、トランザクションの外で `PRAGMA foreign_keys = OFF` にしてから、トランザクションの中で当て、確定の前に `PRAGMA foreign_key_check` を読み、1行でも返れば戻して E17 で止める。終わったら（失敗しても）`PRAGMA foreign_keys = ON` に戻す。`PRAGMA foreign_keys` はトランザクションの中では変えられない（SQLite の文書）ため、トランザクションの外で変える |
 | `0002-research-report.sql` の中身（CR-020） | (1) `delivery` と `sender_key` を、`sender` の検査制約に `brain-research` を足した形で作り直す（新しい表を作り、行を写し、古い表を消し、名前を替える。索引 `delivery_date_ix`、`delivery_received_ix` も作り直す）。(2) `research_topic`、`research_report` と、3章の索引を作る。既存の行の値は変えない。件数は `delivery` が最大で約730件、`sender_key` が2件で、当てる時間は1秒未満の見込み（ファイルの先頭のコメントに書く） |
 | 戻すとき | 戻すためのファイルは書かない。変える前に取ったバックアップを OP07 で戻す（利用者が1人で、戻す時点のデータの差を本人が判断できるため） |
-| 既存データの変換 | `0002-research-report.sql`（CR-020）は表を作り直して行を写すだけで、値は変えない。それより前は該当なし（最初の版）。これまでのニュースと教材は取り込まない（Q-011 の答え）。後の版でデータの値を変えるときは、そのマイグレーションの中に変換の SQL を書き、件数と時間の見込みをそのファイルの先頭のコメントに書く |
+| `0003-research-roadmap.sql` の中身（CR-024） | 1行目に `-- nexus:foreign-keys-off` と書く。(1) `research_report` を、`approaches_json` の件数の検査制約を外し、`steps_json` と `step_changes_md`（どちらも空を許す）を足した形で作り直す（新しい表を作り、行を写し、古い表を消し、名前を替える。索引 `research_report_week_uq` も作り直す）。写した行の `steps_json` と `step_changes_md` は空にする。(2) `research_approach_seen` を作る。件数は `research_report` が数十件で、当てる時間は1秒未満の見込み（ファイルの先頭のコメントに書く） |
+| 既存データの変換 | `0002-research-report.sql`（CR-020）と `0003-research-roadmap.sql`（CR-024）は表を作り直して行を写すだけで、値は変えない。それより前は該当なし（最初の版）。これまでのニュースと教材は取り込まない（Q-011 の答え）。後の版でデータの値を変えるときは、そのマイグレーションの中に変換の SQL を書き、件数と時間の見込みをそのファイルの先頭のコメントに書く |
 
 ## 6. 上流との対応
 
@@ -377,6 +395,7 @@ FTS5 の仮想のテーブルで、分け方は `trigram`（大文字と小文�
 | ENT-013 | `sender_key` | なし |
 | ENT-014 | `research_topic` | なし（CR-020） |
 | ENT-015 | `research_report` | なし（CR-020） |
+| ENT-006（確かめた方法。CR-024） | `research_approach_seen` | 方法ごとの1行に分けた（2.1） |
 | 物理のみ | `search_index` | FN-018 の検索のための写し（2.1） |
 | 物理のみ | `schema_migration` | マイグレーションの記録（5章。NFR-005、NFR-023） |
 | 物理のみ | `job_lock` | 多重起動を防ぐ印（NFR-023、NFR-024。DD-05 4章） |
